@@ -959,6 +959,29 @@ function gerarPDF(d, codigo) {
 /* ============================================================
    Envio
    ============================================================ */
+async function salvarPdfNoStorage(doc, dados, codigo) {
+  // Gera o PDF e deposita no cofre privado da Ana. Falha aqui não pode
+  // travar o fluxo: os dados já estão salvos no banco de qualquer forma.
+  try {
+    const blob = doc.output('blob');
+    const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-');
+    const nomeLimpo = (dados.nome || 'paciente')
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-zA-Z0-9 ]/g, '').trim().replace(/\s+/g, '-');
+    const arquivo = stamp + '_' + nomeLimpo + '_' + codigo.slice(0, 8) + '.pdf';
+    const r = await fetch(CONFIG.SUPABASE_URL + '/storage/v1/object/fichas-pdf/' + arquivo, {
+      method: 'POST',
+      headers: {
+        'apikey': CONFIG.SUPABASE_ANON_KEY,
+        'Authorization': 'Bearer ' + CONFIG.SUPABASE_ANON_KEY,
+        'Content-Type': 'application/pdf'
+      },
+      body: blob
+    });
+    return r.ok;
+  } catch (e) { console.error('pdf storage:', e); return false; }
+}
+
 async function enviarSupabase(dados, codigo) {
   const r = await fetch(CONFIG.SUPABASE_URL + '/rest/v1/' + CONFIG.SUPABASE_TABELA, {
     method: 'POST',
@@ -993,6 +1016,7 @@ async function finalizar() {
   }
 
   const doc = gerarPDF(dados, codigo);
+  if (enviado) { await salvarPdfNoStorage(doc, dados, codigo); }
   const arquivo = 'Anamnese-' + (dados.nome.replace(/\s+/g, '-') || 'paciente') + '.pdf';
 
   document.getElementById('fim-titulo').textContent =
@@ -1019,6 +1043,14 @@ async function finalizar() {
     a.textContent = 'Abrir WhatsApp para enviar';
     acoes.appendChild(a);
   } else {
+    const aviso = document.createElement('a');
+    aviso.href = 'https://wa.me/' + CONFIG.WHATSAPP + '?text=' +
+      encodeURIComponent('Olá, Ana! Acabei de enviar minha ficha de anamnese. Nome: ' +
+        dados.nome + '. Código: ' + codigo.slice(0, 12));
+    aviso.target = '_blank'; aviso.rel = 'noopener';
+    aviso.textContent = 'Avisar a Ana no WhatsApp';
+    acoes.appendChild(aviso);
+
     const b = document.createElement('button');
     b.className = 'alt';
     b.textContent = 'Guardar uma cópia em PDF';
