@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fichas — Ana Maria Jacob Estética</title>
+<meta name="theme-color" content="#B08A3E">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Fichas">
+<meta name="robots" content="noindex, nofollow">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --gelo:#FDFBF8;--dourado:#B08A3E;--linha:#E7D8BE;--tinta:#1B1917;
+  --cinza:#6B6560;--alerta:#A33A3A;--alerta-bg:#FDF6F4;--raio:12px;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;background:var(--gelo);color:var(--tinta);
+  font-family:'Poppins',system-ui,sans-serif;font-size:15px;line-height:1.55;font-weight:300}
+.wrap{max-width:760px;margin:0 auto;padding:0 16px}
+
+header{background:#fff;border-bottom:1px solid var(--linha);padding:22px 0 16px;text-align:center}
+.marca{font-family:'Cormorant Garamond',Georgia,serif;font-size:27px;font-weight:700;color:var(--dourado);margin:0;line-height:1.1}
+.marca-sub{font-size:9px;letter-spacing:.42em;color:var(--dourado);margin:5px 0 0;text-transform:uppercase}
+.doc-titulo{font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--cinza);margin:12px 0 0}
+
+/* ---- login ---- */
+.login{max-width:340px;margin:60px auto;background:#fff;border:1px solid var(--linha);
+  border-radius:var(--raio);padding:28px 24px;text-align:center}
+.login h2{font-family:'Cormorant Garamond',Georgia,serif;font-size:23px;font-weight:600;margin:0 0 6px}
+.login p{font-size:13px;color:var(--cinza);margin:0 0 20px}
+input{width:100%;padding:13px;border:1px solid var(--linha);border-radius:10px;background:var(--gelo);
+  font-family:inherit;font-size:19px;text-align:center;letter-spacing:.22em;text-transform:uppercase;color:var(--tinta)}
+input:focus{outline:2px solid var(--dourado);outline-offset:1px}
+button.principal{width:100%;margin-top:14px;background:var(--dourado);color:#fff;border:none;
+  border-radius:10px;padding:13px;font-family:inherit;font-size:15px;font-weight:500;cursor:pointer}
+button.principal:disabled{opacity:.5}
+.erro{color:var(--alerta);font-size:13px;margin-top:12px;min-height:18px}
+
+/* ---- lista ---- */
+.barra{display:flex;justify-content:space-between;align-items:center;padding:18px 0 12px;gap:12px}
+.contagem{font-size:13px;color:var(--cinza)}
+.recarregar{background:none;border:1px solid var(--linha);border-radius:8px;padding:7px 13px;
+  font-family:inherit;font-size:12px;color:var(--cinza);cursor:pointer;background:#fff}
+
+.ficha{background:#fff;border:1px solid var(--linha);border-radius:var(--raio);
+  padding:16px;margin-bottom:12px}
+.ficha.atencao{border-left:3px solid var(--alerta)}
+.topo{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:3px}
+.nome{font-family:'Cormorant Garamond',Georgia,serif;font-size:20px;font-weight:600;margin:0;line-height:1.2}
+.quando{font-size:11px;color:var(--cinza);white-space:nowrap;padding-top:5px}
+.meta{font-size:12.5px;color:var(--cinza);margin:0 0 10px}
+.meta a{color:var(--dourado);text-decoration:none}
+
+.selo{display:inline-block;background:var(--alerta-bg);color:var(--alerta);border:1px solid #F0D5D0;
+  font-size:11px;font-weight:500;padding:4px 10px;border-radius:20px;margin:0 6px 8px 0}
+.bloco{margin-top:11px;padding-top:11px;border-top:1px solid var(--linha)}
+.rot{font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--dourado);
+  font-weight:500;margin:0 0 4px}
+.txt{font-size:13.5px;margin:0}
+.txt.alerta{color:var(--alerta)}
+
+.acoes{display:flex;gap:9px;margin-top:14px;flex-wrap:wrap}
+.acoes a,.acoes button{flex:1;min-width:130px;text-align:center;text-decoration:none;
+  font-family:inherit;font-size:13.5px;font-weight:500;padding:11px;border-radius:9px;cursor:pointer;
+  background:var(--dourado);color:#fff;border:none;display:block}
+.acoes .alt{background:#fff;color:var(--dourado);border:1px solid var(--dourado)}
+.acoes .off{background:#fff;color:#B5AFA8;border:1px solid var(--linha);cursor:default}
+
+.vazio{text-align:center;padding:50px 20px;color:var(--cinza);font-size:14px}
+.carregando{text-align:center;padding:40px;color:var(--cinza);font-size:14px}
+footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
+  border-top:1px solid var(--linha);margin-top:26px}
+.oculto{display:none}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <p class="marca">Ana Maria Jacob</p>
+    <p class="marca-sub">Estética</p>
+    <p class="doc-titulo">Fichas recebidas</p>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <section class="login" id="tela-login">
+    <h2>Acesso restrito</h2>
+    <p>Estas fichas contêm dados de saúde das pacientes.</p>
+    <input type="password" id="senha" inputmode="text" autocomplete="off"
+           placeholder="senha" maxlength="20">
+    <button class="principal" id="entrar">Entrar</button>
+    <p class="erro" id="erro"></p>
+  </section>
+
+  <section id="tela-lista" class="oculto">
+    <div class="barra">
+      <span class="contagem" id="contagem"></span>
+      <button class="recarregar" id="recarregar">Atualizar</button>
+    </div>
+    <div id="lista"></div>
+  </section>
+
+</div>
+
+<footer>Ana Maria Costa Jacob · CRF/MG 40880 · Guarda por 20 anos</footer>
+
+<script>
+const API = 'https://rjxtxoqprnumouqakxbc.supabase.co/functions/v1/painel-fichas';
+let hashSenha = null;
+
+const el = id => document.getElementById(id);
+
+async function sha256(txt) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(txt));
+  return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+function quando(iso) {
+  const d = new Date(iso);
+  const hoje = new Date();
+  const mesmoDia = d.toDateString() === hoje.toDateString();
+  const hora = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  if (mesmoDia) return 'Hoje, ' + hora;
+  const ontem = new Date(hoje); ontem.setDate(hoje.getDate() - 1);
+  if (d.toDateString() === ontem.toDateString()) return 'Ontem, ' + hora;
+  return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) + ', ' + hora;
+}
+
+function soDigitos(t) { return (t || '').replace(/\D/g, ''); }
+
+function cartao(f) {
+  const alertas = (f.alertas_saude || '').split(' | ').filter(Boolean);
+  const meds = (f.alertas_medicamentos || '').split(' | ').filter(Boolean);
+  const permanente = f.usou_preenchedor_permanente === true;
+  const atencao = permanente || alertas.length > 0;
+
+  const div = document.createElement('div');
+  div.className = 'ficha' + (atencao ? ' atencao' : '');
+
+  let html = '';
+  html += '<div class="topo"><h3 class="nome">' + esc(f.nome) + '</h3>' +
+          '<span class="quando">' + quando(f.criado_em) + '</span></div>';
+
+  const tel = soDigitos(f.telefone);
+  if (f.telefone) {
+    html += '<p class="meta">' +
+      (tel.length >= 10 ? '<a href="https://wa.me/55' + tel.replace(/^55/, '') + '" target="_blank" rel="noopener">' + esc(f.telefone) + '</a>' : esc(f.telefone)) +
+      (f.veio_fazer ? ' · ' + esc(String(f.veio_fazer).replace(/[\[\]"]/g, '')) : '') + '</p>';
+  }
+
+  if (permanente) html += '<span class="selo">Preenchedor permanente</span>';
+  if (alertas.length) html += '<span class="selo">' + alertas.length + ' alerta' + (alertas.length > 1 ? 's' : '') + ' de saúde</span>';
+
+  if (f.objetivo) {
+    html += '<div class="bloco"><p class="rot">Objetivo</p><p class="txt">' + esc(f.objetivo) + '</p></div>';
+  }
+  if (alertas.length) {
+    html += '<div class="bloco"><p class="rot">Respondeu sim em saúde</p><p class="txt alerta">' +
+            alertas.map(esc).join('<br>') + '</p></div>';
+  }
+  if (meds.length) {
+    html += '<div class="bloco"><p class="rot">Medicamentos e alergias</p><p class="txt alerta">' +
+            meds.map(esc).join('<br>') + '</p></div>';
+  }
+  if (f.procedimentos_anteriores) {
+    html += '<div class="bloco"><p class="rot">Já realizou</p><p class="txt">' +
+            esc(f.procedimentos_anteriores) + '</p></div>';
+  }
+  if (f.alertas_laser) {
+    html += '<div class="bloco"><p class="rot">Atenção — depilação a laser</p><p class="txt alerta">' +
+            esc(f.alertas_laser) + '</p></div>';
+  }
+
+  html += '<div class="acoes">';
+  if (f.pdf) {
+    html += '<a href="' + f.pdf + '" target="_blank" rel="noopener">Abrir PDF</a>';
+    html += '<a class="alt" href="' + f.pdf + '" download>Baixar</a>';
+  } else {
+    html += '<button class="off" disabled>PDF não disponível</button>';
+  }
+  html += '</div>';
+
+  div.innerHTML = html;
+  return div;
+}
+
+function esc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+async function carregar() {
+  const lista = el('lista');
+  lista.innerHTML = '<p class="carregando">Carregando…</p>';
+  try {
+    const r = await fetch(API, { method: 'POST', headers: { 'x-senha': hashSenha } });
+    if (r.status === 401) { sair('Senha incorreta'); return; }
+    const d = await r.json();
+    if (d.erro) throw new Error(d.erro);
+
+    lista.innerHTML = '';
+    if (!d.fichas.length) {
+      lista.innerHTML = '<p class="vazio">Nenhuma ficha recebida ainda.<br>Elas aparecem aqui assim que a paciente enviar.</p>';
+    } else {
+      d.fichas.forEach(f => lista.appendChild(cartao(f)));
+    }
+    el('contagem').textContent = d.total + (d.total === 1 ? ' ficha' : ' fichas');
+  } catch (e) {
+    lista.innerHTML = '<p class="vazio">Não foi possível carregar agora.<br>Tente novamente em instantes.</p>';
+    console.error(e);
+  }
+}
+
+function sair(msg) {
+  hashSenha = null;
+  sessionStorage.removeItem('amj_s');
+  el('tela-lista').classList.add('oculto');
+  el('tela-login').classList.remove('oculto');
+  el('erro').textContent = msg || '';
+  el('senha').value = '';
+}
+
+async function entrar(valor) {
+  const bt = el('entrar');
+  bt.disabled = true; bt.textContent = 'Verificando…';
+  el('erro').textContent = '';
+  try {
+    const h = await sha256(valor.trim().toUpperCase());
+    const r = await fetch(API, { method: 'POST', headers: { 'x-senha': h } });
+    if (r.status === 401) { el('erro').textContent = 'Senha incorreta'; return; }
+    if (!r.ok) { el('erro').textContent = 'Erro ao conectar. Tente de novo.'; return; }
+    hashSenha = h;
+    sessionStorage.setItem('amj_s', h);
+    el('tela-login').classList.add('oculto');
+    el('tela-lista').classList.remove('oculto');
+    await carregar();
+  } catch (e) {
+    el('erro').textContent = 'Erro ao conectar. Tente de novo.';
+  } finally {
+    bt.disabled = false; bt.textContent = 'Entrar';
+  }
+}
+
+el('entrar').addEventListener('click', () => {
+  const v = el('senha').value.trim();
+  if (!v) { el('erro').textContent = 'Digite a senha'; return; }
+  entrar(v);
+});
+el('senha').addEventListener('keydown', e => { if (e.key === 'Enter') el('entrar').click(); });
+el('recarregar').addEventListener('click', carregar);
+
+// mantém a sessão só enquanto a aba estiver aberta
+(async () => {
+  const g = sessionStorage.getItem('amj_s');
+  if (g) {
+    hashSenha = g;
+    el('tela-login').classList.add('oculto');
+    el('tela-lista').classList.remove('oculto');
+    await carregar();
+  }
+})();
+</script>
+</body>
+</html>
