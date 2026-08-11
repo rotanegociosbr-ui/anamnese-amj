@@ -24,9 +24,10 @@ body{margin:0;background:var(--gelo);color:var(--tinta);
 .wrap{max-width:760px;margin:0 auto;padding:0 16px}
 
 header{background:#fff;border-bottom:1px solid var(--linha);padding:22px 0 16px;text-align:center}
-.simbolo{display:block;margin:0 auto 8px;height:56px;width:auto}
+.simbolo{display:block;margin:0 auto 8px;width:min(210px,75vw);height:auto}
 .marca{font-family:'Cormorant Garamond',Georgia,serif;font-size:27px;font-weight:700;color:var(--dourado);margin:0;line-height:1.1}
 .marca-sub{font-size:9px;letter-spacing:.42em;color:var(--dourado);margin:5px 0 0;text-transform:uppercase}
+.marca,.marca-sub{display:none}
 .doc-titulo{font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--cinza);margin:12px 0 0}
 
 /* ---- login ---- */
@@ -149,6 +150,7 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
 
 <script>
 const API = 'https://rjxtxoqprnumouqakxbc.supabase.co/functions/v1/painel-fichas';
+document.querySelector('.simbolo').src = '../assets/identidade-visual-oficial.png';
 let hashSenha = null;
 
 const el = id => document.getElementById(id);
@@ -294,7 +296,7 @@ el('senha').addEventListener('keydown', e => { if (e.key === 'Enter') el('entrar
 el('recarregar').addEventListener('click', carregar);
 
 /* ---------- convidar paciente ---------- */
-const LINK_FICHA = 'https://anamariajacob.com.br/';
+const LINK_FICHA = 'https://anamariajacob.com.br/anamnese/';
 
 function mensagem(nome) {
   const ola = nome ? 'Olá, ' + nome + '!' : 'Olá!';
@@ -338,6 +340,10 @@ el('cv-copiar').addEventListener('click', async () => {
     document.body.removeChild(t);
   }
 });
+
+// Mantém o QR code e o arquivo para download alinhados ao novo endereço da ficha.
+el('cv-qrbox').querySelector('img').src = '../assets/qrcode-anamnese.png';
+el('cv-qrbox').querySelector('a').href = '../assets/qrcode-anamnese.png';
 
 el('cv-qr').addEventListener('click', () => {
   const box = el('cv-qrbox');
