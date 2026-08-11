@@ -878,7 +878,7 @@ h3 {
   border: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.78);
   box-shadow: var(--shadow);
-  grid-template-columns: minmax(0, 1.2fr) minmax(300px, 0.8fr);
+  grid-template-columns: minmax(0, 0.9fr) minmax(360px, 1.1fr);
   gap: clamp(45px, 8vw, 110px);
 }
 
@@ -887,12 +887,21 @@ h3 {
   color: var(--muted);
 }
 
+.form-actions-list {
+  display: grid;
+  border-left: 1px solid var(--line);
+}
+
 .form-actions {
   display: flex;
   align-items: flex-start;
   flex-direction: column;
   padding: 32px;
-  border-left: 1px solid var(--line);
+  border-left: 0;
+}
+
+.form-actions + .form-actions {
+  border-top: 1px solid var(--line);
 }
 
 .status-badge,
@@ -912,7 +921,7 @@ h3 {
 }
 
 .form-actions strong {
-  margin: 29px 0 8px;
+  margin: 17px 0 8px;
   font-family: "Cormorant Garamond", Georgia, serif;
   font-size: 29px;
   font-weight: 600;
@@ -1367,6 +1376,15 @@ h3 {
     padding-left: 0;
     border-top: 1px solid var(--line);
     border-left: 0;
+  }
+
+  .form-actions-list {
+    border-top: 1px solid var(--line);
+    border-left: 0;
+  }
+
+  .form-actions-list .form-actions:first-child {
+    border-top: 0;
   }
 
   .journey-grid {
