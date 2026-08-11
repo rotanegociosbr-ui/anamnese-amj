@@ -52,4 +52,15 @@
   document.querySelectorAll('[data-current-year]').forEach((item) => {
     item.textContent = String(new Date().getFullYear());
   });
+
+  const portraitPanel = document.querySelector('.hero-photo-panel');
+  const portraitToggle = document.querySelector('.portrait-toggle');
+
+  if (portraitPanel && portraitToggle) {
+    portraitToggle.addEventListener('click', () => {
+      const paused = portraitPanel.classList.toggle('is-paused');
+      portraitToggle.setAttribute('aria-pressed', String(paused));
+      portraitToggle.textContent = paused ? 'Continuar imagens' : 'Pausar imagens';
+    });
+  }
 })();
