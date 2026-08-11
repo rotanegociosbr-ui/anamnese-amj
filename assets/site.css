@@ -486,9 +486,6 @@ h3 {
 .hero-logo-panel img {
   width: min(100%, 500px);
   height: auto;
-  filter: brightness(1.08) contrast(1.18) saturate(0.94);
-  -webkit-mask-image: radial-gradient(ellipse 78% 76% at 50% 50%, #000 58%, transparent 100%);
-  mask-image: radial-gradient(ellipse 78% 76% at 50% 50%, #000 58%, transparent 100%);
 }
 
 .golden-ribbon {
@@ -548,19 +545,6 @@ h3 {
   background: linear-gradient(90deg, rgba(255, 254, 250, 0.42), transparent 24%);
   content: "";
   pointer-events: none;
-}
-
-.hero-photo-panel figcaption {
-  position: absolute;
-  z-index: 2;
-  right: 14px;
-  bottom: 12px;
-  padding: 5px 8px;
-  color: rgba(50, 37, 31, 0.68);
-  background: rgba(255, 255, 255, 0.76);
-  font-size: 8px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
 }
 
 .portrait-toggle {
@@ -1082,8 +1066,9 @@ h3 {
 
 .footer-brand-block img {
   width: min(100%, 250px);
-  -webkit-mask-image: radial-gradient(ellipse 75% 74% at 50% 50%, #000 58%, transparent 100%);
-  mask-image: radial-gradient(ellipse 75% 74% at 50% 50%, #000 58%, transparent 100%);
+  height: auto;
+  aspect-ratio: 1672 / 941;
+  object-fit: contain;
 }
 
 .footer-brand-block p {
