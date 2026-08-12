@@ -99,6 +99,9 @@ a { color: var(--gold-dark); }
   position: absolute;
   top: 24px;
   left: max(20px, calc((100vw - 1280px) / 2));
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
   color: var(--muted);
   font-size: 12px;
   text-decoration: none;
@@ -709,7 +712,7 @@ footer img {
 }
 
 footer p { margin: 4px 0; }
-footer a { text-underline-offset: 3px; }
+footer a { display: inline-flex; min-height: 44px; align-items: center; padding-inline: 4px; text-underline-offset: 3px; }
 
 .honeypot {
   position: fixed !important;
@@ -738,7 +741,7 @@ footer a { text-underline-offset: 3px; }
   .layout { grid-template-columns: 1fr; }
   .side-nav { position: static; display: flex; gap: 7px; overflow-x: auto; padding: 10px; }
   .side-nav p { display: none; }
-  .side-nav a { flex: 0 0 auto; padding: 7px 10px; border: 1px solid var(--line); border-radius: 20px; }
+  .side-nav a { display: inline-flex; min-height: 44px; flex: 0 0 auto; align-items: center; padding: 7px 10px; border: 1px solid var(--line); border-radius: 20px; }
   .field-grid.thirds { grid-template-columns: 1fr 1fr; }
   .field-grid.thirds .field:last-child { grid-column: 1 / -1; }
   .check-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -746,6 +749,8 @@ footer a { text-underline-offset: 3px; }
 
 @media (max-width: 640px) {
   body { font-size: 14px; }
+  .field input,
+  .field textarea { font-size: 16px; }
   .brand-header { min-height: 126px; padding-top: 10px; }
   .brand-header img { width: 215px; }
   .back-link { position: static; justify-self: start; width: 100%; margin-bottom: -25px; font-size: 10px; }

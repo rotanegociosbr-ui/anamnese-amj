@@ -135,10 +135,10 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--dourado);outline
 .sn{display:flex;gap:5px;flex-shrink:0}
 .sn button{
   border:1px solid var(--linha);background:var(--branco);color:var(--cinza);
-  font-family:inherit;font-size:12px;font-weight:500;width:42px;padding:7px 0;
+  font-family:inherit;font-size:12px;font-weight:500;width:44px;min-width:44px;min-height:44px;padding:8px 0;
   border-radius:7px;cursor:pointer;transition:all .15s
 }
-.sn button[aria-pressed=true]{background:var(--dourado);border-color:var(--dourado);color:#fff}
+.sn button[aria-pressed=true]{background:#86601F;border-color:#86601F;color:#fff}
 .sn button.nao[aria-pressed=true]{background:var(--tinta);border-color:var(--tinta)}
 .linha-sn.pendente{background:var(--alerta-bg)}
 .linha-sn.destaque p{color:var(--alerta);font-weight:400}
@@ -155,11 +155,13 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--dourado);outline
 /* ---------- escolhas ---------- */
 .chips{display:flex;flex-wrap:wrap;gap:7px}
 .chips button{
+  display:inline-flex;min-height:44px;align-items:center;justify-content:center;
   border:1px solid var(--linha);background:var(--branco);color:var(--cinza);
   font-family:inherit;font-size:13px;padding:8px 14px;border-radius:20px;cursor:pointer;transition:all .15s
 }
-.chips button[aria-pressed=true]{background:var(--dourado);border-color:var(--dourado);color:#fff}
+.chips button[aria-pressed=true]{background:#86601F;border-color:#86601F;color:#fff}
 .chips.multi button[aria-pressed=true]::before{content:'✓ ';font-size:11px}
+.sn button:focus-visible,.chips button:focus-visible,#limpar:focus-visible{outline:3px solid #86601F;outline-offset:2px}
 
 /* ---------- avisos ---------- */
 .nota{background:var(--branco);border-left:3px solid var(--dourado);border-radius:0 var(--raio) var(--raio) 0;padding:13px 15px;font-size:13px;margin-bottom:18px}
@@ -170,7 +172,7 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--dourado);outline
 .assina-caixa{background:var(--branco);border:1px solid var(--linha);border-radius:var(--raio);padding:12px}
 canvas{width:100%;height:170px;border:1px dashed var(--linha);border-radius:8px;touch-action:none;display:block;background:#fff}
 .assina-acoes{display:flex;justify-content:space-between;align-items:center;margin-top:9px}
-.limpar{background:none;border:none;color:var(--cinza);font-family:inherit;font-size:12px;text-decoration:underline;cursor:pointer;padding:4px}
+.limpar{min-height:44px;background:none;border:none;color:var(--cinza);font-family:inherit;font-size:12px;text-decoration:underline;cursor:pointer;padding:10px 6px}
 .assina-dica{font-size:11px;color:var(--cinza)}
 
 /* ---------- rodapé de navegação ---------- */
@@ -411,7 +413,7 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0 10px;b
     <button type="button" class="secundaria" id="voltar" style="display:none">Voltar</button>
     <button type="button" class="principal" id="avancar">Continuar</button>
   </div>
-  <p class="aviso-nav" id="aviso-nav"></p>
+  <p class="aviso-nav" id="aviso-nav" role="status" aria-live="polite"></p>
 </div>
 
 <script>

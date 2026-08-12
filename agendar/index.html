@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Solicite uma avaliação na Ana Maria Jacob Estética e envie sua preferência de atendimento pelo WhatsApp.">
+  <meta name="theme-color" content="#FBF6F0">
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="pt_BR">
+  <meta property="og:site_name" content="Ana Maria Jacob Estética">
+  <meta property="og:title" content="Solicitar avaliação | Ana Maria Jacob Estética">
+  <meta property="og:description" content="Conte sua preferência e chegue ao WhatsApp com a mensagem pronta.">
+  <meta property="og:url" content="https://anamariajacob.com.br/agendar/">
+  <meta property="og:image" content="https://anamariajacob.com.br/assets/og.png">
+  <link rel="canonical" href="https://anamariajacob.com.br/agendar/">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&amp;family=Poppins:wght@300;400;500;600&amp;display=swap" rel="stylesheet">
+  <link rel="icon" type="image/png" href="../assets/identidade-visual-transparente-v1.png">
+  <link rel="stylesheet" href="../assets/site.css">
+  <link rel="stylesheet" href="agendar.css">
+  <title>Solicitar avaliação | Ana Maria Jacob Estética</title>
+</head>
+<body class="booking-page">
+  <a class="skip-link" href="#conteudo">Ir para o conteúdo</a>
+
+  <header class="site-header">
+    <div class="header-inner">
+      <a class="header-brand" href="../" aria-label="Ana Maria Jacob Estética — página inicial">
+        <span>Ana Maria Jacob</span>
+        <small>Estética</small>
+      </a>
+      <button class="menu-button" type="button" aria-expanded="false" aria-controls="menu-principal">
+        <span></span><span></span><span></span>
+        <span class="sr-only">Abrir menu</span>
+      </button>
+      <nav class="main-nav" id="menu-principal" aria-label="Navegação principal">
+        <a href="../">Página inicial</a>
+        <a href="../tratamentos/">Tratamentos</a>
+        <a href="../#ana-maria">Ana Maria</a>
+        <a href="../#formularios">Formulários</a>
+        <a class="is-current" href="./" aria-current="page">Solicitar horário</a>
+        <a class="nav-cta" href="https://www.instagram.com/anamariajacob?igsh=MWdva3p4cHNvcm00Zw==" target="_blank" rel="noopener noreferrer">Instagram</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="conteudo" tabindex="-1">
+    <section class="booking-hero" aria-labelledby="titulo-agendamento">
+      <div class="container booking-hero-grid">
+        <div class="booking-intro">
+          <p class="eyebrow">Sua jornada começa aqui</p>
+          <h1 id="titulo-agendamento">Conte como podemos receber você</h1>
+          <p>Preencha apenas os dados iniciais. No final, o WhatsApp da Ana Maria abrirá com sua mensagem organizada para a equipe confirmar a disponibilidade.</p>
+          <ol class="booking-steps" aria-label="Como funciona a solicitação">
+            <li><span>1</span><div><strong>Você conta sua preferência</strong><small>Nome, interesse e melhor período.</small></div></li>
+            <li><span>2</span><div><strong>A mensagem fica pronta</strong><small>Você confere antes de enviar.</small></div></li>
+            <li><span>3</span><div><strong>A clínica confirma</strong><small>O horário só fica reservado após resposta.</small></div></li>
+          </ol>
+          <p class="booking-privacy"><strong>Privacidade:</strong> não informe doenças, medicamentos, fotos ou outros dados de saúde aqui. Essas informações pertencem à ficha de anamnese segura.</p>
+        </div>
+
+        <div class="booking-form-shell">
+          <div class="booking-brand" aria-label="Ana Maria Jacob Estética">
+            <img src="../assets/identidade-visual-transparente-v1.png" width="1672" height="941" alt="Ana Maria Jacob Estética">
+          </div>
+          <form id="form-agendamento" novalidate>
+            <fieldset>
+              <legend>1. Seus dados de contato</legend>
+              <div class="field-grid">
+                <label class="field field-wide" for="nome">
+                  <span>Nome completo</span>
+                  <input id="nome" name="nome" type="text" autocomplete="name" minlength="3" maxlength="100" required>
+                </label>
+                <label class="field" for="telefone">
+                  <span>WhatsApp</span>
+                  <input id="telefone" name="telefone" type="tel" autocomplete="tel" inputmode="tel" maxlength="16" placeholder="(31) 99999-9999" required>
+                </label>
+                <label class="field" for="primeira-visita">
+                  <span>Você já foi atendida?</span>
+                  <select id="primeira-visita" name="primeira_visita" required>
+                    <option value="">Selecione</option>
+                    <option value="É minha primeira avaliação">É minha primeira avaliação</option>
+                    <option value="Já sou paciente">Já sou paciente</option>
+                  </select>
+                </label>
+              </div>
+            </fieldset>
+
+            <fieldset>
+              <legend>2. O que você procura</legend>
+              <label class="field" for="interesse">
+                <span>Interesse inicial</span>
+                <select id="interesse" name="interesse" required>
+                  <option value="">Escolha uma opção</option>
+                  <option>Quero uma avaliação e ainda não sei o procedimento</option>
+                  <option>Preenchimento facial</option>
+                  <option>Skinbooster</option>
+                  <option>Toxina botulínica</option>
+                  <option>Fios de PDO</option>
+                  <option>Intradermoterapia facial</option>
+                  <option>Intradermoterapia capilar</option>
+                  <option>Peeling</option>
+                  <option>Microagulhamento facial</option>
+                  <option>Microagulhamento capilar</option>
+                  <option>Harmonização facial</option>
+                  <option>Aplicação intramuscular com prescrição</option>
+                  <option>Retorno ou acompanhamento</option>
+                </select>
+              </label>
+              <label class="field" for="objetivo">
+                <span>Em poucas palavras, o que você gostaria de conversar? <small>Opcional</small></span>
+                <textarea id="objetivo" name="objetivo" rows="3" maxlength="240" placeholder="Ex.: quero entender opções naturais para linhas de expressão."></textarea>
+              </label>
+              <p class="field-help">Escreva somente seu objetivo geral. Os dados de saúde serão preenchidos depois, no formulário apropriado.</p>
+            </fieldset>
+
+            <fieldset>
+              <legend>3. Sua preferência</legend>
+              <div class="field-grid">
+                <label class="field" for="data-preferida">
+                  <span>Dia preferido</span>
+                  <input id="data-preferida" name="data_preferida" type="date" required>
+                </label>
+                <label class="field" for="periodo">
+                  <span>Melhor período</span>
+                  <select id="periodo" name="periodo" required>
+                    <option value="">Selecione</option>
+                    <option>Manhã</option>
+                    <option>Tarde</option>
+                    <option>Noite</option>
+                    <option>Posso combinar</option>
+                  </select>
+                </label>
+              </div>
+            </fieldset>
+
+            <label class="consent-field" for="consentimento-contato">
+              <input id="consentimento-contato" name="consentimento_contato" type="checkbox" required>
+              <span>Autorizo a clínica a usar estes dados somente para responder esta solicitação e organizar o atendimento.</span>
+            </label>
+
+            <p class="booking-notice">O envio não confirma nem reserva automaticamente o horário. A equipe responderá pelo WhatsApp.</p>
+            <button class="button button-primary booking-submit" type="submit">Continuar no WhatsApp</button>
+            <p class="form-status" id="form-status" role="status" aria-live="polite"></p>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <section class="booking-social" aria-labelledby="titulo-social">
+      <div class="container booking-social-card">
+        <div>
+          <p class="eyebrow">Acompanhe a Ana</p>
+          <h2 id="titulo-social">Conteúdo, bastidores e cuidados no Instagram</h2>
+          <p>Siga <strong>@anamariajacob</strong> para conhecer o trabalho e acompanhar as novidades da clínica.</p>
+        </div>
+        <a class="button button-secondary" href="https://www.instagram.com/anamariajacob?igsh=MWdva3p4cHNvcm00Zw==" target="_blank" rel="noopener noreferrer">Abrir Instagram</a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-bottom booking-footer-bottom">
+      <p>© <span data-current-year>2026</span> Ana Maria Jacob Estética.</p>
+      <p>Ana Maria Costa Jacob Neri · Farmacêutica · CRF/MG 40880</p>
+    </div>
+  </footer>
+
+  <script src="../assets/site.js" defer></script>
+  <script src="agendar.js" defer></script>
+</body>
+</html>
