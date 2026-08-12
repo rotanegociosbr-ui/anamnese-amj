@@ -26,7 +26,7 @@
 
     menuLinks.forEach((link) => link.addEventListener('click', () => closeMenu(false)));
     window.addEventListener('resize', () => {
-      if (window.innerWidth > 1020) closeMenu(false);
+      if (window.innerWidth > 920) closeMenu(false);
     });
     document.addEventListener('keydown', (event) => {
       if (!menu.classList.contains('is-open')) return;

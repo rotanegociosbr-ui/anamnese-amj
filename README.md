@@ -11,6 +11,8 @@ Maria Jacob Estética.
   assinatura da paciente e geração de sua cópia em PDF
 - `/tcle-preenchimento/` — TCLE de preenchimento facial com ácido hialurônico,
   com triagem específica, assinatura e geração canônica da cópia em PDF
+- `/termos/` — central pública para escolher o TCLE do procedimento, mantendo a
+  ficha de anamnese separada e os próximos termos sinalizados como em preparação
 - `/painel/` — acesso restrito da equipe, com filtros para anamneses e TCLEs,
   links de convite, QR codes e acesso aos PDFs armazenados
 
