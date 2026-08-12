@@ -6,6 +6,8 @@ Maria Jacob Estética.
 ## Rotas
 
 - `/` — página inicial da clínica
+- `/tratamentos/` — guia educativo em linguagem simples sobre os tratamentos
+  faciais e capilares informados pela clínica
 - `/anamnese/` — ficha de anamnese preservada
 - `/tcle-toxina/` — TCLE de toxina botulínica para leitura, preenchimento,
   assinatura da paciente e geração de sua cópia em PDF
@@ -19,6 +21,12 @@ Maria Jacob Estética.
   links de convite, QR codes e acesso aos PDFs armazenados
 
 Domínio: `anamariajacob.com.br`
+
+O guia de tratamentos apresenta informações gerais para ajudar pessoas leigas a
+entender cada possibilidade. Ele não substitui avaliação, diagnóstico,
+orientação individual ou consentimento informado. Subtécnicas, produtos,
+regiões e protocolos somente devem ser anunciados depois de confirmação da
+profissional responsável.
 
 ## Fluxo do TCLE
 
