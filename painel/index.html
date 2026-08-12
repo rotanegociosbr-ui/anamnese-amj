@@ -132,6 +132,7 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
           <option value="anamnese">Ficha de anamnese</option>
           <option value="tcle_toxina">TCLE — Toxina botulínica</option>
           <option value="tcle_preenchimento">TCLE — Preenchimento facial</option>
+          <option value="tcle_intradermoterapia">Pré-avaliação — Intradermoterapia</option>
         </select>
         <input type="text" id="cv-nome" aria-label="Nome da paciente, opcional" placeholder="Nome dela (opcional)" autocomplete="off">
         <input type="tel" id="cv-tel" aria-label="WhatsApp da paciente com DDD" placeholder="WhatsApp com DDD" inputmode="numeric" autocomplete="off">
@@ -170,7 +171,8 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
 const API = 'https://rjxtxoqprnumouqakxbc.supabase.co/functions/v1/painel-fichas';
 const TIPOS_TCLE = {
   tcle_toxina_botulinica: { label: 'TCLE · Toxina botulínica', arquivo: 'TCLE-Toxina.pdf' },
-  tcle_preenchimento_facial: { label: 'TCLE · Preenchimento facial', arquivo: 'TCLE-Preenchimento-Facial.pdf' }
+  tcle_preenchimento_facial: { label: 'TCLE · Preenchimento facial', arquivo: 'TCLE-Preenchimento-Facial.pdf' },
+  tcle_intradermoterapia_estetica: { label: 'Pré-avaliação · Intradermoterapia estética', arquivo: 'Pre-Avaliacao-Intradermoterapia.pdf' }
 };
 let hashSenha = null;
 let filtroAtual = 'todos';
@@ -277,14 +279,15 @@ function cartaoDocumento(d) {
   html += '<span class="selo">Aguardando revisão profissional</span>';
   if (alertas.length) html += '<span class="selo">' + alertas.length + ' resposta' + (alertas.length > 1 ? 's' : '') + ' para revisar</span>';
 
-  if (Array.isArray(d.regioes) && d.regioes.length) {
-    html += '<div class="bloco"><p class="rot">Regiões de interesse</p><p class="txt">' + d.regioes.map(esc).join('; ') + '</p></div>';
-  }
+  if (Array.isArray(d.modalidades) && d.modalidades.length) html += '<div class="bloco"><p class="rot">Modalidades de interesse</p><p class="txt">' + d.modalidades.map(esc).join('; ') + '</p></div>';
+  if (Array.isArray(d.regioes) && d.regioes.length) html += '<div class="bloco"><p class="rot">Regiões de interesse</p><p class="txt">' + d.regioes.map(esc).join('; ') + '</p></div>';
+  else if (typeof d.regioes === 'string' && d.regioes) html += '<div class="bloco"><p class="rot">Região ou regiões informadas</p><p class="txt">' + esc(d.regioes) + '</p></div>';
   if (d.objetivo) html += '<div class="bloco"><p class="rot">Objetivo</p><p class="txt">' + esc(d.objetivo) + '</p></div>';
   if (d.detalhamento_volume_previsto) html += '<div class="bloco"><p class="rot">Detalhes e volume esperado</p><p class="txt">' + esc(d.detalhamento_volume_previsto) + '</p></div>';
+  if (d.detalhamento_plano_previsto) html += '<div class="bloco"><p class="rot">Plano inicialmente conversado</p><p class="txt">' + esc(d.detalhamento_plano_previsto) + '</p></div>';
   if (alertas.length) {
     html += '<div class="bloco"><p class="rot">Respostas “Sim” para revisão</p><p class="txt alerta">' +
-      alertas.map(a => esc(a.pergunta) + (a.detalhe ? '<br><small>' + esc(a.detalhe) + '</small>' : '')).join('<br><br>') + '</p></div>';
+      alertas.map(a => esc(a.pergunta) + (a.resposta === 'nao_sei' ? ' — NÃO SEI' : ' — SIM') + (a.detalhe ? '<br><small>' + esc(a.detalhe) + '</small>' : '')).join('<br><br>') + '</p></div>';
   }
   if (d.duvidas) html += '<div class="bloco"><p class="rot">Dúvidas registradas</p><p class="txt">' + esc(d.duvidas) + '</p></div>';
   if (d.status_anamnese) html += '<div class="bloco"><p class="rot">Anamnese geral</p><p class="txt">' + esc(d.status_anamnese) + '</p></div>';
@@ -416,6 +419,13 @@ const DOCUMENTOS_CONVITE = {
     link: 'https://anamariajacob.com.br/tcle-preenchimento/',
     qr: '../assets/qrcode-tcle-preenchimento.png',
     arquivo: 'QRCode-TCLE-Preenchimento-Facial-AnaMariaJacob.png',
+    orientacao: 'Leia com calma antes de enviar.'
+  },
+  tcle_intradermoterapia: {
+    nome: 'pré-avaliação do TCLE de intradermoterapia estética',
+    link: 'https://anamariajacob.com.br/tcle-intradermoterapia/',
+    qr: '../assets/qrcode-tcle-intradermoterapia.png',
+    arquivo: 'QRCode-TCLE-Intradermoterapia-AnaMariaJacob.png',
     orientacao: 'Leia com calma antes de enviar.'
   }
 };

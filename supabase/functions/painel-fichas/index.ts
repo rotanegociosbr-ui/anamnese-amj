@@ -22,6 +22,10 @@ const DOCUMENT_TYPES: Record<string, { label: string; filename: string }> = {
     label: "TCLE · Preenchimento facial",
     filename: "TCLE-Preenchimento-Facial",
   },
+  tcle_intradermoterapia_estetica: {
+    label: "Pré-avaliação · Intradermoterapia estética",
+    filename: "Pre-Avaliacao-Intradermoterapia",
+  },
 };
 
 const attempts = new Map<string, { count: number; resetAt: number }>();
@@ -163,9 +167,14 @@ Deno.serve(async (req: Request) => {
         : {};
       const health = Array.isArray(data.confirmacoes_saude) ? data.confirmacoes_saude : [];
       const alerts = health
-        .filter((item) => item && typeof item === "object" && (item as Record<string, unknown>).resposta === "sim")
+        .filter((item) => {
+          if (!item || typeof item !== "object") return false;
+          const answer = (item as Record<string, unknown>).resposta;
+          return answer === "sim" || answer === "nao_sei";
+        })
         .map((item) => ({
           pergunta: safeText((item as Record<string, unknown>).pergunta),
+          resposta: safeText((item as Record<string, unknown>).resposta, 20),
           detalhe: safeText((item as Record<string, unknown>).detalhe, 600),
         }));
       const path = safeText(row.pdf_path, 500);
@@ -185,9 +194,13 @@ Deno.serve(async (req: Request) => {
         codigo_verificacao: row.codigo_verificacao,
         revisado: row.revisado === true,
         status_profissional: "aguardando_revisao_profissional",
-        regioes: Array.isArray(procedure.regioes) ? procedure.regioes.slice(0, 10) : [],
+        modalidades: Array.isArray(procedure.modalidades) ? procedure.modalidades.slice(0, 3) : [],
+        regioes: Array.isArray(procedure.regioes)
+          ? procedure.regioes.slice(0, 10)
+          : safeText(procedure.regioes, 600),
         objetivo: safeText(procedure.objetivo, 600),
         detalhamento_volume_previsto: safeText(procedure.detalhamento_volume_previsto, 600),
+        detalhamento_plano_previsto: safeText(procedure.detalhamento_plano_previsto, 600),
         status_anamnese: safeText(procedure.status_anamnese, 40),
         alertas_saude: alerts,
         duvidas: safeText(data.duvidas, 1200),
