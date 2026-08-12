@@ -677,6 +677,28 @@
   color: var(--muted);
 }
 
+.post-care-section {
+  background: linear-gradient(180deg, var(--paper), var(--ivory));
+}
+
+.post-care-highlight {
+  padding: 18px;
+  border-left: 2px solid var(--gold);
+  background: rgba(255, 255, 255, 0.58);
+}
+
+.faq-source-note {
+  padding-top: 22px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.faq-source-note a {
+  color: var(--gold-dark);
+  font-weight: 500;
+}
+
 .guide-cta-section {
   padding: clamp(72px, 9vw, 118px) 0;
   background: linear-gradient(180deg, var(--ivory), #f4e7d9);
@@ -711,6 +733,12 @@
 
 .guide-cta-actions .button {
   width: 100%;
+}
+
+.guide-cta-actions small {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.6;
 }
 
 .treatments-footer {

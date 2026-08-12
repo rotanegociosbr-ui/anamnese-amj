@@ -392,6 +392,43 @@ h3 {
   gap: 12px;
 }
 
+a:focus-visible,
+button:focus-visible {
+  outline: 3px solid #7a5517;
+  outline-offset: 4px;
+}
+
+.site-footer a:focus-visible {
+  outline-color: #f1d69b;
+}
+
+.hero-social-link {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  margin-top: 12px;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 500;
+  gap: 9px;
+  text-decoration: none;
+}
+
+.hero-social-link span {
+  padding: 6px 9px;
+  color: var(--white);
+  background: var(--dark);
+  border-radius: 999px;
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.hero-social-link:hover,
+.hero-social-link:focus-visible {
+  color: var(--gold-dark);
+}
+
 .button {
   display: inline-flex;
   min-height: 44px;
@@ -1223,8 +1260,20 @@ h3 {
   gap: 45px;
 }
 
-.contact-card > div:first-child p:last-child {
+.contact-card > div:first-child > p:not(.eyebrow) {
   color: var(--muted);
+}
+
+.post-care-link {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  margin-top: 12px;
+  color: var(--gold-dark);
+  font-size: 12px;
+  font-weight: 500;
+  gap: 8px;
+  text-underline-offset: 5px;
 }
 
 .contact-actions {
