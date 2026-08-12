@@ -1285,6 +1285,30 @@ button:focus-visible {
   box-shadow: none;
 }
 
+.terms-heading-upcoming {
+  margin-top: clamp(68px, 8vw, 104px);
+}
+
+.terms-grid-upcoming {
+  row-gap: 30px;
+}
+
+.status-badge-upcoming {
+  color: #765a2b;
+  border-style: dashed;
+  background: rgba(177, 132, 49, 0.04);
+}
+
+.term-choice.is-guidance {
+  background: linear-gradient(145deg, #f7f1ea, #eee3d7);
+}
+
+.status-badge-guidance {
+  color: var(--ink);
+  border-color: rgba(72, 53, 43, 0.24);
+  background: rgba(72, 53, 43, 0.05);
+}
+
 .term-number {
   margin: auto 0 5px;
   color: rgba(139, 100, 32, 0.44);
