@@ -10,6 +10,12 @@ entrypoint = "./functions/tcle-submit/index.ts"
 # For example, if you want to serve static HTML pages in your function:
 # static_files = [ "./functions/tcle-submit/*.html" ]
 
+[functions.tcle-preenchimento-submit]
+enabled = true
+verify_jwt = false
+import_map = "./functions/tcle-preenchimento-submit/deno.json"
+entrypoint = "./functions/tcle-preenchimento-submit/index.ts"
+
 [functions.painel-fichas]
 enabled = true
 verify_jwt = false

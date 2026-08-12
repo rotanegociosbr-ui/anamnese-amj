@@ -265,12 +265,12 @@ h3 {
 
 .main-nav .nav-cta {
   display: inline-flex;
-  min-height: 40px;
+  min-height: 44px;
   align-items: center;
   justify-content: center;
   padding: 10px 17px;
   color: var(--white);
-  background: linear-gradient(135deg, #c59a47, #a87824);
+  background: linear-gradient(135deg, #8a651f, #6f4c16);
   border-radius: 5px;
   box-shadow: 0 9px 22px rgba(139, 100, 32, 0.16);
 }
@@ -394,7 +394,7 @@ h3 {
 
 .button {
   display: inline-flex;
-  min-height: 42px;
+  min-height: 44px;
   align-items: center;
   justify-content: center;
   padding: 11px 18px;
@@ -417,7 +417,7 @@ h3 {
 
 .button-primary {
   color: var(--white);
-  background: linear-gradient(135deg, #bd9140, #9a6c1d);
+  background: linear-gradient(135deg, #8a651f, #6f4c16);
   box-shadow: 0 13px 28px rgba(139, 100, 32, 0.17);
 }
 
@@ -920,11 +920,12 @@ h3 {
   text-transform: uppercase;
 }
 
-.form-actions strong {
+.form-actions h3 {
   margin: 17px 0 8px;
   font-family: "Cormorant Garamond", Georgia, serif;
   font-size: 29px;
   font-weight: 600;
+  line-height: 1.1;
 }
 
 .form-actions small {

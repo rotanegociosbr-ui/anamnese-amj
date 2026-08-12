@@ -2,9 +2,9 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import type { PDFFont, PDFPage } from "pdf-lib";
 
-const TYPE = "tcle_toxina_botulinica";
+const TYPE = "tcle_preenchimento_facial";
 const TERM_VERSION = "2026-08-11-v1";
-const TERM_SHA256 = "5b40612ee3ea8cdef9811b9f966558073aa37c6aa386364b35e71b5419f77858";
+const TERM_SHA256 = "b8069d21e1560a4445d424c0f998836e276655dc70ddf095ad557d7f7d3145b0";
 const BUCKET = "documentos-clinicos";
 const MAX_BODY_BYTES = 1_500_000;
 const MAX_PDF_BYTES = 4_000_000;
@@ -45,6 +45,7 @@ type ClinicalData = {
     finalidade: string;
     regioes: string[];
     objetivo: string;
+    detalhamento_volume_previsto: string;
     status_anamnese: string;
   };
   confirmacoes_saude: HealthAnswer[];
@@ -60,6 +61,8 @@ type ClinicalData = {
   duvidas: string;
   declaracoes: {
     leitura: true;
+    risco_vascular: true;
+    ciencia_hialuronidase_urgencia: true;
     informacoes_verdadeiras: true;
     decisao_voluntaria: true;
     revisao_profissional: true;
@@ -69,40 +72,39 @@ type ClinicalData = {
   assinatura_metodo: "desenhada" | "nome_digitado";
   assinado_em_cliente: string;
   fuso_horario: string;
-  status_profissional: "aguardando_revisao";
+  status_profissional: "aguardando_revisao_profissional";
   registro_material: "a_preencher_pela_profissional";
 };
 
 const HEALTH_QUESTIONS = Object.freeze([
   "Está grávida, com suspeita de gravidez ou amamentando?",
-  "Tem doença neuromuscular, como miastenia gravis, síndrome de Eaton-Lambert, esclerose lateral amiotrófica ou outra?",
-  "Tem alergia conhecida à toxina botulínica ou a componentes de algum produto já utilizado?",
-  "Usa aminoglicosídeos, relaxantes musculares, anticolinérgicos ou outro medicamento que possa interferir na contração muscular?",
+  "Já aplicou preenchedor permanente, como PMMA, silicone líquido ou bioplastia, em qualquer região do rosto?",
+  "Já aplicou preenchedor absorvível anteriormente? Em qual região e há quanto tempo?",
+  "Teve alguma reação, nódulo ou complicação em aplicação anterior?",
+  "Tem alergia a ácido hialurônico, lidocaína ou anestésicos locais?",
+  "Tem alguma doença autoimune ou inflamatória, como lúpus, artrite reumatoide, esclerodermia ou outra?",
+  "Apresenta infecção, inflamação, ferida, acne inflamada ou herpes ativo na área a ser tratada?",
+  "Tem histórico de herpes labial recorrente?",
   "Usa anticoagulante ou antiagregante, como AAS, varfarina, clopidogrel, rivaroxabana ou semelhante?",
   "Tem distúrbio de coagulação ou sangra com facilidade?",
-  "Apresenta infecção, inflamação, ferida ou lesão de pele na região pretendida?",
-  "Tem doença autoimune ou condição que altere sua imunidade?",
-  "Já realizou aplicação de toxina botulínica anteriormente?",
-  "Já teve reação ou resultado adverso após aplicação de toxina botulínica?",
-  "Aplicou toxina botulínica nos últimos três meses?",
-  "Realizou outro procedimento estético na face nos últimos 30 dias?",
+  "Realizou ou fará procedimento odontológico nas últimas ou nas próximas duas semanas?",
+  "Tomou alguma vacina nas últimas duas semanas ou pretende tomar nas próximas duas semanas?",
   "Usa ou usou isotretinoína oral nos últimos seis meses?",
-  "Tem histórico de herpes labial recorrente?",
-  "Tem doença crônica em tratamento, como diabetes, hipertensão, doença da tireoide ou outra?",
+  "Tem doença crônica em tratamento, como diabetes, hipertensão, doença da tireoide, imunossupressão ou outra?",
   "Faz uso contínuo de medicamento, vitamina, fitoterápico ou suplemento?",
   "Tem histórico de queloide ou cicatrização anormal?",
+  "Fez laser, peeling ou outro procedimento na região nos últimos 30 dias?",
 ]);
 
 const ALLOWED_REGIONS = new Set([
-  "Terço superior (testa)",
-  "Glabela",
-  "Periorbital",
-  "Nariz",
-  "Lábio superior",
-  "Mento",
-  "Sorriso gengival",
-  "Masseter",
-  "Platisma",
+  "Lábios",
+  "Sulco nasogeniano",
+  "Olheiras / região infraorbital",
+  "Malar / maçã do rosto",
+  "Mento / queixo",
+  "Mandíbula / contorno",
+  "Têmporas",
+  "Sulco labiomentual",
 ]);
 
 function cors(req: Request): Record<string, string> {
@@ -290,8 +292,13 @@ function safeData(
   if (!validRegions || new Set(regions).size !== regions.length) return null;
 
   const objective = text(procedure.objetivo, 600);
+  const expectedVolume = text(procedure.detalhamento_volume_previsto, 600);
   const anamnesisStatus = text(procedure.status_anamnese, 40);
-  if (objective.length < 5 || !["Já preenchi", "Ainda vou preencher"].includes(anamnesisStatus)) return null;
+  if (
+    objective.length < 5 ||
+    expectedVolume.length < 3 ||
+    !["Já preenchi", "Ainda vou preencher"].includes(anamnesisStatus)
+  ) return null;
 
   if (health.length !== HEALTH_QUESTIONS.length) return null;
   const cleanedHealth: HealthAnswer[] = [];
@@ -317,6 +324,8 @@ function safeData(
 
   if (![
     declarations.leitura,
+    declarations.risco_vascular,
+    declarations.ciencia_hialuronidase_urgencia,
     declarations.informacoes_verdadeiras,
     declarations.decisao_voluntaria,
     declarations.revisao_profissional,
@@ -372,6 +381,7 @@ function safeData(
       finalidade: "exclusivamente estética",
       regioes: regions,
       objetivo: objective,
+      detalhamento_volume_previsto: expectedVolume,
       status_anamnese: anamnesisStatus,
     },
     confirmacoes_saude: cleanedHealth,
@@ -389,6 +399,8 @@ function safeData(
     duvidas: text(source.duvidas, 1200),
     declaracoes: {
       leitura: true,
+      risco_vascular: true,
+      ciencia_hialuronidase_urgencia: true,
       informacoes_verdadeiras: true,
       decisao_voluntaria: true,
       revisao_profissional: true,
@@ -398,7 +410,7 @@ function safeData(
     assinatura_metodo: signatureMethod,
     assinado_em_cliente: clientSignedAt,
     fuso_horario: timezone,
-    status_profissional: "aguardando_revisao",
+    status_profissional: "aguardando_revisao_profissional",
     registro_material: "a_preencher_pela_profissional",
   };
 }
@@ -439,7 +451,7 @@ async function buildCanonicalPdf(
   termText: string,
 ): Promise<Uint8Array> {
   const pdf = await PDFDocument.create();
-  pdf.setTitle("TCLE - Toxina Botulínica - " + data.identificacao.nome);
+  pdf.setTitle("TCLE - Preenchimento Facial com Ácido Hialurônico - " + data.identificacao.nome);
   pdf.setSubject("Manifestação eletrônica do paciente - aguardando revisão profissional");
   pdf.setAuthor("Ana Maria Costa Jacob Estética");
   pdf.setCreator("anamariajacob.com.br - geração canônica no servidor");
@@ -574,7 +586,7 @@ async function buildCanonicalPdf(
   textBlock("TERMO DE CONSENTIMENTO LIVRE E ESCLARECIDO", {
     font: bold, size: 14, lineHeight: 18, after: 3, color: colorGold, align: "center",
   });
-  textBlock("APLICAÇÃO ESTÉTICA DE TOXINA BOTULÍNICA TIPO A", {
+  textBlock("PREENCHIMENTO FACIAL COM ÁCIDO HIALURÔNICO", {
     font: bold, size: 11, lineHeight: 15, after: 4, align: "center",
   });
   textBlock("Versão " + TERM_VERSION + " · Código " + code, {
@@ -585,7 +597,7 @@ async function buildCanonicalPdf(
   });
 
   const termBlocks = termText.split(/\n{2,}/).map((item) => item.trim()).filter(Boolean);
-  for (let index = 2; index < termBlocks.length; index++) {
+  for (let index = 1; index < termBlocks.length; index++) {
     const block = termBlocks[index];
     if (/^\d+\.\s+[A-ZÁÉÍÓÚÃÕÇ]/.test(block)) {
       heading(block);
@@ -625,8 +637,9 @@ async function buildCanonicalPdf(
   textBlock("Finalidade: exclusivamente estética.");
   textBlock("Regiões de interesse: " + data.procedimento.regioes.join("; "));
   textBlock("Objetivo informado: " + data.procedimento.objetivo);
+  textBlock("Detalhes e volume inicialmente esperado pela paciente: " + data.procedimento.detalhamento_volume_previsto);
   textBlock("Anamnese geral: " + data.procedimento.status_anamnese + ".");
-  textBlock("A definição final de produto, dose, pontos e regiões depende de avaliação profissional.", { font: bold });
+  textBlock("A definição final de produto, volume, plano, pontos e regiões depende de avaliação profissional e das indicações de uso do produto registrado.", { font: bold });
 
   heading("CONFIRMAÇÃO DE SEGURANÇA ESPECÍFICA");
   for (const item of data.confirmacoes_saude) {
@@ -653,6 +666,8 @@ async function buildCanonicalPdf(
 
   heading("DECLARAÇÕES E MANIFESTAÇÃO");
   textBlock("[CONFIRMADO] Leu integralmente e compreendeu finalidade, limitações, alternativas, riscos e sinais de urgência.");
+  textBlock("[CONFIRMADO] Compreendeu especificamente o risco vascular, inclusive necrose, cicatriz, perda visual e evento neurológico.");
+  textBlock("[CONFIRMADO] Compreendeu que uma complicação pode exigir avaliação imediata, encaminhamento e hialuronidase quando clinicamente indicada.");
   textBlock("[CONFIRMADO] Declarou que as informações são verdadeiras e que comunicará alterações antes da aplicação.");
   textBlock("[CONFIRMADO] Declarou decisão livre e ciência do direito de recusar ou desistir antes do procedimento.");
   textBlock("[CONFIRMADO] Compreendeu que o documento aguarda revisão e assinatura profissional.");
@@ -695,6 +710,7 @@ async function buildCanonicalPdf(
   );
 
   newPage();
+  ensure(610);
   heading("REGISTRO E ASSINATURA PROFISSIONAL");
   textBlock(
     "Área exclusiva da profissional. Esta cópia permanece aguardando revisão, esclarecimento das dúvidas e assinatura antes do procedimento.",
@@ -703,13 +719,18 @@ async function buildCanonicalPdf(
   textBlock("STATUS: AGUARDANDO REVISÃO PROFISSIONAL", { font: bold, color: colorRed, after: 14 });
   textBlock("Data e hora da revisão: ___________________________________________________________", { after: 13 });
   textBlock("Produto/marca: __________________________________________________________________", { after: 13 });
+  textBlock("Fabricante/importador: ____________________________________________________________", { after: 13 });
   textBlock("Lote: __________________  Validade: __________  Registro Anvisa: __________________", { after: 13 });
-  textBlock("Diluição: ______________  Região/pontos: __________________________________________", { after: 13 });
-  textBlock("Unidades aplicadas: ______________________________________________________________", { after: 13 });
+  textBlock("Registro consultado em: __________  Etiqueta/cartão de rastreabilidade: ___________", { after: 13 });
+  textBlock("Região e plano anatômico: _________________________________________________________", { after: 13 });
+  textBlock("Volume aplicado: __________ mL   Agulha/cânula: ___________________________________", { after: 13 });
+  textBlock("Hialuronidase (se utilizada) — marca/lote/validade/volume: _________________________", { after: 13 });
+  textBlock("________________________________________________________________________________", { after: 13 });
   textBlock("Dúvidas esclarecidas e orientação individual: ____________________________________", { after: 13 });
   textBlock("________________________________________________________________________________", { after: 13 });
   textBlock("Intercorrências/observações: _____________________________________________________", { after: 13 });
   textBlock("________________________________________________________________________________", { after: 18 });
+  textBlock("Via/cartão de rastreabilidade entregue ao paciente:  [  ] Sim  [  ] Não", { after: 18 });
   textBlock("Ana Maria Costa Jacob · Farmacêutica · CRF/MG 40880", { font: bold, after: 22 });
   textBlock("Assinatura profissional: _________________________________________________________", { after: 5 });
 
@@ -829,7 +850,7 @@ Deno.serve(async (req: Request) => {
         codigo: previous.codigo_verificacao,
         recebido_em: previous.recebido_em,
         pdf_url: pdfPath ? await signedPdfUrl(pdfPath) : null,
-        pdf_nome: "TCLE-Toxina-" + text(previous.codigo_verificacao, 8) + ".pdf",
+        pdf_nome: "TCLE-Preenchimento-Facial-" + text(previous.codigo_verificacao, 8) + ".pdf",
         idempotente: true,
       });
     }
@@ -905,8 +926,8 @@ Deno.serve(async (req: Request) => {
     // A validação principal continua; falha do limitador é registrada pela plataforma.
   }
 
-  const signaturePath = "tcle-toxina/" + idempotencyKey + "/assinatura.png";
-  const pdfPath = "tcle-toxina/" + idempotencyKey + "/documento.pdf";
+  const signaturePath = "tcle-preenchimento/" + idempotencyKey + "/assinatura.png";
+  const pdfPath = "tcle-preenchimento/" + idempotencyKey + "/documento.pdf";
   const serverReceivedAt = new Date().toISOString();
   let pdf: Uint8Array;
   try {
@@ -1009,7 +1030,7 @@ Deno.serve(async (req: Request) => {
               codigo: previous.codigo_verificacao,
               recebido_em: previous.recebido_em,
               pdf_url: previousPdfPath ? await signedPdfUrl(previousPdfPath) : null,
-              pdf_nome: "TCLE-Toxina-" + text(previous.codigo_verificacao, 8) + ".pdf",
+              pdf_nome: "TCLE-Preenchimento-Facial-" + text(previous.codigo_verificacao, 8) + ".pdf",
               idempotente: true,
             });
           }
@@ -1045,7 +1066,7 @@ Deno.serve(async (req: Request) => {
       recebido_em: receivedAt,
       status: "aguardando_revisao_profissional",
       pdf_url: pdfUrl,
-      pdf_nome: "TCLE-Toxina-" + expectedCode.slice(0, 8) + ".pdf",
+      pdf_nome: "TCLE-Preenchimento-Facial-" + expectedCode.slice(0, 8) + ".pdf",
     }, recovery ? 200 : 201);
   } catch (error) {
     console.error("TCLE submission failed", { recordId, error: String(error) });

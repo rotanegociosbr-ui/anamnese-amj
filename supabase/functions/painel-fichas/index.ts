@@ -13,6 +13,17 @@ const ALLOWED_ORIGINS = new Set([
   "http://localhost:8765",
 ]);
 
+const DOCUMENT_TYPES: Record<string, { label: string; filename: string }> = {
+  tcle_toxina_botulinica: {
+    label: "TCLE · Toxina botulínica",
+    filename: "TCLE-Toxina",
+  },
+  tcle_preenchimento_facial: {
+    label: "TCLE · Preenchimento facial",
+    filename: "TCLE-Preenchimento-Facial",
+  },
+};
+
 const attempts = new Map<string, { count: number; resetAt: number }>();
 
 function cors(req: Request): Record<string, string> {
@@ -158,23 +169,30 @@ Deno.serve(async (req: Request) => {
           detalhe: safeText((item as Record<string, unknown>).detalhe, 600),
         }));
       const path = safeText(row.pdf_path, 500);
+      const type = safeText(row.tipo, 80);
+      const typeMeta = DOCUMENT_TYPES[type] || {
+        label: "Documento clínico",
+        filename: "Documento-Clinico",
+      };
       return {
         id: row.id,
-        tipo: row.tipo,
+        tipo: type,
+        tipo_label: typeMeta.label,
         versao_termo: row.versao_termo,
         nome: row.nome,
         telefone: row.telefone,
         recebido_em: row.recebido_em,
         codigo_verificacao: row.codigo_verificacao,
         revisado: row.revisado === true,
-        status_profissional: "aguardando_revisao",
+        status_profissional: "aguardando_revisao_profissional",
         regioes: Array.isArray(procedure.regioes) ? procedure.regioes.slice(0, 10) : [],
         objetivo: safeText(procedure.objetivo, 600),
+        detalhamento_volume_previsto: safeText(procedure.detalhamento_volume_previsto, 600),
         status_anamnese: safeText(procedure.status_anamnese, 40),
         alertas_saude: alerts,
         duvidas: safeText(data.duvidas, 1200),
         pdf: documentLinks[path] || null,
-        pdf_nome: path ? "TCLE-Toxina-" + safeText(row.codigo_verificacao, 8) + ".pdf" : null,
+        pdf_nome: path ? typeMeta.filename + "-" + safeText(row.codigo_verificacao, 8) + ".pdf" : null,
       };
     });
 
