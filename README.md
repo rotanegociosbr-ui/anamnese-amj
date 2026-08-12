@@ -7,7 +7,8 @@ Maria Jacob Estética.
 
 - `/` — página inicial da clínica
 - `/tratamentos/` — guia educativo em linguagem simples sobre os tratamentos
-  faciais e capilares informados pela clínica
+  faciais, capilares e a administração intramuscular mediante avaliação,
+  anamnese, indicação individual e prescrição válida
 - `/anamnese/` — ficha de anamnese preservada
 - `/tcle-toxina/` — TCLE de toxina botulínica para leitura, preenchimento,
   assinatura da paciente e geração de sua cópia em PDF
@@ -26,7 +27,9 @@ O guia de tratamentos apresenta informações gerais para ajudar pessoas leigas 
 entender cada possibilidade. Ele não substitui avaliação, diagnóstico,
 orientação individual ou consentimento informado. Subtécnicas, produtos,
 regiões e protocolos somente devem ser anunciados depois de confirmação da
-profissional responsável.
+profissional responsável. O conteúdo de aplicação intramuscular é apenas
+educativo, não é coberto pelo TCLE de intradermoterapia e requer consentimento
+específico antes do procedimento.
 
 ## Fluxo do TCLE
 

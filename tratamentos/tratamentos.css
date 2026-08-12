@@ -293,6 +293,11 @@
   text-transform: uppercase;
 }
 
+.interest-card--wide {
+  min-height: 280px;
+  grid-column: 2 / span 2;
+}
+
 .guide-index-section {
   padding: clamp(70px, 8vw, 105px) 0;
   color: rgba(255, 255, 255, 0.78);
@@ -527,6 +532,19 @@
   font-size: 12px;
 }
 
+.chapter-note-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  margin-top: 14px;
+  color: var(--gold-dark);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-underline-offset: 5px;
+  text-transform: uppercase;
+}
+
 .evaluation-section {
   background: var(--white);
 }
@@ -758,6 +776,11 @@
     min-height: 290px;
   }
 
+  .interest-card--wide {
+    min-height: 250px;
+    grid-column: 1 / -1;
+  }
+
   .chapter-body {
     gap: 54px;
   }
@@ -897,6 +920,10 @@
 
   .interest-card {
     min-height: 0;
+  }
+
+  .interest-card--wide {
+    grid-column: auto;
   }
 
   .interest-number {
