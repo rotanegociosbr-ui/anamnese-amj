@@ -202,6 +202,63 @@
   font-size: 11px;
 }
 
+.treatment-editorial {
+  padding: clamp(72px, 8vw, 110px) 0;
+  background: linear-gradient(145deg, #fbf6f0, #f0ddca);
+}
+
+.treatment-editorial-grid {
+  display: grid;
+  align-items: center;
+  grid-template-columns: minmax(0, 1.15fr) minmax(300px, 0.85fr);
+  gap: clamp(38px, 7vw, 96px);
+}
+
+.treatment-editorial figure,
+.consultation-editorial {
+  margin: 0;
+}
+
+.treatment-editorial figure {
+  position: relative;
+}
+
+.treatment-editorial img,
+.consultation-editorial img {
+  width: 100%;
+  height: auto;
+  object-fit: cover;
+}
+
+.treatment-editorial figcaption,
+.consultation-editorial figcaption {
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.treatment-editorial figcaption {
+  margin-top: 9px;
+}
+
+.treatment-editorial h2 {
+  margin-bottom: 18px;
+}
+
+.treatment-editorial > .container > div > p:not(.eyebrow) {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.treatment-editorial .text-link {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  color: var(--gold-dark);
+  font-size: 11px;
+  font-weight: 600;
+  text-underline-offset: 5px;
+}
+
 .interest-section {
   background: var(--paper);
 }
@@ -304,6 +361,12 @@
   background: var(--dark);
 }
 
+.guide-index-section .eyebrow,
+.safety-card .eyebrow,
+.guide-index a span {
+  color: #D6B774;
+}
+
 .guide-index-layout {
   display: grid;
   grid-template-columns: minmax(260px, 0.62fr) minmax(0, 1.38fr);
@@ -354,7 +417,6 @@
 }
 
 .guide-index a span {
-  color: var(--gold-light);
   font-family: "Poppins", sans-serif;
   font-size: 9px;
   letter-spacing: 0.1em;
@@ -547,6 +609,35 @@
 
 .evaluation-section {
   background: var(--white);
+}
+
+.consultation-editorial {
+  display: grid;
+  align-items: stretch;
+  margin-bottom: 42px;
+  border: 1px solid var(--line);
+  background: var(--ivory);
+  grid-template-columns: minmax(0, 1.35fr) minmax(260px, 0.65fr);
+}
+
+.consultation-editorial img {
+  min-height: 330px;
+}
+
+.consultation-editorial figcaption {
+  display: flex;
+  justify-content: center;
+  flex-direction: column;
+  padding: 28px;
+  font-size: 11px;
+}
+
+.consultation-editorial figcaption strong {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--gold-dark);
+  font-family: "Cormorant Garamond", Georgia, serif;
+  font-size: 25px;
 }
 
 .evaluation-steps {
@@ -792,6 +883,7 @@
 
 @media (max-width: 920px) {
   .guide-hero-grid,
+  .treatment-editorial-grid,
   .guide-section-heading,
   .guide-index-layout,
   .chapter-body,
@@ -799,6 +891,14 @@
   .faq-layout,
   .guide-cta-card {
     grid-template-columns: 1fr;
+  }
+
+  .consultation-editorial {
+    grid-template-columns: 1fr;
+  }
+
+  .consultation-editorial img {
+    min-height: 0;
   }
 
   .guide-hero-grid {
