@@ -11,6 +11,8 @@ Maria Jacob Estética.
   assinatura da paciente e geração de sua cópia em PDF
 - `/tcle-preenchimento/` — TCLE de preenchimento facial com ácido hialurônico,
   com triagem específica, assinatura e geração canônica da cópia em PDF
+- `/tcle-intradermoterapia/` — TCLE de intradermoterapia estética facial,
+  corporal ou capilar, sem abranger aplicação intramuscular
 - `/termos/` — central pública para escolher o TCLE do procedimento, mantendo a
   ficha de anamnese separada e os próximos termos sinalizados como em preparação
 - `/painel/` — acesso restrito da equipe, com filtros para anamneses e TCLEs,
@@ -53,6 +55,8 @@ existentes.
 - `tcle-toxina/termo-v1.txt` — texto canônico versionado e vinculado por SHA-256
 - `tcle-preenchimento/` — formulário, estilos, validação e texto canônico do
   TCLE de preenchimento facial
+- `tcle-intradermoterapia/` — formulário, estilos, validação e texto canônico
+  do TCLE de intradermoterapia estética
 
 ## Supabase
 
@@ -62,10 +66,14 @@ existentes.
   privado de documentos clínicos
 - `supabase/migrations/20260811214204_documentos_clinicos_tcle_preenchimento.sql` —
   amplia o tipo permitido sem alterar RLS, permissões ou registros existentes
+- `supabase/migrations/20260812021638_documentos_clinicos_tcle_intradermoterapia.sql` —
+  acrescenta o tipo da intradermoterapia ao mesmo armazenamento protegido
 - `supabase/functions/tcle-submit/index.ts` — endpoint server-side de recepção,
   validação, geração canônica do PDF, integridade e armazenamento do TCLE
 - `supabase/functions/tcle-preenchimento-submit/index.ts` — endpoint isolado do
   preenchimento facial, com validação e PDF canônico próprios
+- `supabase/functions/tcle-intradermoterapia-submit/index.ts` — endpoint isolado
+  da intradermoterapia, com validação e PDF canônico próprios
 - `supabase/functions/painel-fichas/index.ts` — endpoint server-side do painel,
   unificando resumos das anamneses e dos TCLEs e emitindo links assinados
 
