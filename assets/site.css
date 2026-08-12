@@ -1416,7 +1416,9 @@ button:focus-visible {
 }
 
 .journey-grid li {
+  display: flex;
   min-height: 220px;
+  flex-direction: column;
   padding: 30px;
 }
 
@@ -1454,11 +1456,92 @@ button:focus-visible {
   display: inline-flex;
   min-height: 44px;
   align-items: center;
-  margin-top: 13px;
+  align-self: flex-start;
+  margin-top: auto;
+  padding-top: 13px;
   color: var(--gold-dark);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
   text-underline-offset: 4px;
+}
+
+.guidance-section {
+  background: var(--ivory);
+}
+
+.guidance-heading {
+  max-width: 790px;
+  margin-bottom: clamp(32px, 5vw, 52px);
+}
+
+.guidance-heading > p:last-child {
+  max-width: 720px;
+  margin-bottom: 0;
+  color: var(--muted);
+}
+
+.guidance-grid {
+  display: grid;
+  border: 1px solid var(--line);
+  background: var(--white);
+  box-shadow: var(--shadow);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.guidance-card {
+  min-width: 0;
+  padding: clamp(30px, 4vw, 48px);
+}
+
+.guidance-card:nth-child(even) {
+  border-left: 1px solid var(--line);
+}
+
+.guidance-card:nth-child(n + 3) {
+  border-top: 1px solid var(--line);
+}
+
+.guidance-number {
+  display: block;
+  margin-bottom: 24px;
+  color: var(--gold-dark);
+  font-family: "Cormorant Garamond", Georgia, serif;
+  font-size: 23px;
+}
+
+.guidance-card h3 {
+  margin-bottom: 14px;
+  font-size: clamp(1.75rem, 2.6vw, 2.35rem);
+}
+
+.guidance-card p {
+  margin-bottom: 22px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.guidance-card a {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  color: var(--gold-dark);
+  font-size: 12px;
+  font-weight: 600;
+  gap: 8px;
+  text-underline-offset: 4px;
+}
+
+.guidance-source {
+  max-width: 920px;
+  margin: 22px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.guidance-source a {
+  color: var(--gold-dark);
+  font-weight: 500;
+  text-underline-offset: 3px;
 }
 
 .channel-section {
@@ -2149,6 +2232,25 @@ button:focus-visible {
   .journey-grid li:nth-child(3) {
     border-top: 1px solid var(--line);
     border-left: 0;
+  }
+
+  .journey-grid li:first-child {
+    border-top: 0;
+  }
+
+  .guidance-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .guidance-card,
+  .guidance-card:nth-child(even),
+  .guidance-card:nth-child(n + 3) {
+    border-top: 1px solid var(--line);
+    border-left: 0;
+  }
+
+  .guidance-card:first-child {
+    border-top: 0;
   }
 
   .channel-symbol {
