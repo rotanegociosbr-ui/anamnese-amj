@@ -26,6 +26,18 @@ const DOCUMENT_TYPES: Record<string, { label: string; filename: string }> = {
     label: "Pré-avaliação · Intradermoterapia estética",
     filename: "Pre-Avaliacao-Intradermoterapia",
   },
+  tcle_bioestimulador_colageno: {
+    label: "Pré-avaliação · Bioestimulador de colágeno",
+    filename: "Pre-Avaliacao-Bioestimulador-Colageno",
+  },
+  tcle_peeling_quimico: {
+    label: "Pré-avaliação · Peeling químico superficial",
+    filename: "Pre-Avaliacao-Peeling-Quimico-Superficial",
+  },
+  tcle_fios_pdo: {
+    label: "Pré-avaliação · Fios absorvíveis de PDO",
+    filename: "Pre-Avaliacao-Fios-PDO",
+  },
 };
 
 const attempts = new Map<string, { count: number; resetAt: number }>();

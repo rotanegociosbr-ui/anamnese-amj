@@ -16,8 +16,14 @@ Maria Jacob Estética.
   com triagem específica, assinatura e geração canônica da cópia em PDF
 - `/tcle-intradermoterapia/` — TCLE de intradermoterapia estética facial,
   corporal ou capilar, sem abranger aplicação intramuscular
-- `/termos/` — central pública para escolher o TCLE do procedimento, mantendo a
-  ficha de anamnese separada e os próximos termos sinalizados como em preparação
+- `/tcle-bioestimulador/` — pré-avaliação para bioestimulador de colágeno,
+  com envio, assinatura e geração canônica da cópia em PDF
+- `/tcle-peeling-quimico/` — pré-avaliação restrita a peeling químico
+  superficial não fenólico; não abrange fenol nem peelings médios ou profundos
+- `/tcle-fios-pdo/` — pré-avaliação para fios absorvíveis de polidioxanona,
+  dependente da identificação profissional do dispositivo, região e técnica
+- `/termos/` — central pública para escolher o documento do procedimento,
+  mantendo a ficha de anamnese separada
 - `/painel/` — acesso restrito da equipe, com filtros para anamneses e TCLEs,
   links de convite, QR codes e acesso aos PDFs armazenados
 
@@ -30,6 +36,13 @@ regiões e protocolos somente devem ser anunciados depois de confirmação da
 profissional responsável. O conteúdo de aplicação intramuscular é apenas
 educativo, não é coberto pelo TCLE de intradermoterapia e requer consentimento
 específico antes do procedimento.
+
+## Área privada Fichas
+
+A rota `/painel/` corresponde à área interna **Fichas** da clínica. Todas as
+anamneses e todos os termos liberados aparecem nela, com acesso restrito por
+senha à equipe. Os documentos usam armazenamento privado e o painel recebe
+apenas os resumos necessários e links temporários para os PDFs.
 
 ## Fluxo do TCLE
 
@@ -68,6 +81,25 @@ existentes.
   TCLE de preenchimento facial
 - `tcle-intradermoterapia/` — formulário, estilos, validação e texto canônico
   do TCLE de intradermoterapia estética
+- `tcle-bioestimulador/` — formulário, estilos, validação e texto canônico da
+  pré-avaliação do bioestimulador de colágeno
+- `tcle-peeling-quimico/` — pré-avaliação do peeling químico superficial não
+  fenólico, com triagem, autorizações e texto canônico próprios
+- `tcle-fios-pdo/` — pré-avaliação para fios absorvíveis de PDO, com triagem,
+  autorizações e texto canônico próprios
+
+## Pré-avaliações liberadas em 18/08/2026
+
+| Documento | Versão | SHA-256 canônico |
+| --- | --- | --- |
+| Bioestimulador de colágeno | `2026-08-18-v1` | `cf2c0958cc679441b99849ded246d12ee1b9f7aaa102604a441dda1720a66213` |
+| Peeling químico superficial | `2026-08-18-v1` | `3f04db1af1f0e984385862abdd0b1b93ae34ebfd49f09587f541c317022b530b` |
+| Fios absorvíveis de PDO | `2026-08-18-v1` | `6a31a13133e29132763e2ded44c6d1a424d64154d0cb883b02628d897924bd24` |
+
+Os três documentos registram uma manifestação inicial e não autorizam
+automaticamente a realização do procedimento. Produto ou dispositivo, região,
+quantidade, técnica e plano continuam sujeitos à avaliação profissional
+individual, à rastreabilidade e à confirmação antes da execução.
 
 ## Supabase
 
@@ -79,12 +111,24 @@ existentes.
   amplia o tipo permitido sem alterar RLS, permissões ou registros existentes
 - `supabase/migrations/20260812021638_documentos_clinicos_tcle_intradermoterapia.sql` —
   acrescenta o tipo da intradermoterapia ao mesmo armazenamento protegido
+- `supabase/migrations/20260818111337_documentos_clinicos_tcle_bioestimulador.sql` —
+  acrescenta o tipo do bioestimulador ao armazenamento protegido
+- `supabase/migrations/20260818115439_documentos_clinicos_tcle_peeling_quimico.sql` —
+  acrescenta o tipo do peeling químico ao armazenamento protegido
+- `supabase/migrations/20260818115450_documentos_clinicos_tcle_fios_pdo.sql` —
+  acrescenta o tipo dos fios de PDO ao armazenamento protegido
 - `supabase/functions/tcle-submit/index.ts` — endpoint server-side de recepção,
   validação, geração canônica do PDF, integridade e armazenamento do TCLE
 - `supabase/functions/tcle-preenchimento-submit/index.ts` — endpoint isolado do
   preenchimento facial, com validação e PDF canônico próprios
 - `supabase/functions/tcle-intradermoterapia-submit/index.ts` — endpoint isolado
   da intradermoterapia, com validação e PDF canônico próprios
+- `supabase/functions/tcle-bioestimulador-submit/index.ts` — endpoint isolado da
+  pré-avaliação do bioestimulador
+- `supabase/functions/tcle-peeling-quimico-submit/index.ts` — endpoint isolado
+  da pré-avaliação do peeling químico
+- `supabase/functions/tcle-fios-pdo-submit/index.ts` — endpoint isolado da
+  pré-avaliação dos fios de PDO
 - `supabase/functions/painel-fichas/index.ts` — endpoint server-side do painel,
   unificando resumos das anamneses e dos TCLEs e emitindo links assinados
 

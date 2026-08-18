@@ -142,6 +142,9 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
           <option value="tcle_toxina">TCLE — Toxina botulínica</option>
           <option value="tcle_preenchimento">TCLE — Preenchimento facial</option>
           <option value="tcle_intradermoterapia">Pré-avaliação — Intradermoterapia</option>
+          <option value="tcle_bioestimulador">Pré-avaliação — Bioestimulador</option>
+          <option value="tcle_peeling_quimico">Pré-avaliação — Peeling químico</option>
+          <option value="tcle_fios_pdo">Pré-avaliação — Fios de PDO</option>
         </select>
         <input type="text" id="cv-nome" aria-label="Nome da paciente, opcional" placeholder="Nome dela (opcional)" autocomplete="off">
         <input type="tel" id="cv-tel" aria-label="WhatsApp da paciente com DDD" placeholder="WhatsApp com DDD" inputmode="numeric" autocomplete="off">
@@ -181,7 +184,10 @@ const API = 'https://rjxtxoqprnumouqakxbc.supabase.co/functions/v1/painel-fichas
 const TIPOS_TCLE = {
   tcle_toxina_botulinica: { label: 'TCLE · Toxina botulínica', arquivo: 'TCLE-Toxina.pdf' },
   tcle_preenchimento_facial: { label: 'TCLE · Preenchimento facial', arquivo: 'TCLE-Preenchimento-Facial.pdf' },
-  tcle_intradermoterapia_estetica: { label: 'Pré-avaliação · Intradermoterapia estética', arquivo: 'Pre-Avaliacao-Intradermoterapia.pdf' }
+  tcle_intradermoterapia_estetica: { label: 'Pré-avaliação · Intradermoterapia estética', arquivo: 'Pre-Avaliacao-Intradermoterapia.pdf' },
+  tcle_bioestimulador_colageno: { label: 'Pré-avaliação · Bioestimulador de colágeno', arquivo: 'Pre-Avaliacao-Bioestimulador-Colageno.pdf' },
+  tcle_peeling_quimico: { label: 'Pré-avaliação · Peeling químico superficial', arquivo: 'Pre-Avaliacao-Peeling-Quimico-Superficial.pdf' },
+  tcle_fios_pdo: { label: 'Pré-avaliação · Fios absorvíveis de PDO', arquivo: 'Pre-Avaliacao-Fios-PDO.pdf' }
 };
 let hashSenha = null;
 let filtroAtual = 'todos';
@@ -436,6 +442,30 @@ const DOCUMENTOS_CONVITE = {
     qr: '../assets/qrcode-tcle-intradermoterapia.png',
     arquivo: 'QRCode-TCLE-Intradermoterapia-AnaMariaJacob.png',
     orientacao: 'Leia com calma antes de enviar.'
+  },
+  tcle_bioestimulador: {
+    nome: 'pré-avaliação do TCLE de bioestimulador de colágeno',
+    link: 'https://anamariajacob.com.br/tcle-bioestimulador/',
+    qr: '../assets/qrcode-tcle-bioestimulador.png',
+    arquivo: 'QRCode-TCLE-Bioestimulador-Colageno-AnaMariaJacob.png',
+    orientacao: 'Leia com calma antes de enviar.',
+    liberado: true
+  },
+  tcle_peeling_quimico: {
+    nome: 'pré-avaliação do TCLE de peeling químico superficial',
+    link: 'https://anamariajacob.com.br/tcle-peeling-quimico/',
+    qr: '../assets/qrcode-tcle-peeling-quimico.png',
+    arquivo: 'QRCode-TCLE-Peeling-Quimico-AnaMariaJacob.png',
+    orientacao: 'Leia com calma antes de enviar.',
+    liberado: true
+  },
+  tcle_fios_pdo: {
+    nome: 'pré-avaliação do TCLE de fios de PDO',
+    link: 'https://anamariajacob.com.br/tcle-fios-pdo/',
+    qr: '../assets/qrcode-tcle-fios-pdo.png',
+    arquivo: 'QRCode-TCLE-Fios-PDO-AnaMariaJacob.png',
+    orientacao: 'Leia com calma antes de enviar.',
+    liberado: true
   }
 };
 
