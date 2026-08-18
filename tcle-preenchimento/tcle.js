@@ -4,8 +4,8 @@ const CONFIG = Object.freeze({
   API_URL: 'https://rjxtxoqprnumouqakxbc.supabase.co/functions/v1/tcle-preenchimento-submit',
   PUBLISHABLE_KEY: 'sb_publishable_Ip14p4tUfYFjwUYaWinMlw_Gf9v0YwT',
   TYPE: 'tcle_preenchimento_facial',
-  TERM_VERSION: '2026-08-11-v1',
-  TERM_SHA256: 'b8069d21e1560a4445d424c0f998836e276655dc70ddf095ad557d7f7d3145b0',
+  TERM_VERSION: '2026-08-18-v1',
+  TERM_SHA256: '4e2fae97c2bc890fabe4b52e11324209cf60ad636fbff07993b7d3f7d8d4e8ad',
   WHATSAPP: '5531995844803',
   MAX_SIGNATURE_BYTES: 500_000
 });

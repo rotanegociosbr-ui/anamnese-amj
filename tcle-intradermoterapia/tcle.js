@@ -4,8 +4,8 @@ const CONFIG = Object.freeze({
   API_URL: 'https://rjxtxoqprnumouqakxbc.supabase.co/functions/v1/tcle-intradermoterapia-submit',
   PUBLISHABLE_KEY: 'sb_publishable_Ip14p4tUfYFjwUYaWinMlw_Gf9v0YwT',
   TYPE: 'tcle_intradermoterapia_estetica',
-  TERM_VERSION: '2026-08-11-v1',
-  TERM_SHA256: 'fefcf01a609b21369af4b576b031df4cf0fd12dca933d6d0755f220e21283337',
+  TERM_VERSION: '2026-08-18-v1',
+  TERM_SHA256: '65c38aa1611a53d5602db4307d8353f508dffc6cd6ab7ada320d2db2db925de4',
   WHATSAPP: '5531995844803',
   MAX_SIGNATURE_BYTES: 500_000
 });
