@@ -22,6 +22,24 @@ verify_jwt = false
 import_map = "./functions/tcle-intradermoterapia-submit/deno.json"
 entrypoint = "./functions/tcle-intradermoterapia-submit/index.ts"
 
+[functions.tcle-bioestimulador-submit]
+enabled = true
+verify_jwt = false
+import_map = "./functions/tcle-bioestimulador-submit/deno.json"
+entrypoint = "./functions/tcle-bioestimulador-submit/index.ts"
+
+[functions.tcle-peeling-quimico-submit]
+enabled = true
+verify_jwt = false
+import_map = "./functions/tcle-peeling-quimico-submit/deno.json"
+entrypoint = "./functions/tcle-peeling-quimico-submit/index.ts"
+
+[functions.tcle-fios-pdo-submit]
+enabled = true
+verify_jwt = false
+import_map = "./functions/tcle-fios-pdo-submit/deno.json"
+entrypoint = "./functions/tcle-fios-pdo-submit/index.ts"
+
 [functions.painel-fichas]
 enabled = true
 verify_jwt = false
