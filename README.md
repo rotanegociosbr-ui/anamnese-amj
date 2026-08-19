@@ -26,7 +26,8 @@ Maria Jacob Estética.
   mantendo a ficha de anamnese separada
 - `/painel/` — acesso restrito da equipe, com filtros para anamneses e TCLEs,
   links de convite, QR codes, acesso aos PDFs armazenados e o módulo interno
-  **Agenda e retornos**
+  **Agenda e retornos**; proprietários autenticados com MFA também recebem a
+  aba privada **Financeiro**
 
 Domínio: `anamariajacob.com.br`
 
@@ -89,6 +90,36 @@ origem, senha, conteúdo, transições de estado e idempotência; somente ela us
 acesso para `public`, `anon` ou `authenticated` e não armazenam a senha. Dados da
 agenda e credenciais também não devem ser gravados em `localStorage`, exibidos
 em notificações ou registrados em logs.
+
+## Financeiro — Fase 1
+
+A terceira aba do `/painel/` registra clientes reaproveitáveis, receitas,
+despesas, recebimentos e pagamentos manuais, fornecedores, marcas, produtos e
+compras. Ela também mostra valores recebidos, pagos, em aberto e a evolução dos
+últimos seis meses. Fluxo de caixa não é apresentado como lucro contábil.
+
+O Financeiro exige conta individual `owner` e MFA `aal2`. A senha compartilhada
+de transição não autoriza nem revela a aba. Ana Maria Costa Jacob e Rodney Neri
+de Souza Junior devem possuir memberships `owner` ativas, com poderes iguais.
+
+Pagamentos são registros administrativos do que efetivamente ocorreu. Esta fase
+não cobra cartão, não gera PIX ou boleto, não consulta banco e não armazena
+número completo de cartão, CVV, senha ou token. Correções usam cancelamento ou
+estorno auditado; não existe exclusão física de fatos financeiros.
+
+Arquivos principais:
+
+- `painel/index.html`, `painel/financeiro.css` e `painel/financeiro.js` — aba,
+  formulários, indicadores, gráfico, filtros e auditoria;
+- `supabase/migrations/20260819135410_gestao_financeira_mvp.sql` — cadastro
+  canônico de clientes, catálogos, lançamentos, pagamentos, compras, views,
+  RPCs, RLS e menor privilégio;
+- `supabase/functions/financeiro-fichas/` — API owner-only, com MFA, filtro por
+  clínica, validação, idempotência e auditoria nominal.
+
+Produtos e compras nesta fase não constituem controle completo de estoque. Lote,
+validade, recebimento físico, FEFO e consumo por atendimento permanecem para a
+fase sanitária posterior do projeto.
 
 ## Fluxo do TCLE
 

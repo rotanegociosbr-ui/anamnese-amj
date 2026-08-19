@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="referrer" content="no-referrer">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Documentos — Ana Maria Jacob Estética</title>
+<title>Fichas, Agenda e Financeiro — Ana Maria Jacob Estética</title>
 <meta name="theme-color" content="#B08A3E">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Documentos">
@@ -14,6 +14,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link href="./financeiro.css" rel="stylesheet">
 <style>
 :root{
   --gelo:#FDFBF8;--dourado:#85611D;--linha:#E7D8BE;--tinta:#1B1917;
@@ -249,7 +250,7 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
     <img class="simbolo" src="../assets/identidade-visual-transparente-v1.png" alt="Ana Maria Jacob Estética">
     <p class="marca">Ana Maria Jacob</p>
     <p class="marca-sub">Estética</p>
-    <h1 class="doc-titulo">Fichas · Agenda e retornos</h1>
+    <h1 class="doc-titulo">Fichas · Agenda · Financeiro</h1>
   </div>
 </header>
 
@@ -362,6 +363,7 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
     <div class="abas" role="tablist" aria-label="Áreas do aplicativo Fichas">
       <button class="aba" id="aba-bt-fichas" type="button" role="tab" aria-selected="true" aria-controls="aba-fichas" tabindex="0">Fichas</button>
       <button class="aba" id="aba-bt-agenda" type="button" role="tab" aria-selected="false" aria-controls="aba-agenda" tabindex="-1">Agenda e retornos</button>
+      <button class="aba" id="aba-bt-financeiro" type="button" role="tab" aria-selected="false" aria-controls="aba-financeiro" tabindex="-1" hidden>Financeiro</button>
     </div>
 
     <section class="painel-aba" id="aba-fichas" role="tabpanel" aria-labelledby="aba-bt-fichas">
@@ -482,6 +484,176 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
       <div id="agenda-lista" aria-live="polite" aria-busy="false"></div>
       <p class="agenda-status" id="agenda-status" role="status" aria-live="polite"></p>
     </section>
+
+    <section class="painel-aba financeiro-painel oculto" id="aba-financeiro" role="tabpanel" aria-labelledby="aba-bt-financeiro" hidden>
+      <div class="financeiro-cabecalho">
+        <div>
+          <p class="financeiro-sobretitulo">Gestão empresarial privada</p>
+          <h2>Financeiro</h2>
+          <p>Recebimentos, despesas, clientes, produtos e compras com auditoria nominal.</p>
+        </div>
+        <button class="financeiro-botao secundario" id="financeiro-atualizar" type="button">Atualizar dados</button>
+      </div>
+
+      <div class="financeiro-bloqueio oculto" id="financeiro-bloqueio" role="alert">
+        <strong>Acesso financeiro protegido</strong>
+        <p>Entre com uma conta proprietária individual e confirme o MFA. A senha temporária não libera esta área.</p>
+      </div>
+
+      <div id="financeiro-conteudo">
+        <p class="financeiro-status" id="financeiro-status" role="status" aria-live="polite"></p>
+
+        <div class="financeiro-kpis" aria-label="Resumo financeiro">
+          <article><span>Recebido</span><strong id="financeiro-kpi-recebido">R$ 0,00</strong><small>Receitas efetivamente recebidas</small></article>
+          <article><span>Pago</span><strong id="financeiro-kpi-pago">R$ 0,00</strong><small>Despesas efetivamente pagas</small></article>
+          <article class="destaque"><span>Fluxo líquido</span><strong id="financeiro-kpi-fluxo">R$ 0,00</strong><small>Recebido menos pago</small></article>
+          <article><span>A receber</span><strong id="financeiro-kpi-receber">R$ 0,00</strong><small>Saldo aberto de clientes</small></article>
+          <article><span>A pagar</span><strong id="financeiro-kpi-pagar">R$ 0,00</strong><small>Saldo aberto de despesas</small></article>
+          <article><span>Competência</span><strong id="financeiro-kpi-competencia">R$ 0,00</strong><small>Faturado menos incorrido</small></article>
+        </div>
+
+        <section class="financeiro-grafico-card" aria-labelledby="financeiro-grafico-titulo">
+          <div>
+            <h3 id="financeiro-grafico-titulo">Evolução dos últimos 6 meses</h3>
+            <p>Entradas e saídas pelo caixa. Fluxo de caixa não representa lucro contábil.</p>
+          </div>
+          <div class="financeiro-grafico" id="financeiro-grafico" role="img" aria-label="Sem dados financeiros para exibir"></div>
+          <div class="financeiro-legenda"><span><i class="receita"></i>Recebido</span><span><i class="despesa"></i>Pago</span></div>
+        </section>
+
+        <div class="financeiro-atalhos" role="group" aria-label="Ações financeiras">
+          <button type="button" data-financeiro-abrir="financeiro-editor-lancamento">Nova receita ou despesa</button>
+          <button type="button" data-financeiro-abrir="financeiro-editor-pagamento">Registrar pagamento</button>
+          <button type="button" data-financeiro-abrir="financeiro-editor-cliente">Cadastrar cliente</button>
+          <button type="button" data-financeiro-abrir="financeiro-editor-catalogo">Marcas e produtos</button>
+          <button type="button" data-financeiro-abrir="financeiro-editor-compra">Registrar compra</button>
+        </div>
+
+        <details class="financeiro-editor" id="financeiro-editor-lancamento">
+          <summary>Nova receita ou despesa</summary>
+          <form class="financeiro-form" id="financeiro-form-lancamento" novalidate>
+            <div class="financeiro-grid">
+              <label><span>Tipo</span><select id="financeiro-lancamento-tipo" required><option value="receita">Receita</option><option value="despesa">Despesa</option></select></label>
+              <label><span>Origem</span><select id="financeiro-lancamento-origem" required><option value="atendimento">Atendimento</option><option value="produto">Venda de produto</option><option value="operacional">Despesa operacional</option><option value="ajuste">Ajuste justificado</option></select></label>
+              <label class="largo" id="financeiro-lancamento-cliente-campo"><span>Cliente</span><select id="financeiro-lancamento-cliente"><option value="">Selecione um cliente</option></select></label>
+              <label class="largo oculto" id="financeiro-lancamento-fornecedor-campo"><span>Fornecedor <small>opcional</small></span><select id="financeiro-lancamento-fornecedor"><option value="">Sem fornecedor</option></select></label>
+              <label class="largo"><span>Descrição</span><input id="financeiro-lancamento-descricao" type="text" minlength="2" maxlength="200" required></label>
+              <label><span>Categoria</span><input id="financeiro-lancamento-categoria" type="text" minlength="2" maxlength="100" placeholder="Ex.: atendimento, aluguel" required></label>
+              <label><span>Valor total</span><input id="financeiro-lancamento-valor" type="text" inputmode="decimal" placeholder="0,00" required></label>
+              <label><span>Competência</span><input id="financeiro-lancamento-competencia" type="date" required></label>
+              <label><span>Vencimento</span><input id="financeiro-lancamento-vencimento" type="date" required></label>
+              <label><span>Condição</span><select id="financeiro-lancamento-condicao" required><option value="avista">À vista</option><option value="parcelado">Parcelado</option><option value="entrada_saldo">Entrada + saldo</option></select></label>
+              <label><span>Parcelas</span><input id="financeiro-lancamento-parcelas" type="number" min="1" max="120" value="1" required></label>
+              <label class="largo"><span>Observações <small>sem dados clínicos</small></span><textarea id="financeiro-lancamento-observacoes" maxlength="1000" rows="3"></textarea></label>
+            </div>
+            <div class="financeiro-form-acoes"><button class="financeiro-botao" type="submit">Salvar lançamento</button></div>
+            <p class="financeiro-form-status" id="financeiro-lancamento-status" role="status" aria-live="polite"></p>
+          </form>
+        </details>
+
+        <details class="financeiro-editor" id="financeiro-editor-pagamento">
+          <summary>Registrar pagamento ou recebimento</summary>
+          <form class="financeiro-form" id="financeiro-form-pagamento" novalidate>
+            <div class="financeiro-grid">
+              <label class="largo"><span>Lançamento em aberto</span><select id="financeiro-pagamento-lancamento" required><option value="">Selecione</option></select></label>
+              <label><span>Forma</span><select id="financeiro-pagamento-forma" required><option value="">Selecione</option></select></label>
+              <label><span>Valor</span><input id="financeiro-pagamento-valor" type="text" inputmode="decimal" placeholder="0,00" required></label>
+              <label><span>Data e hora</span><input id="financeiro-pagamento-data" type="datetime-local" required></label>
+              <label><span>Parcelas no cartão</span><input id="financeiro-pagamento-parcelas" type="number" min="1" max="120" value="1" required></label>
+              <label class="largo"><span>Referência opcional <small>não informe cartão completo ou CVV</small></span><input id="financeiro-pagamento-referencia" type="text" maxlength="120"></label>
+            </div>
+            <div class="financeiro-form-acoes"><button class="financeiro-botao" type="submit">Registrar valor</button></div>
+            <p class="financeiro-form-status" id="financeiro-pagamento-status" role="status" aria-live="polite"></p>
+          </form>
+        </details>
+
+        <details class="financeiro-editor" id="financeiro-editor-cliente">
+          <summary>Cadastro reaproveitável de cliente</summary>
+          <form class="financeiro-form" id="financeiro-form-cliente" novalidate>
+            <p class="financeiro-nota">Antes de cadastrar, pesquise as fichas e agendamentos existentes. O sistema nunca une pessoas apenas pelo nome.</p>
+            <div class="financeiro-grid">
+              <label class="largo"><span>Pesquisar cadastros existentes</span><input id="financeiro-cliente-pesquisa" type="search" maxlength="120" placeholder="Nome, telefone ou CPF"></label>
+              <div class="financeiro-candidatos largo" id="financeiro-cliente-candidatos" aria-live="polite"></div>
+              <label class="largo"><span>Nome completo</span><input id="financeiro-cliente-nome" type="text" minlength="2" maxlength="160" autocomplete="name" required></label>
+              <label><span>Telefone</span><input id="financeiro-cliente-telefone" type="tel" maxlength="18" autocomplete="tel"></label>
+              <label><span>E-mail</span><input id="financeiro-cliente-email" type="email" maxlength="254" autocomplete="email"></label>
+              <label><span>CPF <small>somente números</small></span><input id="financeiro-cliente-cpf" type="text" inputmode="numeric" minlength="11" maxlength="14"></label>
+            </div>
+            <div class="financeiro-form-acoes"><button class="financeiro-botao" type="submit">Salvar cliente</button></div>
+            <p class="financeiro-form-status" id="financeiro-cliente-status" role="status" aria-live="polite"></p>
+          </form>
+        </details>
+
+        <details class="financeiro-editor" id="financeiro-editor-catalogo">
+          <summary>Fornecedores, marcas e produtos</summary>
+          <div class="financeiro-subformularios">
+            <form class="financeiro-form" id="financeiro-form-fornecedor" novalidate>
+              <h3>Novo fornecedor</h3>
+              <label><span>Nome</span><input id="financeiro-fornecedor-nome" type="text" minlength="2" maxlength="160" required></label>
+              <label><span>CNPJ ou CPF <small>opcional</small></span><input id="financeiro-fornecedor-documento" type="text" inputmode="numeric" maxlength="18"></label>
+              <button class="financeiro-botao" type="submit">Salvar fornecedor</button>
+              <p class="financeiro-form-status" id="financeiro-fornecedor-status" role="status"></p>
+            </form>
+            <form class="financeiro-form" id="financeiro-form-marca" novalidate>
+              <h3>Nova marca</h3>
+              <label><span>Nome da marca</span><input id="financeiro-marca-nome" type="text" minlength="2" maxlength="120" required></label>
+              <button class="financeiro-botao" type="submit">Salvar marca</button>
+              <p class="financeiro-form-status" id="financeiro-marca-status" role="status"></p>
+            </form>
+            <form class="financeiro-form" id="financeiro-form-produto" novalidate>
+              <h3>Novo produto</h3>
+              <label><span>Nome</span><input id="financeiro-produto-nome" type="text" minlength="2" maxlength="160" required></label>
+              <label><span>Marca</span><select id="financeiro-produto-marca"><option value="">Sem marca</option></select></label>
+              <label><span>Tipo</span><select id="financeiro-produto-tipo" required><option value="injetavel">Injetável</option><option value="medicamento">Medicamento</option><option value="dermocosmetico">Dermocosmético</option><option value="descartavel">Descartável</option><option value="epi">EPI</option><option value="limpeza">Limpeza</option><option value="revenda">Revenda</option><option value="outro">Outro</option></select></label>
+              <label><span>Unidade</span><select id="financeiro-produto-unidade" required><option value="un">Unidade</option><option value="cx">Caixa</option><option value="frasco">Frasco</option><option value="seringa">Seringa</option><option value="ml">ml</option><option value="mg">mg</option><option value="g">g</option><option value="kit">Kit</option></select></label>
+              <label><span>Custo de referência</span><input id="financeiro-produto-custo" type="text" inputmode="decimal" placeholder="0,00"></label>
+              <label><span>Registro Anvisa <small>quando aplicável</small></span><input id="financeiro-produto-anvisa" type="text" maxlength="80"></label>
+              <button class="financeiro-botao" type="submit">Salvar produto</button>
+              <p class="financeiro-form-status" id="financeiro-produto-status" role="status"></p>
+            </form>
+          </div>
+        </details>
+
+        <details class="financeiro-editor" id="financeiro-editor-compra">
+          <summary>Registrar compra de produtos</summary>
+          <form class="financeiro-form" id="financeiro-form-compra" novalidate>
+            <div class="financeiro-grid">
+              <label><span>Fornecedor</span><select id="financeiro-compra-fornecedor" required><option value="">Selecione</option></select></label>
+              <label><span>Data da compra</span><input id="financeiro-compra-data" type="date" required></label>
+              <label><span>Nota ou documento <small>opcional</small></span><input id="financeiro-compra-nota" type="text" maxlength="80"></label>
+              <label><span>Categoria</span><input id="financeiro-compra-categoria" type="text" value="Produtos e insumos" minlength="2" maxlength="100" required></label>
+              <label><span>Condição</span><select id="financeiro-compra-condicao" required><option value="avista">À vista</option><option value="parcelado">Parcelado</option><option value="entrada_saldo">Entrada + saldo</option></select></label>
+              <label><span>Parcelas</span><input id="financeiro-compra-parcelas" type="number" min="1" max="120" value="1" required></label>
+            </div>
+            <div class="financeiro-itens-topo"><h3>Itens da compra</h3><button class="financeiro-botao secundario" id="financeiro-adicionar-item" type="button">Adicionar item</button></div>
+            <div class="financeiro-itens" id="financeiro-compra-itens"></div>
+            <p class="financeiro-total">Total calculado: <strong id="financeiro-compra-total">R$ 0,00</strong></p>
+            <label><span>Observações <small>opcional</small></span><textarea id="financeiro-compra-observacoes" maxlength="1000" rows="3"></textarea></label>
+            <div class="financeiro-form-acoes"><button class="financeiro-botao" type="submit">Salvar compra e despesa</button></div>
+            <p class="financeiro-form-status" id="financeiro-compra-status" role="status" aria-live="polite"></p>
+          </form>
+        </details>
+
+        <section class="financeiro-lista-card" aria-labelledby="financeiro-lista-titulo">
+          <div class="financeiro-lista-topo">
+            <div><h3 id="financeiro-lista-titulo">Lançamentos recentes</h3><p id="financeiro-contagem"></p></div>
+            <div class="financeiro-filtros">
+              <select id="financeiro-filtro-tipo" aria-label="Filtrar por tipo"><option value="">Receitas e despesas</option><option value="receita">Receitas</option><option value="despesa">Despesas</option></select>
+              <select id="financeiro-filtro-status" aria-label="Filtrar por situação"><option value="">Todas as situações</option><option value="pendente">Pendentes</option><option value="parcial">Parciais</option><option value="pago">Pagos</option><option value="vencido">Vencidos</option><option value="cancelado">Cancelados</option></select>
+            </div>
+          </div>
+          <div class="financeiro-lista" id="financeiro-lista" aria-live="polite" aria-busy="false"></div>
+        </section>
+
+        <details class="financeiro-editor" id="financeiro-editor-auditoria">
+          <summary>Auditoria financeira recente</summary>
+          <div class="financeiro-auditoria-wrap">
+            <p class="financeiro-nota">Histórico imutável das ações financeiras. Os detalhes técnicos não exibem CPF, telefone nem conteúdo clínico.</p>
+            <div class="financeiro-auditoria" id="financeiro-auditoria" aria-live="polite"></div>
+          </div>
+        </details>
+      </div>
+    </section>
   </section>
 
 </main>
@@ -490,6 +662,7 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
 
 <script src="./vendor/supabase-js-2.112.3.min.js"></script>
 <script src="./auth-mfa.js"></script>
+<script src="./financeiro.js"></script>
 <script>
 const SUPABASE_URL = 'https://rjxtxoqprnumouqakxbc.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_Ip14p4tUfYFjwUYaWinMlw_Gf9v0YwT';
@@ -748,6 +921,7 @@ function atualizarIdentidade(dados) {
     el('usuario-nome').textContent = 'Acesso temporário';
     el('usuario-detalhes').textContent = 'Senha compartilhada de transição · sessão protegida nesta aba';
   }
+  if (window.AMJFinanceiro) window.AMJFinanceiro.atualizarAcesso();
 }
 
 async function cabecalhosAcesso(comJson) {
@@ -921,6 +1095,7 @@ function limparEstadoAplicativo() {
   agendaLembretes = [];
   agendaCarregada = false;
   identidadeBackend = null;
+  if (window.AMJFinanceiro) window.AMJFinanceiro.reset();
   agendaAtivarAba('fichas', false);
   if (sessaoMonitor) clearInterval(sessaoMonitor);
   sessaoMonitor = null;
@@ -1716,21 +1891,21 @@ function agendaIniciarPolling() {
 }
 
 function agendaAtivarAba(nome, moverFoco) {
-  const agendaAtiva = nome === 'agenda';
-  const btFichas = el('aba-bt-fichas');
-  const btAgenda = el('aba-bt-agenda');
-  const painelFichas = el('aba-fichas');
-  const painelAgenda = el('aba-agenda');
-  btFichas.setAttribute('aria-selected', String(!agendaAtiva));
-  btAgenda.setAttribute('aria-selected', String(agendaAtiva));
-  btFichas.tabIndex = agendaAtiva ? -1 : 0;
-  btAgenda.tabIndex = agendaAtiva ? 0 : -1;
-  painelFichas.classList.toggle('oculto', agendaAtiva);
-  painelAgenda.classList.toggle('oculto', !agendaAtiva);
-  painelFichas.hidden = agendaAtiva;
-  painelAgenda.hidden = !agendaAtiva;
-  if (moverFoco) (agendaAtiva ? btAgenda : btFichas).focus();
-  if (agendaAtiva && !agendaCarregada) carregarAgenda();
+  const abas = ['fichas', 'agenda', 'financeiro'];
+  let ativa = abas.includes(nome) ? nome : 'fichas';
+  if (ativa === 'financeiro' && (el('aba-bt-financeiro').hidden || el('aba-bt-financeiro').disabled)) ativa = 'fichas';
+  abas.forEach(chave => {
+    const botao = el('aba-bt-' + chave);
+    const painel = el('aba-' + chave);
+    const selecionada = chave === ativa;
+    botao.setAttribute('aria-selected', String(selecionada));
+    botao.tabIndex = selecionada ? 0 : -1;
+    painel.classList.toggle('oculto', !selecionada);
+    painel.hidden = !selecionada;
+  });
+  if (moverFoco) el('aba-bt-' + ativa).focus();
+  if (ativa === 'agenda' && !agendaCarregada) carregarAgenda();
+  if (ativa === 'financeiro' && window.AMJFinanceiro) window.AMJFinanceiro.ativar();
 }
 
 function agendaAtualizarEstadoCentral() {
@@ -1964,13 +2139,21 @@ async function agendaMarcarLembrete(agendamento, lembrete, botao) {
 
 el('aba-bt-fichas').addEventListener('click', () => agendaAtivarAba('fichas', false));
 el('aba-bt-agenda').addEventListener('click', () => agendaAtivarAba('agenda', false));
+el('aba-bt-financeiro').addEventListener('click', () => agendaAtivarAba('financeiro', false));
 document.querySelector('.abas').addEventListener('keydown', evento => {
   if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(evento.key)) return;
   evento.preventDefault();
-  const agendaAtiva = el('aba-bt-agenda').getAttribute('aria-selected') === 'true';
-  const proxima = evento.key === 'ArrowRight' || evento.key === 'End' ? 'agenda' :
-    evento.key === 'ArrowLeft' || evento.key === 'Home' ? 'fichas' : (agendaAtiva ? 'agenda' : 'fichas');
-  agendaAtivarAba(proxima, true);
+  const disponiveis = ['fichas', 'agenda', 'financeiro'].filter(chave => {
+    const botao = el('aba-bt-' + chave);
+    return !botao.hidden && !botao.disabled;
+  });
+  const atual = disponiveis.findIndex(chave => el('aba-bt-' + chave).getAttribute('aria-selected') === 'true');
+  let indice = atual < 0 ? 0 : atual;
+  if (evento.key === 'Home') indice = 0;
+  else if (evento.key === 'End') indice = disponiveis.length - 1;
+  else if (evento.key === 'ArrowRight') indice = (indice + 1) % disponiveis.length;
+  else if (evento.key === 'ArrowLeft') indice = (indice - 1 + disponiveis.length) % disponiveis.length;
+  agendaAtivarAba(disponiveis[indice], true);
 });
 
 document.querySelectorAll('[data-agenda-filtro]').forEach(bt => {
