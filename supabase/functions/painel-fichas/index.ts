@@ -116,6 +116,41 @@ function validUuid(value: string): boolean {
     .test(value);
 }
 
+function safePdfPath(value: unknown): string {
+  const path = safeText(value, 500).trim();
+  if (
+    !path || path.startsWith("/") || path.includes("..") ||
+    !path.toLowerCase().endsWith(".pdf")
+  ) return "";
+  return path;
+}
+
+function legacyNameKey(value: unknown): string {
+  return safeText(value, 300)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function findLegacyPdf(
+  names: string[],
+  marker: string,
+  patientName: unknown,
+): string | null {
+  if (!marker) return null;
+  const matches = names.filter((name) =>
+    name.toLowerCase().endsWith(".pdf") && name.includes(marker)
+  );
+  if (matches.length <= 1) return matches[0] || null;
+
+  const patientKey = legacyNameKey(patientName);
+  return matches.find((name) =>
+    patientKey && legacyNameKey(name).includes(patientKey)
+  ) || matches[0];
+}
+
 Deno.serve(async (req: Request) => {
   const origin = req.headers.get("origin") || "";
   if (req.method === "OPTIONS") {
@@ -243,7 +278,7 @@ Deno.serve(async (req: Request) => {
     if (!formsResponse.ok) {
       throw new Error("anamneses_read_" + formsResponse.status);
     }
-    const forms = await formsResponse.json();
+    const rawForms = await formsResponse.json();
 
     const filesResponse = await admin("/storage/v1/object/list/fichas-pdf", {
       method: "POST",
@@ -257,35 +292,59 @@ Deno.serve(async (req: Request) => {
     const names = files.map((item: { name?: string }) => item.name).filter(
       Boolean,
     );
-    const formLinks = await signedLinks("fichas-pdf", names);
-
     const codesResponse = await admin(
-      "/rest/v1/anamneses?select=id,codigo_verificacao,arquivado_em,arquivado_motivo",
+      "/rest/v1/anamneses?select=id,codigo_verificacao,arquivado_em,arquivado_motivo,pdf_path,status" +
+        "&status=in.(legado,recebido)",
     );
+    if (!codesResponse.ok) {
+      throw new Error("anamneses_meta_read_" + codesResponse.status);
+    }
     const codes = codesResponse.ok ? await codesResponse.json() : [];
     const formMetaById: Record<string, {
       marker: string;
       archivedAt: string | null;
       archiveReason: string | null;
+      pdfPath: string;
+      status: "legado" | "recebido";
     }> = {};
-    for (const item of codes) {
-      formMetaById[item.id] = {
-        marker: (item.codigo_verificacao || "").slice(0, 8),
+    for (const item of codes as Array<Record<string, unknown>>) {
+      const id = safeText(item.id, 40);
+      const status = safeText(item.status, 20);
+      if (!id || (status !== "legado" && status !== "recebido")) continue;
+      formMetaById[id] = {
+        marker: safeText(item.codigo_verificacao, 64).slice(0, 8),
         archivedAt: safeText(item.arquivado_em, 40) || null,
         archiveReason: safeText(item.arquivado_motivo, 500) || null,
+        pdfPath: safePdfPath(item.pdf_path),
+        status,
       };
     }
 
+    const forms = (rawForms as Array<Record<string, unknown>>).filter((form) =>
+      Boolean(formMetaById[safeText(form.id, 40)])
+    );
+    const formPdfPaths: Record<string, string> = {};
     for (const form of forms) {
-      const metadata = formMetaById[form.id];
+      const id = safeText(form.id, 40);
+      const metadata = formMetaById[id];
       const marker = metadata?.marker;
-      const filename = marker
-        ? names.find((name: string) => name.includes(marker))
+      const legacyPath = metadata?.status === "legado"
+        ? findLegacyPdf(names, marker, form.nome)
         : null;
-      form.pdf = filename ? formLinks[filename] || null : null;
-      form.pdf_nome = filename || null;
+      const pdfPath = metadata?.pdfPath || legacyPath || "";
+      if (pdfPath) formPdfPaths[id] = pdfPath;
+      form.status = metadata.status;
+      form.pdf_nome = pdfPath || null;
       form.arquivado_em = metadata?.archivedAt || null;
       form.arquivado_motivo = metadata?.archiveReason || null;
+    }
+    const formLinks = await signedLinks(
+      "fichas-pdf",
+      [...new Set(Object.values(formPdfPaths))],
+    );
+    for (const form of forms) {
+      const path = formPdfPaths[safeText(form.id, 40)] || "";
+      form.pdf = path ? formLinks[path] || null : null;
     }
 
     // Nova coleção: apenas resumo do TCLE, nunca o JSON clínico completo.

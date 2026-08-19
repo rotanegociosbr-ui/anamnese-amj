@@ -56,3 +56,11 @@ enabled = true
 verify_jwt = false
 import_map = "./functions/agenda-fichas/deno.json"
 entrypoint = "./functions/agenda-fichas/index.ts"
+
+[functions.anamnese-submit]
+enabled = true
+# Formulário público de paciente: não há conta Auth. A função aplica CORS,
+# honeypot, limite de corpo, validação clínica, rate limit e idempotência.
+verify_jwt = false
+import_map = "./functions/anamnese-submit/deno.json"
+entrypoint = "./functions/anamnese-submit/index.ts"
