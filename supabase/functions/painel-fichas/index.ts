@@ -64,8 +64,7 @@ function cors(req: Request): Record<string, string> {
     "Access-Control-Allow-Origin": ALLOWED_ORIGINS.has(origin)
       ? origin
       : "https://anamariajacob.com.br",
-    "Access-Control-Allow-Headers":
-      "authorization, apikey, content-type, x-senha",
+    "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-senha",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
     "Vary": "Origin",
   };
@@ -73,10 +72,9 @@ function cors(req: Request): Record<string, string> {
 
 function json(req: Request, body: unknown, status = 200): Response {
   const context = requestAuth.get(req);
-  const responseBody =
-    context && body && typeof body === "object" && !Array.isArray(body)
-      ? { ...(body as Record<string, unknown>), ...authResponseFields(context) }
-      : body;
+  const responseBody = context && body && typeof body === "object" && !Array.isArray(body)
+    ? { ...(body as Record<string, unknown>), ...authResponseFields(context) }
+    : body;
   return new Response(JSON.stringify(responseBody), {
     status,
     headers: {
@@ -109,7 +107,7 @@ async function signedLinks(
   if (!paths.length) return result;
   const response = await admin("/storage/v1/object/sign/" + bucket, {
     method: "POST",
-    body: JSON.stringify({ expiresIn: 7200, paths }),
+    body: JSON.stringify({ expiresIn: 900, paths }),
   });
   if (!response.ok) return result;
   for (const item of await response.json()) {
@@ -159,9 +157,8 @@ function findLegacyPdf(
   if (matches.length <= 1) return matches[0] || null;
 
   const patientKey = legacyNameKey(patientName);
-  return matches.find((name) =>
-    patientKey && legacyNameKey(name).includes(patientKey)
-  ) || matches[0];
+  return matches.find((name) => patientKey && legacyNameKey(name).includes(patientKey)) ||
+    matches[0];
 }
 
 Deno.serve(async (req: Request) => {
@@ -446,9 +443,9 @@ Deno.serve(async (req: Request) => {
       throw new Error("documents_read_" + documentsResponse.status);
     }
     const documentRows = await documentsResponse.json();
-    const documentPaths = documentRows.map((item: { pdf_path?: string }) =>
-      item.pdf_path
-    ).filter(Boolean);
+    const documentPaths = documentRows.map((item: { pdf_path?: string }) => item.pdf_path).filter(
+      Boolean,
+    );
     const documentLinks = await signedLinks(
       "documentos-clinicos",
       documentPaths,
@@ -458,13 +455,10 @@ Deno.serve(async (req: Request) => {
       const data = row.dados && typeof row.dados === "object"
         ? row.dados as Record<string, unknown>
         : {};
-      const procedure =
-        data.procedimento && typeof data.procedimento === "object"
-          ? data.procedimento as Record<string, unknown>
-          : {};
-      const health = Array.isArray(data.confirmacoes_saude)
-        ? data.confirmacoes_saude
-        : [];
+      const procedure = data.procedimento && typeof data.procedimento === "object"
+        ? data.procedimento as Record<string, unknown>
+        : {};
+      const health = Array.isArray(data.confirmacoes_saude) ? data.confirmacoes_saude : [];
       const alerts = health
         .filter((item) => {
           if (!item || typeof item !== "object") return false;
@@ -493,9 +487,7 @@ Deno.serve(async (req: Request) => {
         codigo_verificacao: row.codigo_verificacao,
         revisado: row.revisado === true,
         status_profissional: "aguardando_revisao_profissional",
-        modalidades: Array.isArray(procedure.modalidades)
-          ? procedure.modalidades.slice(0, 3)
-          : [],
+        modalidades: Array.isArray(procedure.modalidades) ? procedure.modalidades.slice(0, 3) : [],
         regioes: Array.isArray(procedure.regioes)
           ? procedure.regioes.slice(0, 10)
           : safeText(procedure.regioes, 600),
@@ -524,10 +516,9 @@ Deno.serve(async (req: Request) => {
     const activeForms = forms.filter((item: { arquivado_em?: string | null }) =>
       !item.arquivado_em
     ).length;
-    const activeDocuments =
-      documents.filter((item: { arquivado_em?: string | null }) =>
-        !item.arquivado_em
-      ).length;
+    const activeDocuments = documents.filter((item: { arquivado_em?: string | null }) =>
+      !item.arquivado_em
+    ).length;
     const archivedForms = forms.length - activeForms;
     const archivedDocuments = documents.length - activeDocuments;
 
