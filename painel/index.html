@@ -2,6 +2,7 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
+<meta name="referrer" content="no-referrer">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Documentos — Ana Maria Jacob Estética</title>
 <meta name="theme-color" content="#B08A3E">
@@ -31,18 +32,50 @@ header{background:#fff;border-bottom:1px solid var(--linha);padding:22px 0 16px;
 .doc-titulo{font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--cinza);margin:12px 0 0}
 
 /* ---- login ---- */
-.login{max-width:340px;margin:60px auto;background:#fff;border:1px solid var(--linha);
+.login{max-width:430px;margin:48px auto;background:#fff;border:1px solid var(--linha);
   border-radius:var(--raio);padding:28px 24px;text-align:center}
 .login h2{font-family:'Cormorant Garamond',Georgia,serif;font-size:23px;font-weight:600;margin:0 0 6px}
 .login p{font-size:13px;color:var(--cinza);margin:0 0 20px}
 input{width:100%;padding:13px;border:1px solid var(--linha);border-radius:10px;background:var(--gelo);
   font-family:inherit;font-size:19px;text-align:center;letter-spacing:.22em;text-transform:uppercase;color:var(--tinta)}
 input:focus{outline:2px solid var(--dourado);outline-offset:1px}
-button:focus-visible,a:focus-visible,select:focus-visible,textarea:focus-visible,summary:focus-visible{outline:3px solid var(--dourado);outline-offset:2px}
+button:focus-visible,a:focus-visible,select:focus-visible,textarea:focus-visible,summary:focus-visible{
+  outline:3px solid var(--dourado);outline-offset:2px
+}
 button.principal{width:100%;margin-top:14px;background:var(--dourado);color:#fff;border:none;
   border-radius:10px;padding:13px;font-family:inherit;font-size:15px;font-weight:500;cursor:pointer}
 button.principal:disabled{opacity:.5}
 .erro{color:var(--alerta);font-size:13px;margin-top:12px;min-height:18px}
+.login-metodos{display:flex;gap:6px;margin:20px 0 18px;padding:5px;border:1px solid var(--linha);border-radius:11px;background:#F5EFE6}
+.login-metodo{flex:1;min-height:43px;border:1px solid transparent;border-radius:8px;background:transparent;color:var(--cinza);
+  font-family:inherit;font-size:12.5px;font-weight:500;cursor:pointer}
+.login-metodo[aria-selected="true"]{background:#fff;border-color:var(--linha);color:var(--dourado);box-shadow:0 2px 8px rgba(70,50,22,.08)}
+.auth-panel{text-align:left}
+.auth-form{display:grid;gap:12px}
+.auth-form label{display:grid;gap:5px;color:var(--tinta);font-size:12px;font-weight:500;text-align:left}
+.auth-form input{width:100%;min-height:46px;padding:11px 12px;border:1px solid var(--linha);border-radius:9px;background:var(--gelo);
+  color:var(--tinta);font-family:inherit;font-size:16px;text-align:left;letter-spacing:normal;text-transform:none}
+.auth-form input[readonly]{background:#F5F1EB;color:var(--cinza)}
+.auth-form .principal{margin-top:2px}
+.auth-nota{margin:14px 0 0!important;padding:10px 12px;border-left:3px solid var(--dourado);border-radius:0 8px 8px 0;
+  background:#FFF9EE;color:var(--cinza)!important;font-size:11.5px!important;text-align:left}
+.auth-ajuda{margin:9px 0 0!important;color:var(--cinza)!important;font-size:11.5px!important;text-align:left}
+.auth-secundario{width:100%;min-height:43px;margin-top:9px;border:1px solid var(--dourado);border-radius:9px;background:#fff;color:var(--dourado);
+  font-family:inherit;font-size:13px;font-weight:500;cursor:pointer}
+.auth-identificacao{margin:0 0 16px!important;padding:9px 11px;border:1px solid var(--linha);border-radius:8px;background:#FFFDF9;
+  color:var(--tinta)!important;font-size:12px!important;overflow-wrap:anywhere}
+.auth-qr{display:block;width:min(230px,80vw);height:auto;margin:15px auto;padding:8px;border:1px solid var(--linha);border-radius:10px;background:#fff}
+.auth-segredo{display:block;margin:10px 0 14px;padding:10px;border:1px dashed var(--dourado);border-radius:8px;background:#FFF9EE;
+  color:var(--tinta);font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:13px;letter-spacing:.08em;overflow-wrap:anywhere;user-select:all}
+.auth-passos{margin:0 0 14px;padding-left:22px;color:var(--cinza);font-size:12px;text-align:left}
+.auth-passos li+li{margin-top:5px}
+.identidade-sessao{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:18px 0 0;padding:12px 14px;
+  border:1px solid var(--linha);border-radius:10px;background:#fff}
+.identidade-sessao strong,.identidade-sessao span{display:block}
+.identidade-sessao strong{font-family:'Cormorant Garamond',Georgia,serif;font-size:18px;line-height:1.15}
+.identidade-sessao span{margin-top:2px;color:var(--cinza);font-size:10.5px;overflow-wrap:anywhere}
+.identidade-sessao button{flex:0 0 auto;min-height:39px;border:1px solid var(--dourado);border-radius:8px;background:#fff;color:var(--dourado);
+  font-family:inherit;font-size:11.5px;font-weight:500;cursor:pointer}
 
 /* ---- lista ---- */
 
@@ -82,6 +115,11 @@ button.principal:disabled{opacity:.5}
 .agenda-cabecalho h2{font-family:'Cormorant Garamond',Georgia,serif;font-size:25px;line-height:1.1;margin:0 0 4px}
 .agenda-cabecalho p{font-size:12.5px;color:var(--cinza);margin:0}
 .agenda-topo-acoes{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.agenda-estado-motor{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:0 0 12px}
+.agenda-estado-motor p{margin:0;padding:9px 11px;border:1px solid var(--linha);border-radius:8px;background:#FFFDF9;
+  color:var(--cinza);font-size:11.5px}
+.agenda-estado-motor p.ativo{border-color:#BFD7BF;background:#F2F8F2;color:#356B35}
+.agenda-estado-motor p.erro{border-color:#F0D5D0;background:var(--alerta-bg);color:var(--alerta)}
 .agenda-botao{border:1px solid var(--dourado);border-radius:9px;background:var(--dourado);color:#fff;padding:9px 12px;
   font-family:inherit;font-size:12.5px;font-weight:500;cursor:pointer}
 .agenda-botao.alt{background:#fff;color:var(--dourado)}
@@ -152,13 +190,20 @@ button.principal:disabled{opacity:.5}
 .agenda-vazio{padding:36px 16px;text-align:center;color:var(--cinza);font-size:13px}
 
 @media(max-width:640px){
+  input,.linha-envio input,.linha-envio select{font-size:16px}
+  button.principal,.cv-acoes button,.recarregar,.filtro,.acoes a,.acoes button,.cv-qr a,.aba,
+  .agenda-botao,.agenda-filtro,.agenda-resumo{min-height:44px}
+  .cv-qr a{display:inline-flex;align-items:center;justify-content:center}
   .agenda-cabecalho,.agenda-card-topo{align-items:stretch;flex-direction:column}
   .agenda-topo-acoes{justify-content:stretch}
   .agenda-topo-acoes .agenda-botao{flex:1}
   .agenda-resumos{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .agenda-estado-motor{grid-template-columns:1fr}
   .agenda-grid,.agenda-check-grid{grid-template-columns:1fr}
   .agenda-campo.largo{grid-column:auto}
   .agenda-data{text-align:left;white-space:normal}
+  .identidade-sessao{align-items:stretch;flex-direction:column}
+  .identidade-sessao button{width:100%}
 }
 
 .ficha{background:#fff;border:1px solid var(--linha);border-radius:var(--raio);
@@ -194,15 +239,6 @@ button.principal:disabled{opacity:.5}
 .carregando{text-align:center;padding:40px;color:var(--cinza);font-size:14px}
 footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
   border-top:1px solid var(--linha);margin-top:26px}
-
-@media(max-width:640px){
-  input,.linha-envio input,.linha-envio select{font-size:16px}
-  button.principal,.cv-acoes button,.recarregar,.filtro,.acoes a,.acoes button,.cv-qr a,.aba,
-  .agenda-botao,.agenda-filtro,.agenda-resumo{
-    min-height:44px
-  }
-  .cv-qr a{display:inline-flex;align-items:center;justify-content:center}
-}
 .oculto{display:none}
 </style>
 </head>
@@ -219,16 +255,110 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
 
 <main class="wrap">
 
-  <section class="login" id="tela-login">
-    <h2>Acesso restrito</h2>
+  <section class="login" id="tela-login" aria-labelledby="login-titulo">
+    <h2 id="login-titulo">Acesso restrito</h2>
     <p>Estes documentos contêm dados pessoais e de saúde.</p>
-    <input type="password" id="senha" inputmode="text" autocomplete="off" aria-label="Senha de acesso"
-           placeholder="senha" maxlength="20">
-    <button class="principal" id="entrar">Entrar</button>
-    <p class="erro" id="erro" role="alert" aria-live="assertive"></p>
+
+    <div class="login-metodos" role="tablist" aria-label="Escolha o modo de acesso">
+      <button class="login-metodo" id="login-metodo-individual" type="button" role="tab"
+              aria-selected="true" aria-controls="login-painel-individual" tabindex="0">Login individual</button>
+      <button class="login-metodo" id="login-metodo-temporario" type="button" role="tab"
+              aria-selected="false" aria-controls="login-painel-temporario" tabindex="-1">Acesso temporário</button>
+    </div>
+
+    <div class="auth-panel" id="login-painel-individual" role="tabpanel" aria-labelledby="login-metodo-individual">
+      <form class="auth-form" id="form-login-individual" novalidate>
+        <label for="auth-email">E-mail individual
+          <input id="auth-email" name="email" type="email" inputmode="email" autocomplete="username"
+                 maxlength="254" required>
+        </label>
+        <label for="auth-senha">Senha
+          <input id="auth-senha" name="password" type="password" autocomplete="current-password"
+                 minlength="12" maxlength="128" required>
+        </label>
+        <button class="principal" id="entrar-individual" type="submit">Entrar com segurança</button>
+      </form>
+      <p class="erro" id="auth-login-erro" role="alert" aria-live="assertive"></p>
+      <p class="auth-nota">Somente contas convidadas pela clínica podem entrar. Não existe cadastro público neste aplicativo.</p>
+    </div>
+
+    <div class="auth-panel oculto" id="login-painel-temporario" role="tabpanel"
+         aria-labelledby="login-metodo-temporario" hidden>
+      <label class="auth-form" for="senha">Senha temporária
+        <input type="password" id="senha" inputmode="text" autocomplete="off"
+               aria-label="Senha de acesso temporário" placeholder="senha" maxlength="20">
+      </label>
+      <button class="principal" id="entrar" type="button">Entrar temporariamente</button>
+      <p class="erro" id="erro" role="alert" aria-live="assertive"></p>
+      <p class="auth-nota">Acesso de transição. Ele permanecerá disponível até Ana e Rodney concluírem e testarem o MFA.</p>
+    </div>
+  </section>
+
+  <section class="login oculto" id="tela-convite" aria-labelledby="convite-titulo" hidden>
+    <h2 id="convite-titulo">Finalize seu convite</h2>
+    <p>Defina uma senha exclusiva antes de configurar a proteção em duas etapas.</p>
+    <p class="auth-identificacao" id="convite-identidade"></p>
+    <form class="auth-form" id="form-definir-senha" novalidate>
+      <label for="auth-nova-senha">Nova senha
+        <input id="auth-nova-senha" type="password" autocomplete="new-password"
+               minlength="12" maxlength="128" aria-describedby="senha-orientacao" required>
+      </label>
+      <label for="auth-confirma-senha">Confirme a nova senha
+        <input id="auth-confirma-senha" type="password" autocomplete="new-password"
+               minlength="12" maxlength="128" required>
+      </label>
+      <p class="auth-ajuda" id="senha-orientacao">Use pelo menos 12 caracteres e não reutilize a senha de outro serviço.</p>
+      <button class="principal" id="definir-senha" type="submit">Salvar senha e continuar</button>
+    </form>
+    <p class="erro" id="auth-convite-erro" role="alert" aria-live="assertive"></p>
+    <button class="auth-secundario" type="button" data-auth-logout>Cancelar e sair</button>
+  </section>
+
+  <section class="login oculto" id="tela-mfa-cadastro" aria-labelledby="mfa-cadastro-titulo" hidden>
+    <h2 id="mfa-cadastro-titulo">Proteja sua conta</h2>
+    <p>Use um aplicativo autenticador no celular para ativar o segundo fator.</p>
+    <ol class="auth-passos">
+      <li>Abra Google Authenticator, Microsoft Authenticator ou outro aplicativo TOTP.</li>
+      <li>Escaneie o QR code. Se necessário, digite a chave exibida abaixo.</li>
+      <li>Informe o código de 6 números gerado pelo aplicativo.</li>
+    </ol>
+    <img class="auth-qr" id="mfa-qr" alt="QR code para configurar o autenticador" hidden>
+    <span class="auth-segredo" id="mfa-segredo" aria-label="Chave manual do autenticador"></span>
+    <form class="auth-form" id="form-mfa-cadastro" novalidate>
+      <label for="mfa-cadastro-codigo">Código do autenticador
+        <input id="mfa-cadastro-codigo" type="text" inputmode="numeric" autocomplete="one-time-code"
+               pattern="[0-9]{6}" minlength="6" maxlength="6" aria-describedby="mfa-cadastro-ajuda" required>
+      </label>
+      <p class="auth-ajuda" id="mfa-cadastro-ajuda">O código muda aproximadamente a cada 30 segundos.</p>
+      <button class="principal" id="mfa-ativar" type="submit">Ativar MFA</button>
+    </form>
+    <p class="erro" id="auth-mfa-cadastro-erro" role="alert" aria-live="assertive"></p>
+    <button class="auth-secundario" type="button" data-auth-logout>Cancelar e sair</button>
+  </section>
+
+  <section class="login oculto" id="tela-mfa-desafio" aria-labelledby="mfa-desafio-titulo" hidden>
+    <h2 id="mfa-desafio-titulo">Confirmação em duas etapas</h2>
+    <p>Abra o aplicativo autenticador e informe o código atual.</p>
+    <p class="auth-identificacao" id="mfa-desafio-identidade"></p>
+    <form class="auth-form" id="form-mfa-desafio" novalidate>
+      <label for="mfa-desafio-codigo">Código do autenticador
+        <input id="mfa-desafio-codigo" type="text" inputmode="numeric" autocomplete="one-time-code"
+               pattern="[0-9]{6}" minlength="6" maxlength="6" required autofocus>
+      </label>
+      <button class="principal" id="mfa-confirmar" type="submit">Confirmar e entrar</button>
+    </form>
+    <p class="erro" id="auth-mfa-desafio-erro" role="alert" aria-live="assertive"></p>
+    <button class="auth-secundario" type="button" data-auth-logout>Usar outra conta</button>
   </section>
 
   <section id="tela-lista" class="oculto">
+    <div class="identidade-sessao" aria-label="Sessão atual">
+      <div>
+        <strong id="usuario-nome">Acesso protegido</strong>
+        <span id="usuario-detalhes"></span>
+      </div>
+      <button id="encerrar-sessao" type="button">Encerrar sessão</button>
+    </div>
     <div class="abas" role="tablist" aria-label="Áreas do aplicativo Fichas">
       <button class="aba" id="aba-bt-fichas" type="button" role="tab" aria-selected="true" aria-controls="aba-fichas" tabindex="0">Fichas</button>
       <button class="aba" id="aba-bt-agenda" type="button" role="tab" aria-selected="false" aria-controls="aba-agenda" tabindex="-1">Agenda e retornos</button>
@@ -285,12 +415,15 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
           <p>Organize horários, confirmações e acompanhamentos sem expor informações clínicas nas mensagens.</p>
         </div>
         <div class="agenda-topo-acoes">
-          <button class="agenda-botao alt" id="agenda-alertas" type="button">Ativar alertas do navegador</button>
+          <button class="agenda-botao alt" id="agenda-alertas" type="button">Ativar notificações neste aparelho</button>
           <button class="agenda-botao alt" id="agenda-atualizar" type="button">Atualizar agenda</button>
         </div>
       </div>
+      <div class="agenda-estado-motor" aria-label="Estado das automações">
+        <p id="agenda-automacao-central" role="status" aria-live="polite">Automação central: verificando…</p>
+        <p id="agenda-alertas-status" role="status" aria-live="polite">Notificações neste aparelho: verificando…</p>
+      </div>
       <p class="agenda-alerta-interno" id="agenda-alerta-interno" role="status" aria-live="polite"></p>
-      <p class="agenda-status" id="agenda-alertas-status" role="status" aria-live="polite"></p>
 
       <div class="agenda-resumos" aria-label="Resumo da agenda">
         <button class="agenda-resumo ativo" type="button" data-agenda-filtro="hoje" aria-pressed="true"><strong id="agenda-total-hoje">0</strong><span>Hoje</span></button>
@@ -303,6 +436,7 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
         <summary id="agenda-form-titulo">Novo agendamento</summary>
         <form class="agenda-form" id="agenda-form" novalidate>
           <input id="agenda-id" type="hidden">
+          <input id="agenda-retorno-de-id" type="hidden">
           <fieldset>
             <legend>Cliente e horário</legend>
             <div class="agenda-grid">
@@ -354,7 +488,11 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
 
 <footer>Ana Maria Costa Jacob · CRF/MG 40880 · Documentos clínicos protegidos</footer>
 
+<script src="./vendor/supabase-js-2.112.3.min.js"></script>
+<script src="./auth-mfa.js"></script>
 <script>
+const SUPABASE_URL = 'https://rjxtxoqprnumouqakxbc.supabase.co';
+const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_Ip14p4tUfYFjwUYaWinMlw_Gf9v0YwT';
 const API = 'https://rjxtxoqprnumouqakxbc.supabase.co/functions/v1/painel-fichas';
 const AGENDA_API = 'https://rjxtxoqprnumouqakxbc.supabase.co/functions/v1/agenda-fichas';
 const AGENDA_POLL_MS = 90000;
@@ -369,6 +507,12 @@ const TIPOS_TCLE = {
   tcle_fios_pdo: { label: 'Pré-avaliação · Fios absorvíveis de PDO', arquivo: 'Pre-Avaliacao-Fios-PDO.pdf' }
 };
 let hashSenha = null;
+let modoAcesso = null;
+let authController = null;
+let authSession = null;
+let authEncerrando = false;
+let authInicioConcluido = false;
+let identidadeBackend = null;
 let filtroAtual = 'todos';
 let cachePainel = { fichas: [], documentos: [], totais: { anamneses: 0, tcles: 0, geral: 0 } };
 let agendaCache = [];
@@ -380,6 +524,7 @@ let agendaPoll = null;
 let agendaIdempotencyKey = null;
 let agendaEnviando = false;
 let agendaReagendando = false;
+let agendaAutomacao = null;
 let agendaUltimaAssinaturaAlerta = '';
 let agendaAgoraServidor = Date.now();
 let agendaAgoraRecebidoEm = performance.now();
@@ -568,14 +713,84 @@ function esc(s) {
     .replace(/"/g, '&quot;');
 }
 
+function nomeConhecido(email) {
+  const nomes = {
+    'anamariajacob95@gmail.com': 'Ana Maria Costa Jacob',
+    'rodneyneridesouzajunior@gmail.com': 'Rodney Neri de Souza Junior'
+  };
+  return nomes[String(email || '').trim().toLowerCase()] || '';
+}
+
+function rotuloPapel(role) {
+  const papeis = {
+    owner: 'Proprietário(a)',
+    professional: 'Profissional',
+    assistant: 'Assistente',
+    legacy: 'Acesso temporário'
+  };
+  return papeis[String(role || '').toLowerCase()] || 'Acesso individual';
+}
+
+function atualizarIdentidade(dados) {
+  if (modoAcesso === 'auth') {
+    if (dados && dados.identity && typeof dados.identity === 'object') {
+      identidadeBackend = {
+        display_name: String(dados.identity.display_name || ''),
+        role: String(dados.identity.role || dados.role || '')
+      };
+    }
+    const email = authSession && authSession.user ? String(authSession.user.email || '') : '';
+    const nome = identidadeBackend && identidadeBackend.display_name || nomeConhecido(email) || email || 'Conta individual';
+    const papel = identidadeBackend && identidadeBackend.role || dados && dados.role || '';
+    el('usuario-nome').textContent = nome;
+    el('usuario-detalhes').textContent = [email, rotuloPapel(papel), 'MFA confirmado'].filter(Boolean).join(' · ');
+  } else {
+    el('usuario-nome').textContent = 'Acesso temporário';
+    el('usuario-detalhes').textContent = 'Senha compartilhada de transição · sessão protegida nesta aba';
+  }
+}
+
+async function cabecalhosAcesso(comJson) {
+  const headers = {};
+  if (comJson) headers['Content-Type'] = 'application/json';
+
+  if (modoAcesso === 'auth') {
+    if (!authController) throw new Error('Login individual indisponível.');
+    const session = await authController.getSession();
+    if (!session || !session.access_token) {
+      await sair('Sua sessão individual expirou. Entre novamente.');
+      throw new Error('Sessão individual encerrada.');
+    }
+    authSession = session;
+    headers.apikey = SUPABASE_PUBLISHABLE_KEY;
+    headers.Authorization = 'Bearer ' + session.access_token;
+    return headers;
+  }
+
+  if (modoAcesso === 'legacy' && hashSenha) {
+    headers['x-senha'] = hashSenha;
+    return headers;
+  }
+  throw new Error('Entre novamente para continuar.');
+}
+
+async function acessoNegado() {
+  if (modoAcesso === 'auth') {
+    await sair('Seu acesso individual não pôde ser validado. Entre novamente ou fale com o administrador.');
+  } else {
+    await sair('Senha temporária incorreta.');
+  }
+}
+
 async function carregar() {
   const lista = el('lista');
   lista.innerHTML = '<p class="carregando">Carregando…</p>';
   try {
-    const r = await fetch(API, { method: 'POST', headers: { 'x-senha': hashSenha } });
-    if (r.status === 401) { sair('Senha incorreta'); return; }
+    const r = await fetch(API, { method: 'POST', headers: await cabecalhosAcesso(false) });
+    if (r.status === 401 || r.status === 403) { await acessoNegado(); return; }
     const d = await r.json();
     if (d.erro) throw new Error(d.erro);
+    atualizarIdentidade(d);
 
     const fichas = Array.isArray(d.fichas) ? d.fichas : [];
     const documentos = Array.isArray(d.documentos) ? d.documentos : [];
@@ -638,7 +853,7 @@ async function alterarArquivamentoFicha(botao) {
   try {
     const resposta = await fetch(API, {
       method: 'POST',
-      headers: { 'x-senha': hashSenha, 'Content-Type': 'application/json' },
+      headers: await cabecalhosAcesso(true),
       body: JSON.stringify({
         acao,
         origem,
@@ -646,7 +861,7 @@ async function alterarArquivamentoFicha(botao) {
         motivo: motivoLimpo
       })
     });
-    if (resposta.status === 401) { sair('Senha incorreta'); return; }
+    if (resposta.status === 401 || resposta.status === 403) { await acessoNegado(); return; }
     const dados = await resposta.json().catch(() => ({}));
     if (!resposta.ok || dados.erro) throw new Error(dados.erro || 'Não foi possível atualizar a ficha.');
     await carregar();
@@ -665,26 +880,99 @@ async function alterarArquivamentoFicha(botao) {
   }
 }
 
-function sair(msg) {
-  hashSenha = null;
+const TELAS_AUTENTICACAO = ['tela-login', 'tela-convite', 'tela-mfa-cadastro', 'tela-mfa-desafio'];
+
+function mostrarTelaAutenticacao(id) {
+  TELAS_AUTENTICACAO.forEach(telaId => {
+    const tela = el(telaId);
+    const visivel = telaId === id;
+    tela.classList.toggle('oculto', !visivel);
+    tela.hidden = !visivel;
+  });
+  el('tela-lista').classList.add('oculto');
+  el('tela-lista').hidden = true;
+}
+
+function selecionarMetodoLogin(metodo, focar) {
+  const individual = metodo !== 'legacy';
+  const configuracao = [
+    ['login-metodo-individual', 'login-painel-individual', individual],
+    ['login-metodo-temporario', 'login-painel-temporario', !individual]
+  ];
+  configuracao.forEach(([botaoId, painelId, ativo]) => {
+    const botao = el(botaoId);
+    const painel = el(painelId);
+    botao.setAttribute('aria-selected', String(ativo));
+    botao.tabIndex = ativo ? 0 : -1;
+    painel.classList.toggle('oculto', !ativo);
+    painel.hidden = !ativo;
+  });
+  if (focar) el(individual ? 'auth-email' : 'senha').focus();
+}
+
+function mensagemAuth(erro, padrao) {
+  if (erro && typeof erro.message === 'string' && erro.message.trim()) return erro.message;
+  return padrao;
+}
+
+function limparEstadoAplicativo() {
   agendaPararPolling();
   agendaCache = [];
   agendaLembretes = [];
   agendaCarregada = false;
+  identidadeBackend = null;
   agendaAtivarAba('fichas', false);
-  sessionStorage.removeItem('amj_s');
-  sessionStorage.removeItem('amj_login_em');
-  sessionStorage.removeItem('amj_atividade_em');
   if (sessaoMonitor) clearInterval(sessaoMonitor);
   sessaoMonitor = null;
-  el('tela-lista').classList.add('oculto');
-  el('tela-login').classList.remove('oculto');
-  el('erro').textContent = msg || '';
+}
+
+function finalizarSaidaInterface(msg, metodoPreferido) {
+  limparEstadoAplicativo();
+  hashSenha = null;
+  authSession = null;
+  modoAcesso = null;
+  sessionStorage.removeItem('amj_s');
+  sessionStorage.removeItem('amj_modo_acesso');
+  sessionStorage.removeItem('amj_login_em');
+  sessionStorage.removeItem('amj_atividade_em');
   el('senha').value = '';
+  el('auth-senha').value = '';
+  el('auth-nova-senha').value = '';
+  el('auth-confirma-senha').value = '';
+  el('mfa-cadastro-codigo').value = '';
+  el('mfa-desafio-codigo').value = '';
+  el('mfa-qr').removeAttribute('src');
+  el('mfa-qr').hidden = true;
+  el('mfa-segredo').textContent = '';
+  mostrarTelaAutenticacao('tela-login');
+  selecionarMetodoLogin(metodoPreferido === 'legacy' ? 'legacy' : 'auth', false);
+  el(metodoPreferido === 'legacy' ? 'erro' : 'auth-login-erro').textContent = msg || '';
+}
+
+async function sair(msg) {
+  const modoAnterior = modoAcesso;
+  modoAcesso = null;
+  const preferencia = modoAnterior === 'legacy' ? 'legacy' : 'auth';
+  if (modoAnterior === 'auth' && authController && !authEncerrando) {
+    authEncerrando = true;
+    try {
+      await authController.signOut();
+    } catch (erro) {
+      console.warn('A sessão local já não estava disponível para encerramento.');
+    } finally {
+      authEncerrando = false;
+    }
+  }
+  finalizarSaidaInterface(msg, preferencia);
+}
+
+function sessaoAplicativoAtiva() {
+  return modoAcesso === 'legacy' ? Boolean(hashSenha) :
+    modoAcesso === 'auth' ? Boolean(authSession && authSession.access_token) : false;
 }
 
 function registrarAtividadeSessao(forcar) {
-  if (!hashSenha) return;
+  if (!sessaoAplicativoAtiva()) return;
   if (!forcar && !sessaoAindaValida()) {
     verificarSessao();
     return;
@@ -704,11 +992,11 @@ function sessaoAindaValida() {
 }
 
 function verificarSessao() {
-  if (hashSenha && !sessaoAindaValida()) {
-    sair('Sua sessão expirou por segurança. Entre novamente.');
+  if (sessaoAplicativoAtiva() && !sessaoAindaValida()) {
+    void sair('Sua sessão expirou por segurança. Entre novamente.');
     return false;
   }
-  return Boolean(hashSenha);
+  return sessaoAplicativoAtiva();
 }
 
 function iniciarMonitorSessao() {
@@ -716,38 +1004,233 @@ function iniciarMonitorSessao() {
   sessaoMonitor = setInterval(verificarSessao, 30_000);
 }
 
-async function entrar(valor) {
+function iniciarRelogioSessao(restaurando) {
+  const agora = Date.now();
+  if (!restaurando || !Number(sessionStorage.getItem('amj_login_em'))) {
+    sessionStorage.setItem('amj_login_em', String(agora));
+  }
+  if (!restaurando || !Number(sessionStorage.getItem('amj_atividade_em'))) {
+    sessionStorage.setItem('amj_atividade_em', String(agora));
+  }
+  registrarAtividadeSessao(true);
+  iniciarMonitorSessao();
+}
+
+async function abrirAplicativo(modo, session, restaurando) {
+  modoAcesso = modo;
+  if (modo === 'auth') {
+    authSession = session;
+    hashSenha = null;
+    sessionStorage.removeItem('amj_s');
+  }
+  sessionStorage.setItem('amj_modo_acesso', modo);
+  iniciarRelogioSessao(restaurando);
+  TELAS_AUTENTICACAO.forEach(id => {
+    el(id).classList.add('oculto');
+    el(id).hidden = true;
+  });
+  el('tela-lista').classList.remove('oculto');
+  el('tela-lista').hidden = false;
+  atualizarIdentidade(null);
+  await carregar();
+  if (!sessaoAplicativoAtiva()) return;
+  await carregarAgenda({ silencioso: true });
+  if (sessaoAplicativoAtiva()) agendaIniciarPolling();
+}
+
+async function prepararCadastroMfa(session) {
+  authSession = session;
+  mostrarTelaAutenticacao('tela-mfa-cadastro');
+  el('auth-mfa-cadastro-erro').textContent = 'Preparando o QR code…';
+  el('mfa-qr').hidden = true;
+  el('mfa-segredo').textContent = '';
+  try {
+    const cadastro = await authController.beginEnrollment();
+    if (cadastro.alreadyEnrolled) {
+      el('auth-mfa-cadastro-erro').textContent = '';
+      mostrarTelaAutenticacao('tela-mfa-desafio');
+      el('mfa-desafio-identidade').textContent = session.user && session.user.email || 'Conta individual';
+      el('mfa-desafio-codigo').focus();
+      return;
+    }
+    const qr = String(cadastro.qrCode || '');
+    if (!qr.startsWith('data:image/')) throw new Error('O QR code recebido não é válido.');
+    el('mfa-qr').src = qr;
+    el('mfa-qr').hidden = false;
+    el('mfa-segredo').textContent = cadastro.secret || '';
+    el('auth-mfa-cadastro-erro').textContent = '';
+    el('mfa-cadastro-codigo').focus();
+  } catch (erro) {
+    el('auth-mfa-cadastro-erro').textContent = mensagemAuth(erro, 'Não foi possível preparar o MFA.');
+  }
+}
+
+async function processarEtapaAuth(session, restaurando) {
+  authSession = session;
+  modoAcesso = 'auth';
+  sessionStorage.setItem('amj_modo_acesso', 'auth');
+  const proxima = await authController.getNextStep();
+  if (proxima.step === 'password') {
+    iniciarRelogioSessao(restaurando);
+    mostrarTelaAutenticacao('tela-convite');
+    el('convite-identidade').textContent = session.user && session.user.email || 'Conta convidada';
+    el('auth-nova-senha').focus();
+    return;
+  }
+  if (proxima.step === 'enroll') {
+    iniciarRelogioSessao(restaurando);
+    await prepararCadastroMfa(proxima.session);
+    return;
+  }
+  if (proxima.step === 'challenge') {
+    iniciarRelogioSessao(restaurando);
+    mostrarTelaAutenticacao('tela-mfa-desafio');
+    el('mfa-desafio-identidade').textContent = session.user && session.user.email || 'Conta individual';
+    el('mfa-desafio-codigo').focus();
+    return;
+  }
+  if (proxima.step === 'ready') {
+    await abrirAplicativo('auth', proxima.session, restaurando);
+    return;
+  }
+  finalizarSaidaInterface('', 'auth');
+}
+
+async function entrarTemporariamente(valor) {
   const bt = el('entrar');
   bt.disabled = true; bt.textContent = 'Verificando…';
   el('erro').textContent = '';
   try {
     const h = await sha256(valor.trim().toUpperCase());
     const r = await fetch(API, { method: 'POST', headers: { 'x-senha': h } });
-    if (r.status === 401) { el('erro').textContent = 'Senha incorreta'; return; }
+    if (r.status === 401 || r.status === 403) { el('erro').textContent = 'Senha temporária incorreta.'; return; }
     if (!r.ok) { el('erro').textContent = 'Erro ao conectar. Tente de novo.'; return; }
+    if (authSession && authController) {
+      try { await authController.signOut(); } catch (_) {}
+    }
+    authSession = null;
     hashSenha = h;
+    modoAcesso = 'legacy';
     sessionStorage.setItem('amj_s', h);
-    sessionStorage.setItem('amj_login_em', String(Date.now()));
-    registrarAtividadeSessao(true);
-    iniciarMonitorSessao();
-    el('tela-login').classList.add('oculto');
-    el('tela-lista').classList.remove('oculto');
-    await carregar();
-    await carregarAgenda({ silencioso: true });
-    agendaIniciarPolling();
+    await abrirAplicativo('legacy', null, false);
   } catch (e) {
     el('erro').textContent = 'Erro ao conectar. Tente de novo.';
   } finally {
-    bt.disabled = false; bt.textContent = 'Entrar';
+    bt.disabled = false; bt.textContent = 'Entrar temporariamente';
   }
 }
 
+el('login-metodo-individual').addEventListener('click', () => selecionarMetodoLogin('auth', true));
+el('login-metodo-temporario').addEventListener('click', () => selecionarMetodoLogin('legacy', true));
+el('login-metodo-individual').parentElement.addEventListener('keydown', evento => {
+  if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(evento.key)) return;
+  evento.preventDefault();
+  const irIndividual = evento.key === 'ArrowLeft' || evento.key === 'Home';
+  selecionarMetodoLogin(irIndividual ? 'auth' : 'legacy', true);
+  el(irIndividual ? 'login-metodo-individual' : 'login-metodo-temporario').focus();
+});
+
 el('entrar').addEventListener('click', () => {
   const v = el('senha').value.trim();
-  if (!v) { el('erro').textContent = 'Digite a senha'; return; }
-  entrar(v);
+  if (!v) { el('erro').textContent = 'Digite a senha temporária.'; return; }
+  void entrarTemporariamente(v);
 });
 el('senha').addEventListener('keydown', e => { if (e.key === 'Enter') el('entrar').click(); });
+
+el('form-login-individual').addEventListener('submit', async evento => {
+  evento.preventDefault();
+  const form = evento.currentTarget;
+  if (!form.reportValidity()) return;
+  const botao = el('entrar-individual');
+  botao.disabled = true; botao.textContent = 'Verificando…';
+  el('auth-login-erro').textContent = '';
+  try {
+    if (!authController) throw new Error('O login individual ainda não está disponível neste aparelho.');
+    const session = await authController.signIn(el('auth-email').value, el('auth-senha').value);
+    hashSenha = null;
+    sessionStorage.removeItem('amj_s');
+    sessionStorage.removeItem('amj_login_em');
+    sessionStorage.removeItem('amj_atividade_em');
+    el('auth-senha').value = '';
+    await processarEtapaAuth(session, false);
+  } catch (erro) {
+    el('auth-login-erro').textContent = mensagemAuth(erro, 'Não foi possível entrar.');
+  } finally {
+    botao.disabled = false; botao.textContent = 'Entrar com segurança';
+  }
+});
+
+el('form-definir-senha').addEventListener('submit', async evento => {
+  evento.preventDefault();
+  const form = evento.currentTarget;
+  if (!form.reportValidity()) return;
+  const senha = el('auth-nova-senha').value;
+  if (senha !== el('auth-confirma-senha').value) {
+    el('auth-convite-erro').textContent = 'As duas senhas precisam ser iguais.';
+    el('auth-confirma-senha').focus();
+    return;
+  }
+  const botao = el('definir-senha');
+  botao.disabled = true; botao.textContent = 'Salvando…';
+  el('auth-convite-erro').textContent = '';
+  try {
+    await authController.updatePassword(senha);
+    el('auth-nova-senha').value = '';
+    el('auth-confirma-senha').value = '';
+    const session = await authController.getSession();
+    await processarEtapaAuth(session, false);
+  } catch (erro) {
+    el('auth-convite-erro').textContent = mensagemAuth(erro, 'Não foi possível salvar a senha.');
+  } finally {
+    botao.disabled = false; botao.textContent = 'Salvar senha e continuar';
+  }
+});
+
+el('form-mfa-cadastro').addEventListener('submit', async evento => {
+  evento.preventDefault();
+  const form = evento.currentTarget;
+  if (!form.reportValidity()) return;
+  const botao = el('mfa-ativar');
+  botao.disabled = true; botao.textContent = 'Confirmando…';
+  el('auth-mfa-cadastro-erro').textContent = '';
+  try {
+    const session = await authController.verifyEnrollment(el('mfa-cadastro-codigo').value);
+    el('mfa-cadastro-codigo').value = '';
+    el('mfa-qr').removeAttribute('src');
+    el('mfa-qr').hidden = true;
+    el('mfa-segredo').textContent = '';
+    await abrirAplicativo('auth', session, false);
+  } catch (erro) {
+    el('auth-mfa-cadastro-erro').textContent = mensagemAuth(erro, 'O código não pôde ser confirmado.');
+    el('mfa-cadastro-codigo').select();
+  } finally {
+    botao.disabled = false; botao.textContent = 'Ativar MFA';
+  }
+});
+
+el('form-mfa-desafio').addEventListener('submit', async evento => {
+  evento.preventDefault();
+  const form = evento.currentTarget;
+  if (!form.reportValidity()) return;
+  const botao = el('mfa-confirmar');
+  botao.disabled = true; botao.textContent = 'Confirmando…';
+  el('auth-mfa-desafio-erro').textContent = '';
+  try {
+    const session = await authController.verifyChallenge(el('mfa-desafio-codigo').value);
+    el('mfa-desafio-codigo').value = '';
+    await abrirAplicativo('auth', session, false);
+  } catch (erro) {
+    el('auth-mfa-desafio-erro').textContent = mensagemAuth(erro, 'O código não pôde ser confirmado.');
+    el('mfa-desafio-codigo').select();
+  } finally {
+    botao.disabled = false; botao.textContent = 'Confirmar e entrar';
+  }
+});
+
+document.querySelectorAll('[data-auth-logout]').forEach(botao => {
+  botao.addEventListener('click', () => { void sair('Sessão encerrada.'); });
+});
+el('encerrar-sessao').addEventListener('click', () => { void sair('Sessão encerrada com segurança.'); });
 el('recarregar').addEventListener('click', carregar);
 el('lista').addEventListener('click', evento => {
   const botao = evento.target.closest('button[data-ficha-acao]');
@@ -854,6 +1337,7 @@ function agendaNormalizar(item) {
     procedimento: String(a.procedimento || ''),
     data_hora: String(a.data_hora || ''),
     duracao_min: Number(a.duracao_min) || 60,
+    retorno_de_id: a.retorno_de_id ? String(a.retorno_de_id) : '',
     retorno_em: a.retorno_em ? String(a.retorno_em).slice(0, 10) : '',
     observacoes: String(a.observacoes || ''),
     lembretes_autorizados: a.lembretes_autorizados === true || a.autoriza_lembretes === true ||
@@ -865,6 +1349,10 @@ function agendaNormalizar(item) {
     lembrete_24h_enviado_em: a.lembrete_24h_enviado_em || null,
     lembrete_2h_enviado_em: a.lembrete_2h_enviado_em || null,
     lembrete_retorno_enviado_em: a.lembrete_retorno_enviado_em || null,
+    lembrete_confirmacao_status: String(a.lembrete_confirmacao_status || ''),
+    lembrete_24h_status: String(a.lembrete_24h_status || ''),
+    lembrete_2h_status: String(a.lembrete_2h_status || ''),
+    lembrete_retorno_status: String(a.lembrete_retorno_status || ''),
     versao: Number(a.versao) || 1,
     updated_at: a.updated_at || null
   };
@@ -873,13 +1361,13 @@ function agendaNormalizar(item) {
 async function agendaRequest(acao, payload) {
   const resposta = await fetch(AGENDA_API, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-senha': hashSenha },
+    headers: await cabecalhosAcesso(true),
     body: JSON.stringify(Object.assign({ acao: acao }, payload || {}))
   });
   let dados = {};
   try { dados = await resposta.json(); } catch (_) {}
-  if (resposta.status === 401) {
-    sair('Sua sessão expirou. Entre novamente.');
+  if (resposta.status === 401 || resposta.status === 403) {
+    await acessoNegado();
     throw new Error('Sessão encerrada');
   }
   if (!resposta.ok || dados.erro) {
@@ -920,6 +1408,7 @@ function agendaTipoLembrete(agendamento) {
 function agendaEhRetorno(agendamento) {
   return agendamento.categoria === 'retorno' ||
     (Boolean(agendamento.retorno_em) && !agendamento.lembrete_retorno_enviado_em &&
+      agendamento.lembrete_retorno_status !== 'convertido' &&
       (AGENDA_STATUS_ATIVOS.has(agendamento.status) || agendamento.status === 'concluido'));
 }
 
@@ -1035,6 +1524,8 @@ function agendaCartao(agendamento) {
   const numero = agendaNumeroWhatsApp(agendamento.telefone);
   const lembrete = lembreteAtual ? lembreteAtual.tipo : '';
   const podeEnviarWhatsApp = agendamento.lembretes_autorizados && Boolean(lembreteAtual);
+  const inicioMs = agendaData(agendamento.data_hora)?.getTime();
+  const atendimentoIniciado = Number.isFinite(inicioMs) && inicioMs <= agendaAgoraMs();
   let html = '<div class="agenda-card-topo"><div><h3>' + esc(agendamento.nome) + '</h3>' +
     '<p class="agenda-meta">' +
     (numero && podeEnviarWhatsApp ? '<a href="https://wa.me/' + numero + '" target="_blank" rel="noopener noreferrer">' +
@@ -1056,6 +1547,9 @@ function agendaCartao(agendamento) {
   if (agendamento.retorno_em) {
     html += '<div class="agenda-detalhe"><strong>Retorno recomendado</strong>' +
       esc(agendaFormatarRetorno(agendamento.retorno_em)) + '</div>';
+  }
+  if (agendamento.lembrete_retorno_status === 'convertido') {
+    html += '<span class="agenda-selo">Retorno já transformado em novo agendamento</span>';
   }
   if (agendamento.observacoes) {
     html += '<div class="agenda-detalhe"><strong>Observações internas</strong>' +
@@ -1085,12 +1579,22 @@ function agendaCartao(agendamento) {
   if (!AGENDA_STATUS_FINAIS.has(agendamento.status)) {
     html += '<button class="agenda-botao alt" type="button" data-agenda-acao="reagendar" data-agenda-id="' +
       esc(agendamento.id) + '">Reagendar</button>';
-    html += '<button class="agenda-botao alt" type="button" data-agenda-acao="status" data-status="concluido" data-agenda-id="' +
-      esc(agendamento.id) + '">Concluir</button>';
-    html += '<button class="agenda-botao alt" type="button" data-agenda-acao="status" data-status="nao_compareceu" data-agenda-id="' +
-      esc(agendamento.id) + '">Faltou</button>';
+    if (atendimentoIniciado) {
+      html += '<button class="agenda-botao alt" type="button" data-agenda-acao="status" data-status="concluido" data-agenda-id="' +
+        esc(agendamento.id) + '">Concluir</button>';
+      html += '<button class="agenda-botao alt" type="button" data-agenda-acao="status" data-status="nao_compareceu" data-agenda-id="' +
+        esc(agendamento.id) + '">Faltou</button>';
+    } else {
+      html += '<span class="agenda-selo">Concluir/Faltou somente após o início</span>';
+    }
     html += '<button class="agenda-botao perigo" type="button" data-agenda-acao="status" data-status="cancelado" data-agenda-id="' +
       esc(agendamento.id) + '">Cancelar</button>';
+  } else if (agendamento.status === 'concluido') {
+    html += '<button class="agenda-botao" type="button" data-agenda-acao="agendar-retorno" data-agenda-id="' +
+      esc(agendamento.id) + '">Agendar retorno</button>';
+  } else if (agendamento.status === 'cancelado' || agendamento.status === 'nao_compareceu') {
+    html += '<button class="agenda-botao alt" type="button" data-agenda-acao="novo-agendamento" data-agenda-id="' +
+      esc(agendamento.id) + '">Novo agendamento</button>';
   }
   html += '</div>';
   artigo.innerHTML = html;
@@ -1163,7 +1667,7 @@ function renderizarAgenda() {
 
 async function carregarAgenda(opcoes) {
   const silencioso = opcoes && opcoes.silencioso === true;
-  if (!hashSenha || agendaCarregando) return;
+  if (!sessaoAplicativoAtiva() || agendaCarregando) return;
   agendaCarregando = true;
   const lista = el('agenda-lista');
   lista.setAttribute('aria-busy', 'true');
@@ -1175,6 +1679,8 @@ async function carregarAgenda(opcoes) {
       agendaAgoraServidor = agoraRecebido;
       agendaAgoraRecebidoEm = performance.now();
     }
+    agendaAutomacao = dados.automacao && typeof dados.automacao === 'object' ? dados.automacao : null;
+    agendaAtualizarEstadoCentral();
     agendaCache = Array.isArray(dados.agendamentos) ? dados.agendamentos.map(agendaNormalizar) : [];
     agendaLembretes = Array.isArray(dados.lembretes_pendentes)
       ? dados.lembretes_pendentes.map(agendaNormalizarLembrete).filter(lembrete => lembrete.id)
@@ -1187,6 +1693,8 @@ async function carregarAgenda(opcoes) {
       : (silencioso ? '' : 'Agenda atualizada.');
     renderizarAgenda();
   } catch (erro) {
+    agendaAutomacao = null;
+    agendaAtualizarEstadoCentral();
     el('agenda-status').classList.add('erro');
     el('agenda-status').textContent = erro.message || 'Não foi possível carregar a agenda agora.';
     if (!agendaCarregada) lista.innerHTML = '<p class="agenda-vazio">A agenda está temporariamente indisponível. As fichas continuam funcionando normalmente.</p>';
@@ -1203,7 +1711,7 @@ function agendaPararPolling() {
 
 function agendaIniciarPolling() {
   agendaPararPolling();
-  if (!hashSenha || document.hidden) return;
+  if (!sessaoAplicativoAtiva() || document.hidden) return;
   agendaPoll = setInterval(() => carregarAgenda({ silencioso: true }), AGENDA_POLL_MS);
 }
 
@@ -1225,22 +1733,55 @@ function agendaAtivarAba(nome, moverFoco) {
   if (agendaAtiva && !agendaCarregada) carregarAgenda();
 }
 
+function agendaAtualizarEstadoCentral() {
+  const estado = el('agenda-automacao-central');
+  estado.classList.remove('ativo', 'erro');
+  if (!agendaAutomacao || agendaAutomacao.configurada !== true) {
+    estado.classList.add('erro');
+    estado.textContent = 'Automação central: indisponível. Atualize a agenda.';
+    return;
+  }
+  const ultima = Date.parse(String(agendaAutomacao.ultima_execucao || ''));
+  const atrasoMs = Number.isFinite(ultima) ? agendaAgoraMs() - ultima : Number.POSITIVE_INFINITY;
+  const recente = atrasoMs >= -60000 && atrasoMs <= 3 * 60_000;
+  if (agendaAutomacao.ultimo_sucesso === true && recente) {
+    estado.classList.add('ativo');
+    const pendencias = Number(agendaAutomacao.pendencias_abertas) || 0;
+    estado.textContent = 'Automação central: ativa · fila do servidor: ' + pendencias +
+      (pendencias === 1 ? ' pendência.' : ' pendências.');
+  } else {
+    estado.classList.add('erro');
+    estado.textContent = agendaAutomacao.ultimo_sucesso === false
+      ? 'Automação central: a última execução falhou. Atualize e confira a agenda.'
+      : 'Automação central: sem varredura recente.';
+  }
+}
+
 function agendaAtualizarEstadoAlertas() {
   const bt = el('agenda-alertas');
+  const estado = el('agenda-alertas-status');
+  estado.classList.remove('ativo', 'erro');
+  bt.disabled = false;
   if (!('Notification' in window)) {
-    bt.textContent = 'Alertas internos ativos';
-    el('agenda-alertas-status').textContent = 'Este navegador não oferece alertas do sistema. Os avisos internos continuam ativos.';
+    bt.textContent = 'Notificações indisponíveis neste aparelho';
+    bt.disabled = true;
+    estado.classList.add('erro');
+    estado.textContent = 'Notificações neste aparelho: indisponíveis. A fila central continua funcionando.';
     return;
   }
   if (Notification.permission === 'granted') {
-    bt.textContent = 'Alertas do navegador ativos';
-    el('agenda-alertas-status').textContent = 'Alertas ativos enquanto o Fichas estiver aberto. Nenhum nome ou procedimento aparece fora do aplicativo.';
+    bt.textContent = 'Notificações permitidas neste aparelho';
+    bt.disabled = true;
+    estado.classList.add('ativo');
+    estado.textContent = 'Notificações neste aparelho: permitidas com o Fichas aberto. A permissão não é compartilhada com outros aparelhos.';
   } else if (Notification.permission === 'denied') {
-    bt.textContent = 'Alertas internos ativos';
-    el('agenda-alertas-status').textContent = 'Os alertas do navegador estão bloqueados. Mantenha o Fichas aberto para ver os avisos internos.';
+    bt.textContent = 'Notificações bloqueadas neste aparelho';
+    bt.disabled = true;
+    estado.classList.add('erro');
+    estado.textContent = 'Notificações neste aparelho: bloqueadas nas configurações do navegador. A fila central continua ativa.';
   } else {
-    bt.textContent = 'Ativar alertas do navegador';
-    el('agenda-alertas-status').textContent = 'Os avisos internos já estão ativos com o Fichas aberto. O navegador só pedirá permissão após seu clique.';
+    bt.textContent = 'Ativar notificações neste aparelho';
+    estado.textContent = 'Notificações neste aparelho: ainda não autorizadas. Cada celular ou computador precisa permitir separadamente.';
   }
 }
 
@@ -1268,6 +1809,7 @@ function agendaLimparFormulario() {
   const form = el('agenda-form');
   form.reset();
   el('agenda-id').value = '';
+  el('agenda-retorno-de-id').value = '';
   el('agenda-data').min = agendaHoje();
   el('agenda-data').value = agendaHoje();
   el('agenda-duracao').value = '60';
@@ -1284,6 +1826,7 @@ function agendaLimparFormulario() {
 function agendaEditar(agendamento, reagendar) {
   agendaReagendando = reagendar === true;
   el('agenda-id').value = agendamento.id;
+  el('agenda-retorno-de-id').value = agendamento.retorno_de_id || '';
   el('agenda-nome').value = agendamento.nome;
   el('agenda-telefone').value = agendaTelefoneFormatado(agendamento.telefone);
   el('agenda-categoria').value = agendamento.categoria;
@@ -1305,6 +1848,36 @@ function agendaEditar(agendamento, reagendar) {
   agendaIdempotencyKey = null;
   el('agenda-editor').scrollIntoView({ behavior: 'smooth', block: 'start' });
   setTimeout(() => (agendaReagendando ? el('agenda-data') : el('agenda-nome')).focus(), 250);
+}
+
+function agendaPrepararNovo(agendamento, comoRetorno) {
+  agendaLimparFormulario();
+  const retorno = comoRetorno === true;
+  el('agenda-retorno-de-id').value = retorno ? agendamento.id : '';
+  el('agenda-nome').value = agendamento.nome;
+  el('agenda-telefone').value = agendaTelefoneFormatado(agendamento.telefone);
+  el('agenda-categoria').value = retorno ? 'retorno' : agendamento.categoria;
+  el('agenda-procedimento').value = agendamento.procedimento;
+  el('agenda-duracao').value = retorno ? '30' : String(agendamento.duracao_min);
+  const hoje = agendaHoje();
+  const sugerida = retorno && agendamento.retorno_em && agendamento.retorno_em >= hoje
+    ? agendamento.retorno_em : hoje;
+  el('agenda-data').value = sugerida;
+  el('agenda-hora').value = '';
+  el('agenda-retorno').value = '';
+  el('agenda-autoriza-lembretes').checked = agendamento.lembretes_autorizados;
+  el('agenda-lembrete-24h').checked = agendamento.lembretes_autorizados && agendamento.lembrete_24h;
+  el('agenda-lembrete-2h').checked = agendamento.lembretes_autorizados && agendamento.lembrete_2h;
+  agendaSincronizarAutorizacao();
+  el('agenda-form-titulo').textContent = retorno ? 'Agendar retorno vinculado' : 'Novo agendamento para esta cliente';
+  el('agenda-salvar').textContent = retorno ? 'Salvar retorno' : 'Salvar agendamento';
+  el('agenda-cancelar-edicao').classList.remove('oculto');
+  el('agenda-form-status').textContent = retorno
+    ? 'O histórico anterior será preservado. Escolha o horário exato do retorno.'
+    : 'Os dados de contato foram reaproveitados. Escolha uma nova data e hora.';
+  el('agenda-editor').open = true;
+  el('agenda-editor').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  setTimeout(() => el('agenda-hora').focus(), 250);
 }
 
 async function agendaAlterarStatus(agendamento, novoStatus, botao) {
@@ -1476,6 +2049,7 @@ el('agenda-form').addEventListener('submit', async evento => {
     data_hora: dataHora.toISOString(),
     duracao_min: Number(el('agenda-duracao').value),
     retorno_em: retorno || null,
+    retorno_de_id: el('agenda-retorno-de-id').value || null,
     observacoes: el('agenda-observacoes').value.trim(),
     lembretes_autorizados: autorizou,
     autoriza_lembretes: autorizou,
@@ -1505,8 +2079,9 @@ el('agenda-form').addEventListener('submit', async evento => {
     agendaLimparFormulario();
     el('agenda-form-status').textContent = avisoSincronizacao
       ? 'Agendamento salvo. Atualize a agenda para conferir os lembretes.'
-      : (mudouHorario ? 'Atendimento reagendado. A nova confirmação foi preparada.' :
-        (atual ? 'Alterações salvas.' : 'Agendamento criado.'));
+      : (resposta.retorno_vinculado ? 'Retorno agendado e vinculado ao atendimento anterior.' :
+        (mudouHorario ? 'Atendimento reagendado. A nova confirmação foi preparada.' :
+        (atual ? 'Alterações salvas.' : 'Agendamento criado.')));
     await carregarAgenda({ silencioso: true });
     const cartao = salvo ? document.querySelector('[data-agenda-id="' + salvo + '"]') : null;
     if (cartao) cartao.focus();
@@ -1537,6 +2112,10 @@ el('agenda-lista').addEventListener('click', evento => {
     agendaEditar(agendamento);
   } else if (acao === 'reagendar') {
     agendaEditar(agendamento, true);
+  } else if (acao === 'agendar-retorno') {
+    agendaPrepararNovo(agendamento, true);
+  } else if (acao === 'novo-agendamento') {
+    agendaPrepararNovo(agendamento, false);
   } else if (acao === 'status') {
     void agendaAlterarStatus(agendamento, botao.dataset.status, botao);
   } else if (acao === 'marcar-lembrete') {
@@ -1548,10 +2127,12 @@ document.addEventListener('visibilitychange', () => {
   if (document.hidden) {
     agendaPararPolling();
   } else if (verificarSessao()) {
+    agendaAtualizarEstadoAlertas();
     carregarAgenda({ silencioso: true });
     agendaIniciarPolling();
   }
 });
+window.addEventListener('focus', agendaAtualizarEstadoAlertas);
 ['pointerdown', 'keydown', 'touchstart'].forEach(tipo => {
   document.addEventListener(tipo, () => registrarAtividadeSessao(false), { passive: true, capture: true });
 });
@@ -1635,6 +2216,11 @@ function aviso(txt) {
 }
 
 el('cv-enviar').addEventListener('click', () => {
+  const doc = documentoConvite();
+  if (doc.liberado === false) {
+    aviso('Documento em validação — convite bloqueado');
+    return;
+  }
   const nome = el('cv-nome').value.trim();
   const tel = el('cv-tel').value.replace(/\D/g, '');
   const texto = encodeURIComponent(mensagem(nome));
@@ -1651,7 +2237,12 @@ el('cv-enviar').addEventListener('click', () => {
 });
 
 el('cv-copiar').addEventListener('click', async () => {
-  const link = documentoConvite().link;
+  const doc = documentoConvite();
+  if (doc.liberado === false) {
+    aviso('Documento em validação — link bloqueado');
+    return;
+  }
+  const link = doc.link;
   try {
     await navigator.clipboard.writeText(link);
     aviso('Link copiado');
@@ -1667,6 +2258,22 @@ el('cv-copiar').addEventListener('click', async () => {
 function atualizarQrConvite() {
   const doc = documentoConvite();
   const box = el('cv-qrbox');
+  const bloqueado = doc.liberado === false;
+  ['cv-enviar', 'cv-copiar', 'cv-qr'].forEach((id) => {
+    el(id).disabled = bloqueado;
+    el(id).setAttribute('aria-disabled', String(bloqueado));
+  });
+  if (bloqueado) {
+    box.classList.add('oculto');
+    el('cv-qr').textContent = 'Ver QR code';
+    el('cv-qr').setAttribute('aria-expanded', 'false');
+    box.querySelector('img').removeAttribute('src');
+    box.querySelector('img').alt = '';
+    box.querySelector('a').removeAttribute('href');
+    box.querySelector('a').removeAttribute('download');
+    box.querySelector('p').textContent = 'Documento em validação — QR code indisponível para pacientes.';
+    return;
+  }
   box.querySelector('img').src = doc.qr;
   box.querySelector('img').alt = 'QR code para ' + doc.nome;
   box.querySelector('a').href = doc.qr;
@@ -1677,6 +2284,10 @@ el('cv-tipo').addEventListener('change', atualizarQrConvite);
 atualizarQrConvite();
 
 el('cv-qr').addEventListener('click', () => {
+  if (documentoConvite().liberado === false) {
+    aviso('Documento em validação — QR code bloqueado');
+    return;
+  }
   const box = el('cv-qrbox');
   const abrindo = box.classList.contains('oculto');
   box.classList.toggle('oculto');
@@ -1685,21 +2296,59 @@ el('cv-qr').addEventListener('click', () => {
   if (abrindo) box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 });
 
-// Sessão legada temporária: permanece somente nesta aba, com expiração por
-// inatividade e limite absoluto. Supabase Auth + MFA substituirá este acesso.
+// Os dois modos permanecem separados. Uma sessão individual inválida nunca
+// tenta a senha temporária; o acesso de transição só começa por escolha explícita.
 (async () => {
+  mostrarTelaAutenticacao('tela-login');
+  selecionarMetodoLogin('auth', false);
+
+  try {
+    if (!window.AMJAuth) throw new Error('O componente de login individual não foi carregado.');
+    authController = window.AMJAuth.createController({
+      supabaseGlobal: window.supabase,
+      supabaseUrl: SUPABASE_URL,
+      publishableKey: SUPABASE_PUBLISHABLE_KEY,
+      storage: window.sessionStorage,
+      windowLike: window,
+      onAuthEvent(evento, session) {
+        if (session) authSession = session;
+        if (evento === 'SIGNED_OUT' && authInicioConcluido && modoAcesso === 'auth' && !authEncerrando) {
+          setTimeout(() => finalizarSaidaInterface('Sua sessão individual foi encerrada. Entre novamente.', 'auth'), 0);
+        }
+      }
+    });
+
+    const inicial = await authController.initialize();
+    authInicioConcluido = true;
+    if (inicial.session) {
+      authSession = inicial.session;
+      modoAcesso = 'auth';
+      const tinhaRelogio = Boolean(Number(sessionStorage.getItem('amj_login_em'))) &&
+        Boolean(Number(sessionStorage.getItem('amj_atividade_em')));
+      if (tinhaRelogio && !sessaoAindaValida()) {
+        await sair('Sua sessão expirou por segurança. Entre novamente.');
+        return;
+      }
+      await processarEtapaAuth(inicial.session, tinhaRelogio);
+      return;
+    }
+  } catch (erro) {
+    authInicioConcluido = true;
+    el('auth-login-erro').textContent = mensagemAuth(erro, 'O login individual não pôde ser iniciado.');
+    if (erro && (erro.code === 'client_unavailable' || erro.code === 'session_storage_unavailable')) {
+      el('login-metodo-individual').disabled = true;
+      selecionarMetodoLogin('legacy', false);
+      el('erro').textContent = 'Use temporariamente este acesso neste aparelho.';
+    }
+  }
+
   const g = sessionStorage.getItem('amj_s');
   if (g && sessaoAindaValida()) {
     hashSenha = g;
-    registrarAtividadeSessao(true);
-    iniciarMonitorSessao();
-    el('tela-login').classList.add('oculto');
-    el('tela-lista').classList.remove('oculto');
-    await carregar();
-    await carregarAgenda({ silencioso: true });
-    agendaIniciarPolling();
+    modoAcesso = 'legacy';
+    await abrirAplicativo('legacy', null, true);
   } else if (g) {
-    sair('Sua sessão expirou por segurança. Entre novamente.');
+    finalizarSaidaInterface('Sua sessão temporária expirou por segurança. Entre novamente.', 'legacy');
   }
 })();
 </script>

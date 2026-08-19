@@ -1,7 +1,24 @@
+import "@supabase/functions-js/edge-runtime.d.ts";
+import {
+  authenticateDual,
+  authResponseFields,
+  DualAuthConfig,
+  DualAuthContext,
+  DualAuthError,
+  writeClinicAudit,
+} from "../_shared/dual-auth.ts";
+
 const HASH_SENHA = (Deno.env.get("PAINEL_HASH_SENHA") || "").toLowerCase();
-const HASH_SENHA_CONFIGURADO = /^[0-9a-f]{64}$/.test(HASH_SENHA);
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+const AUTH_CONFIG: DualAuthConfig = {
+  supabaseUrl: SUPABASE_URL,
+  serviceRoleKey: SERVICE_ROLE,
+  legacyHash: HASH_SENHA,
+  legacyClinicId: Deno.env.get("CLINIC_ID") || "",
+  allowedRoles: ["owner", "professional", "assistant"],
+  requireAal2: true,
+};
 const MAX_BODY_BYTES = 32 * 1024;
 const MAX_LIST_ITEMS = 300;
 
@@ -12,7 +29,12 @@ const ALLOWED_ORIGINS = new Set([
   "http://localhost:8765",
 ]);
 
-const CATEGORIES = new Set(["avaliacao", "procedimento", "retorno", "acompanhamento"]);
+const CATEGORIES = new Set([
+  "avaliacao",
+  "procedimento",
+  "retorno",
+  "acompanhamento",
+]);
 const STATUSES = new Set([
   "solicitado",
   "aguardando_confirmacao",
@@ -22,7 +44,11 @@ const STATUSES = new Set([
   "nao_compareceu",
   "reagendado",
 ]);
-const ACTIVE_STATUSES = new Set(["solicitado", "aguardando_confirmacao", "confirmado"]);
+const ACTIVE_STATUSES = new Set([
+  "solicitado",
+  "aguardando_confirmacao",
+  "confirmado",
+]);
 const ORIGINS = new Set(["painel", "site", "whatsapp", "telefone", "outro"]);
 const REMINDER_TYPES = new Set(["confirmacao", "24h", "2h", "retorno"]);
 const OPEN_REMINDER_STATUSES = new Set(["pendente", "pronto", "falhou"]);
@@ -34,7 +60,12 @@ const STATUS_TRANSITIONS: Record<string, ReadonlySet<string>> = {
     "nao_compareceu",
     "cancelado",
   ]),
-  aguardando_confirmacao: new Set(["confirmado", "concluido", "nao_compareceu", "cancelado"]),
+  aguardando_confirmacao: new Set([
+    "confirmado",
+    "concluido",
+    "nao_compareceu",
+    "cancelado",
+  ]),
   confirmado: new Set(["concluido", "nao_compareceu", "cancelado"]),
   concluido: new Set(),
   cancelado: new Set(),
@@ -81,6 +112,7 @@ const REMINDER_SELECT = [
   "tentativas",
   "template_key",
   "enviado_em",
+  "convertido_em",
   "provider_message_id",
   "erro_codigo",
   "marcado_manualmente",
@@ -129,6 +161,7 @@ interface ReminderRow {
   tentativas: number;
   template_key: string;
   enviado_em: string | null;
+  convertido_em: string | null;
   provider_message_id: string | null;
   erro_codigo: string | null;
   marcado_manualmente: boolean;
@@ -159,6 +192,16 @@ interface NormalizedAppointment {
   motivo_cancelamento: string | null;
 }
 
+interface AutomationStateRow {
+  ultima_execucao: string | null;
+  ultimo_sucesso: boolean;
+  prontos_promovidos: number;
+  cancelados: number;
+  pendencias_abertas: number;
+  ultimo_erro_codigo: string | null;
+  updated_at: string;
+}
+
 class ApiError extends Error {
   constructor(
     readonly status: number,
@@ -170,6 +213,7 @@ class ApiError extends Error {
 }
 
 const attempts = new Map<string, { count: number; resetAt: number }>();
+const requestAuth = new WeakMap<Request, DualAuthContext>();
 
 function cors(req: Request): Record<string, string> {
   const origin = req.headers.get("origin") || "";
@@ -177,14 +221,20 @@ function cors(req: Request): Record<string, string> {
     "Access-Control-Allow-Origin": ALLOWED_ORIGINS.has(origin)
       ? origin
       : "https://anamariajacob.com.br",
-    "Access-Control-Allow-Headers": "content-type, x-senha",
+    "Access-Control-Allow-Headers":
+      "authorization, apikey, content-type, x-senha",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
     "Vary": "Origin",
   };
 }
 
 function json(req: Request, body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
+  const context = requestAuth.get(req);
+  const responseBody =
+    context && body && typeof body === "object" && !Array.isArray(body)
+      ? { ...(body as JsonRecord), ...authResponseFields(context) }
+      : body;
+  return new Response(JSON.stringify(responseBody), {
     status,
     headers: {
       ...cors(req),
@@ -197,17 +247,13 @@ function json(req: Request, body: unknown, status = 200): Response {
   });
 }
 
-function fail(req: Request, code: string, message: string, status = 400): Response {
+function fail(
+  req: Request,
+  code: string,
+  message: string,
+  status = 400,
+): Response {
   return json(req, { erro: message, codigo: code }, status);
-}
-
-function equalConstantTime(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  let difference = 0;
-  for (let index = 0; index < a.length; index++) {
-    difference |= a.charCodeAt(index) ^ b.charCodeAt(index);
-  }
-  return difference === 0;
 }
 
 function hasOwn(source: JsonRecord, key: string): boolean {
@@ -223,7 +269,12 @@ function optionalText(value: unknown, max: number): string | null {
   return text ? text.slice(0, max) : null;
 }
 
-function requiredText(value: unknown, field: string, min: number, max: number): string {
+function requiredText(
+  value: unknown,
+  field: string,
+  min: number,
+  max: number,
+): string {
   const text = stringValue(value);
   if (text.length < min || text.length > max) {
     throw new ApiError(422, "invalid_" + field, `Confira o campo ${field}.`);
@@ -233,16 +284,23 @@ function requiredText(value: unknown, field: string, min: number, max: number): 
 
 function validUuid(value: unknown): value is string {
   return typeof value === "string" &&
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+      .test(value);
 }
 
 function normalizePhone(value: unknown): string {
   let digits = stringValue(value).replace(/\D/g, "");
-  if (digits.startsWith("55") && (digits.length === 12 || digits.length === 13)) {
+  if (
+    digits.startsWith("55") && (digits.length === 12 || digits.length === 13)
+  ) {
     digits = digits.slice(2);
   }
   if (!/^[1-9][0-9]{9,10}$/.test(digits)) {
-    throw new ApiError(422, "invalid_phone", "Informe um WhatsApp brasileiro com DDD.");
+    throw new ApiError(
+      422,
+      "invalid_phone",
+      "Informe um WhatsApp brasileiro com DDD.",
+    );
   }
   return "+55" + digits;
 }
@@ -259,7 +317,11 @@ function normalizeEmail(value: unknown): string | null {
 function normalizeDateTime(value: unknown, field: string): string {
   const text = stringValue(value);
   if (!/(?:z|[+-]\d{2}:\d{2})$/i.test(text)) {
-    throw new ApiError(422, "invalid_" + field, `Informe ${field} com data, hora e fuso horário.`);
+    throw new ApiError(
+      422,
+      "invalid_" + field,
+      `Informe ${field} com data, hora e fuso horário.`,
+    );
   }
   const timestamp = Date.parse(text);
   if (!Number.isFinite(timestamp)) {
@@ -272,11 +334,21 @@ function normalizeDateOnly(value: unknown): string | null {
   const text = stringValue(value);
   if (!text) return null;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) {
-    throw new ApiError(422, "invalid_return_date", "Confira a data recomendada de retorno.");
+    throw new ApiError(
+      422,
+      "invalid_return_date",
+      "Confira a data recomendada de retorno.",
+    );
   }
   const date = new Date(text + "T12:00:00Z");
-  if (!Number.isFinite(date.getTime()) || date.toISOString().slice(0, 10) !== text) {
-    throw new ApiError(422, "invalid_return_date", "Confira a data recomendada de retorno.");
+  if (
+    !Number.isFinite(date.getTime()) || date.toISOString().slice(0, 10) !== text
+  ) {
+    throw new ApiError(
+      422,
+      "invalid_return_date",
+      "Confira a data recomendada de retorno.",
+    );
   }
   return text;
 }
@@ -290,7 +362,8 @@ function dateKeyInSaoPaulo(value: string): string {
     month: "2-digit",
     day: "2-digit",
   }).formatToParts(date);
-  const part = (type: string): string => parts.find((item) => item.type === type)?.value || "";
+  const part = (type: string): string =>
+    parts.find((item) => item.type === type)?.value || "";
   return `${part("year")}-${part("month")}-${part("day")}`;
 }
 
@@ -336,8 +409,14 @@ function reminderRows(data: unknown): ReminderRow[] {
   return Array.isArray(data) ? data as ReminderRow[] : [];
 }
 
+function automationStateRows(data: unknown): AutomationStateRow[] {
+  return Array.isArray(data) ? data as AutomationStateRow[] : [];
+}
+
 async function readJsonBody(req: Request): Promise<JsonRecord> {
-  if (!req.body) throw new ApiError(400, "empty_body", "Envie os dados da solicitação.");
+  if (!req.body) {
+    throw new ApiError(400, "empty_body", "Envie os dados da solicitação.");
+  }
   const reader = req.body.getReader();
   const chunks: Uint8Array[] = [];
   let total = 0;
@@ -349,7 +428,11 @@ async function readJsonBody(req: Request): Promise<JsonRecord> {
       total += value.byteLength;
       if (total > MAX_BODY_BYTES) {
         await reader.cancel();
-        throw new ApiError(413, "payload_too_large", "A solicitação excedeu o limite permitido.");
+        throw new ApiError(
+          413,
+          "payload_too_large",
+          "A solicitação excedeu o limite permitido.",
+        );
       }
       chunks.push(value);
     }
@@ -366,9 +449,15 @@ async function readJsonBody(req: Request): Promise<JsonRecord> {
 
   let parsed: unknown;
   try {
-    parsed = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(merged));
+    parsed = JSON.parse(
+      new TextDecoder("utf-8", { fatal: true }).decode(merged),
+    );
   } catch {
-    throw new ApiError(400, "invalid_json", "Os dados enviados não formam um JSON válido.");
+    throw new ApiError(
+      400,
+      "invalid_json",
+      "Os dados enviados não formam um JSON válido.",
+    );
   }
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
     throw new ApiError(400, "invalid_body", "Envie um objeto JSON válido.");
@@ -381,7 +470,11 @@ async function admin(
   init: RequestInit = {},
 ): Promise<{ response: Response; data: unknown }> {
   if (!SUPABASE_URL || !SERVICE_ROLE) {
-    throw new ApiError(503, "backend_unavailable", "Agenda temporariamente indisponível.");
+    throw new ApiError(
+      503,
+      "backend_unavailable",
+      "Agenda temporariamente indisponível.",
+    );
   }
   const headers = new Headers(init.headers);
   headers.set("apikey", SERVICE_ROLE);
@@ -406,7 +499,9 @@ function normalizeAppointment(
 ): NormalizedAppointment {
   const now = new Date().toISOString();
   const nameSource = hasOwn(payload, "nome") ? payload.nome : existing?.nome;
-  const phoneSource = hasOwn(payload, "telefone") ? payload.telefone : existing?.telefone;
+  const phoneSource = hasOwn(payload, "telefone")
+    ? payload.telefone
+    : existing?.telefone;
   const categorySource = hasOwn(payload, "categoria")
     ? payload.categoria
     : hasOwn(payload, "tipo")
@@ -425,16 +520,31 @@ function normalizeAppointment(
   const telefone = normalizePhone(phoneSource);
   const categoria = stringValue(categorySource).toLowerCase();
   if (!CATEGORIES.has(categoria)) {
-    throw new ApiError(422, "invalid_category", "Escolha uma categoria válida.");
+    throw new ApiError(
+      422,
+      "invalid_category",
+      "Escolha uma categoria válida.",
+    );
   }
   const procedimento = requiredText(procedureSource, "procedimento", 2, 160);
   const inicioEm = normalizeDateTime(startSource, "data_hora");
   const existingDuration = existing
-    ? Math.round((Date.parse(existing.fim_em) - Date.parse(existing.inicio_em)) / 60_000)
+    ? Math.round(
+      (Date.parse(existing.fim_em) - Date.parse(existing.inicio_em)) / 60_000,
+    )
     : 60;
-  const durationSource = hasOwn(payload, "duracao_min") ? payload.duracao_min : undefined;
-  const duracaoMin = integerValue(durationSource, existingDuration, "duracao_min", 15, 720);
-  const fimEm = new Date(Date.parse(inicioEm) + duracaoMin * 60_000).toISOString();
+  const durationSource = hasOwn(payload, "duracao_min")
+    ? payload.duracao_min
+    : undefined;
+  const duracaoMin = integerValue(
+    durationSource,
+    existingDuration,
+    "duracao_min",
+    15,
+    720,
+  );
+  const fimEm = new Date(Date.parse(inicioEm) + duracaoMin * 60_000)
+    .toISOString();
 
   const statusSource = hasOwn(payload, "status")
     ? payload.status
@@ -444,24 +554,44 @@ function normalizeAppointment(
     throw new ApiError(422, "invalid_status", "Escolha um status válido.");
   }
 
-  const originSource = hasOwn(payload, "origem") ? payload.origem : existing?.origem || "painel";
+  const originSource = hasOwn(payload, "origem")
+    ? payload.origem
+    : existing?.origem || "painel";
   const origem = stringValue(originSource).toLowerCase();
   if (!ORIGINS.has(origem)) {
-    throw new ApiError(422, "invalid_origin", "Origem de agendamento inválida.");
+    throw new ApiError(
+      422,
+      "invalid_origin",
+      "Origem de agendamento inválida.",
+    );
   }
 
-  const emailSource = hasOwn(payload, "email") ? payload.email : existing?.email;
-  const notesSource = hasOwn(payload, "observacoes") ? payload.observacoes : existing?.observacoes;
-  const returnSource = hasOwn(payload, "retorno_em") ? payload.retorno_em : existing?.retorno_em;
+  const emailSource = hasOwn(payload, "email")
+    ? payload.email
+    : existing?.email;
+  const notesSource = hasOwn(payload, "observacoes")
+    ? payload.observacoes
+    : existing?.observacoes;
+  const returnSource = hasOwn(payload, "retorno_em")
+    ? payload.retorno_em
+    : existing?.retorno_em;
   const parentSource = hasOwn(payload, "retorno_de_id")
     ? payload.retorno_de_id
     : existing?.retorno_de_id;
   const retornoDeId = stringValue(parentSource) || null;
   if (retornoDeId && !validUuid(retornoDeId)) {
-    throw new ApiError(422, "invalid_return_parent", "Vínculo de retorno inválido.");
+    throw new ApiError(
+      422,
+      "invalid_return_parent",
+      "Vínculo de retorno inválido.",
+    );
   }
   if (existing && retornoDeId === existing.id) {
-    throw new ApiError(422, "invalid_return_parent", "Um retorno não pode apontar para ele mesmo.");
+    throw new ApiError(
+      422,
+      "invalid_return_parent",
+      "Um retorno não pode apontar para ele mesmo.",
+    );
   }
 
   const authorizationValue = hasOwn(payload, "lembretes_autorizados")
@@ -474,10 +604,18 @@ function normalizeAppointment(
     existing?.lembretes_autorizados || false,
     "lembretes_autorizados",
   );
-  const reminder24Value = hasOwn(payload, "lembrete_24h") ? payload.lembrete_24h : undefined;
-  const reminder2Value = hasOwn(payload, "lembrete_2h") ? payload.lembrete_2h : undefined;
+  const reminder24Value = hasOwn(payload, "lembrete_24h")
+    ? payload.lembrete_24h
+    : undefined;
+  const reminder2Value = hasOwn(payload, "lembrete_2h")
+    ? payload.lembrete_2h
+    : undefined;
   const reminder24 = remindersAuthorized
-    ? boolValue(reminder24Value, existing?.lembrete_24h || false, "lembrete_24h")
+    ? boolValue(
+      reminder24Value,
+      existing?.lembrete_24h || false,
+      "lembrete_24h",
+    )
     : false;
   const reminder2 = remindersAuthorized
     ? boolValue(reminder2Value, existing?.lembrete_2h || false, "lembrete_2h")
@@ -486,7 +624,9 @@ function normalizeAppointment(
   let authorizedAt: string | null = null;
   let revokedAt: string | null = null;
   if (remindersAuthorized) {
-    authorizedAt = existing?.lembretes_autorizados ? existing.lembretes_autorizados_em || now : now;
+    authorizedAt = existing?.lembretes_autorizados
+      ? existing.lembretes_autorizados_em || now
+      : now;
   } else if (existing?.lembretes_autorizados) {
     authorizedAt = existing.lembretes_autorizados_em;
     revokedAt = now;
@@ -498,9 +638,18 @@ function normalizeAppointment(
   const reasonSource = hasOwn(payload, "motivo_cancelamento")
     ? payload.motivo_cancelamento
     : existing?.motivo_cancelamento;
-  const cancellationReason = status === "cancelado" ? optionalText(reasonSource, 500) : null;
-  if (status === "cancelado" && (!cancellationReason || cancellationReason.length < 2)) {
-    throw new ApiError(422, "cancellation_reason_required", "Informe o motivo do cancelamento.");
+  const cancellationReason = status === "cancelado"
+    ? optionalText(reasonSource, 500)
+    : null;
+  if (
+    status === "cancelado" &&
+    (!cancellationReason || cancellationReason.length < 2)
+  ) {
+    throw new ApiError(
+      422,
+      "cancellation_reason_required",
+      "Informe o motivo do cancelamento.",
+    );
   }
 
   const retornoEm = normalizeDateOnly(returnSource);
@@ -544,12 +693,41 @@ async function getAppointmentById(id: string): Promise<AppointmentRow | null> {
     }&limit=1`,
   );
   if (!result.response.ok) {
-    throw new ApiError(502, "agenda_read_failed", "Não foi possível ler a agenda.");
+    throw new ApiError(
+      502,
+      "agenda_read_failed",
+      "Não foi possível ler a agenda.",
+    );
   }
   return appointmentRows(result.data)[0] || null;
 }
 
-async function getAppointmentByIdempotency(key: string): Promise<AppointmentRow | null> {
+async function getAutomationState(): Promise<JsonRecord> {
+  const result = await admin(
+    "/rest/v1/agenda_automacao_estado?select=" +
+      "ultima_execucao,ultimo_sucesso,prontos_promovidos,cancelados," +
+      "pendencias_abertas,ultimo_erro_codigo,updated_at&id=eq.true&limit=1",
+  );
+  if (!result.response.ok) {
+    return { configurada: false, ultimo_sucesso: false };
+  }
+  const row = automationStateRows(result.data)[0];
+  if (!row) return { configurada: false, ultimo_sucesso: false };
+  return {
+    configurada: true,
+    ultima_execucao: row.ultima_execucao,
+    ultimo_sucesso: row.ultimo_sucesso,
+    prontos_promovidos: row.prontos_promovidos,
+    cancelados: row.cancelados,
+    pendencias_abertas: row.pendencias_abertas,
+    ultimo_erro_codigo: row.ultimo_erro_codigo,
+    updated_at: row.updated_at,
+  };
+}
+
+async function getAppointmentByIdempotency(
+  key: string,
+): Promise<AppointmentRow | null> {
   const result = await admin(
     `/rest/v1/agendamentos_clinica?select=${APPOINTMENT_SELECT}&idempotency_key=eq.${
       encodeURIComponent(key)
@@ -565,7 +743,11 @@ async function getAppointmentByIdempotency(key: string): Promise<AppointmentRow 
   return appointmentRows(result.data)[0] || null;
 }
 
-async function hasConflict(start: string, end: string, excludeId?: string): Promise<boolean> {
+async function hasConflict(
+  start: string,
+  end: string,
+  excludeId?: string,
+): Promise<boolean> {
   let path = `/rest/v1/agendamentos_clinica?select=id` +
     `&arquivado_em=is.null` +
     `&status=in.(solicitado,aguardando_confirmacao,confirmado)` +
@@ -592,7 +774,11 @@ async function getReminders(appointmentIds: string[]): Promise<ReminderRow[]> {
       `&agendamento_id=in.(${ids})&order=previsto_em.desc&limit=1500`,
   );
   if (!result.response.ok) {
-    throw new ApiError(502, "reminders_read_failed", "Não foi possível ler os lembretes.");
+    throw new ApiError(
+      502,
+      "reminders_read_failed",
+      "Não foi possível ler os lembretes.",
+    );
   }
   return reminderRows(result.data);
 }
@@ -617,6 +803,7 @@ function reminderPlan(
       tentativas: 0,
       template_key: template,
       enviado_em: null,
+      convertido_em: null,
       provider_message_id: null,
       erro_codigo: null,
       marcado_manualmente: false,
@@ -639,7 +826,11 @@ function reminderPlan(
     add("2h", new Date(start - 2 * 60 * 60_000), "agenda_lembrete_2h_v1");
   }
   if (row.retorno_em) {
-    add("retorno", new Date(row.retorno_em + "T09:00:00-03:00"), "agenda_retorno_v1");
+    add(
+      "retorno",
+      new Date(row.retorno_em + "T09:00:00-03:00"),
+      "agenda_retorno_v1",
+    );
   }
   return rows;
 }
@@ -652,21 +843,35 @@ async function cancelOpenReminderTypes(
   if (!safeTypes.length) return;
   const types = `(${safeTypes.join(",")})`;
   const result = await admin(
-    `/rest/v1/agendamento_lembretes?agendamento_id=eq.${encodeURIComponent(appointmentId)}` +
+    `/rest/v1/agendamento_lembretes?agendamento_id=eq.${
+      encodeURIComponent(appointmentId)
+    }` +
       `&tipo=in.${types}&status=in.(pendente,pronto,falhou)`,
     {
       method: "PATCH",
       headers: { Prefer: "return=minimal" },
-      body: JSON.stringify({ status: "cancelado", updated_at: new Date().toISOString() }),
+      body: JSON.stringify({
+        status: "cancelado",
+        updated_at: new Date().toISOString(),
+      }),
     },
   );
   if (!result.response.ok) {
-    throw new ApiError(502, "reminders_update_failed", "Não foi possível atualizar os lembretes.");
+    throw new ApiError(
+      502,
+      "reminders_update_failed",
+      "Não foi possível atualizar os lembretes.",
+    );
   }
 }
 
-async function cancelOpenReminders(appointmentId: string, allTypes: boolean): Promise<void> {
-  const types = allTypes ? ["confirmacao", "24h", "2h", "retorno"] : ["24h", "2h", "retorno"];
+async function cancelOpenReminders(
+  appointmentId: string,
+  allTypes: boolean,
+): Promise<void> {
+  const types = allTypes
+    ? ["confirmacao", "24h", "2h", "retorno"]
+    : ["24h", "2h", "retorno"];
   await cancelOpenReminderTypes(appointmentId, types);
 }
 
@@ -690,29 +895,49 @@ async function insertReminderRows(plan: JsonRecord[]): Promise<void> {
     },
   );
   if (!result.response.ok) {
-    throw new ApiError(502, "reminders_create_failed", "Não foi possível preparar os lembretes.");
+    throw new ApiError(
+      502,
+      "reminders_create_failed",
+      "Não foi possível preparar os lembretes.",
+    );
   }
 }
 
-function sameReminderSchedule(reminder: ReminderRow, planned: JsonRecord): boolean {
+function sameReminderSchedule(
+  reminder: ReminderRow,
+  planned: JsonRecord,
+): boolean {
   return reminder.tipo === planned.tipo &&
-    Math.abs(Date.parse(reminder.previsto_em) - Date.parse(String(planned.previsto_em))) < 1_000;
+    Math.abs(
+        Date.parse(reminder.previsto_em) -
+          Date.parse(String(planned.previsto_em)),
+      ) < 1_000;
 }
 
-function reminderMatchesPlan(reminder: ReminderRow, planned: JsonRecord): boolean {
+function reminderMatchesPlan(
+  reminder: ReminderRow,
+  planned: JsonRecord,
+): boolean {
   if (reminder.tipo !== planned.tipo) return false;
-  return reminder.tipo === "confirmacao" || sameReminderSchedule(reminder, planned);
+  return reminder.tipo === "confirmacao" ||
+    sameReminderSchedule(reminder, planned);
 }
 
-async function updateReminderIds(ids: string[], values: JsonRecord): Promise<void> {
+async function updateReminderIds(
+  ids: string[],
+  values: JsonRecord,
+): Promise<void> {
   const validIds = [...new Set(ids.filter(validUuid))];
   if (!validIds.length) return;
   const encoded = validIds.map((id) => encodeURIComponent(id)).join(",");
-  const result = await admin(`/rest/v1/agendamento_lembretes?id=in.(${encoded})`, {
-    method: "PATCH",
-    headers: { Prefer: "return=minimal" },
-    body: JSON.stringify(values),
-  });
+  const result = await admin(
+    `/rest/v1/agendamento_lembretes?id=in.(${encoded})`,
+    {
+      method: "PATCH",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify(values),
+    },
+  );
   if (!result.response.ok) {
     throw new ApiError(
       502,
@@ -737,14 +962,17 @@ async function ensureReminderPlans(
     const appointmentReminders = currentReminders.filter((item) =>
       item.agendamento_id === appointment.id
     );
-    const includeConfirmation = ["solicitado", "aguardando_confirmacao"].includes(
-      appointment.status,
-    );
+    const includeConfirmation = ["solicitado", "aguardando_confirmacao"]
+      .includes(
+        appointment.status,
+      );
     const desired = reminderPlan(appointment, includeConfirmation, now);
     const keepIds = new Set<string>();
 
     for (const planned of desired) {
-      const candidates = appointmentReminders.filter((item) => reminderMatchesPlan(item, planned));
+      const candidates = appointmentReminders.filter((item) =>
+        reminderMatchesPlan(item, planned)
+      );
       const current = candidates.find((item) => item.status !== "cancelado");
       if (current) {
         keepIds.add(current.id);
@@ -761,24 +989,36 @@ async function ensureReminderPlans(
     }
 
     for (const reminder of appointmentReminders) {
-      if (OPEN_REMINDER_STATUSES.has(reminder.status) && !keepIds.has(reminder.id)) {
+      if (
+        OPEN_REMINDER_STATUSES.has(reminder.status) && !keepIds.has(reminder.id)
+      ) {
         staleIds.push(reminder.id);
       }
     }
   }
 
-  await updateReminderIds(staleIds, { status: "cancelado", updated_at: updatedAt });
+  await updateReminderIds(staleIds, {
+    status: "cancelado",
+    updated_at: updatedAt,
+  });
   const reopened = {
     enviado_em: null,
+    convertido_em: null,
     provider_message_id: null,
     erro_codigo: null,
     marcado_manualmente: false,
     updated_at: updatedAt,
   };
   await updateReminderIds(reopenReadyIds, { ...reopened, status: "pronto" });
-  await updateReminderIds(reopenPendingIds, { ...reopened, status: "pendente" });
+  await updateReminderIds(reopenPendingIds, {
+    ...reopened,
+    status: "pendente",
+  });
   await insertReminderRows(missing);
-  if (!staleIds.length && !reopenReadyIds.length && !reopenPendingIds.length && !missing.length) {
+  if (
+    !staleIds.length && !reopenReadyIds.length && !reopenPendingIds.length &&
+    !missing.length
+  ) {
     return currentReminders;
   }
   return await getReminders(appointments.map((item) => item.id));
@@ -814,21 +1054,27 @@ function reminderIsActionable(
   if (planned > now) return false;
 
   if (reminder.tipo === "retorno") {
-    if (!appointment.retorno_em || (!active && appointment.status !== "concluido")) return false;
+    if (
+      !appointment.retorno_em || (!active && appointment.status !== "concluido")
+    ) return false;
     const expected = Date.parse(appointment.retorno_em + "T09:00:00-03:00");
     return Math.abs(planned - expected) < 1_000;
   }
   if (!active) return false;
   if (reminder.tipo === "confirmacao") {
-    return ["solicitado", "aguardando_confirmacao"].includes(appointment.status) &&
+    return ["solicitado", "aguardando_confirmacao"].includes(
+      appointment.status,
+    ) &&
       now <= start + 60 * 60_000;
   }
   if (reminder.tipo === "24h") {
-    return appointment.lembrete_24h && Math.abs(planned - (start - 24 * 60 * 60_000)) < 1_000 &&
+    return appointment.lembrete_24h &&
+      Math.abs(planned - (start - 24 * 60 * 60_000)) < 1_000 &&
       now < start - 2 * 60 * 60_000;
   }
   if (reminder.tipo === "2h") {
-    return appointment.lembrete_2h && Math.abs(planned - (start - 2 * 60 * 60_000)) < 1_000 &&
+    return appointment.lembrete_2h &&
+      Math.abs(planned - (start - 2 * 60 * 60_000)) < 1_000 &&
       now <= start + 60 * 60_000;
   }
   return false;
@@ -836,18 +1082,28 @@ function reminderIsActionable(
 
 function latestSent(reminders: ReminderRow[], type: string): string | null {
   return reminders
-    .filter((item) => item.tipo === type && item.status === "enviado" && item.enviado_em)
+    .filter((item) =>
+      item.tipo === type && item.status === "enviado" && item.enviado_em
+    )
     .map((item) => item.enviado_em as string)
     .sort()
     .at(-1) || null;
 }
 
-function currentReminderStatus(reminders: ReminderRow[], type: string): string | null {
+function currentReminderStatus(
+  reminders: ReminderRow[],
+  type: string,
+): string | null {
   return reminders.find((item) => item.tipo === type)?.status || null;
 }
 
-function presentAppointment(row: AppointmentRow, reminders: ReminderRow[]): JsonRecord {
-  const duration = Math.round((Date.parse(row.fim_em) - Date.parse(row.inicio_em)) / 60_000);
+function presentAppointment(
+  row: AppointmentRow,
+  reminders: ReminderRow[],
+): JsonRecord {
+  const duration = Math.round(
+    (Date.parse(row.fim_em) - Date.parse(row.inicio_em)) / 60_000,
+  );
   return {
     id: row.id,
     idempotency_key: row.idempotency_key,
@@ -868,7 +1124,10 @@ function presentAppointment(row: AppointmentRow, reminders: ReminderRow[]): Json
     lembretes_autorizados: row.lembretes_autorizados,
     lembrete_24h: row.lembrete_24h,
     lembrete_2h: row.lembrete_2h,
-    lembrete_confirmacao_status: currentReminderStatus(reminders, "confirmacao"),
+    lembrete_confirmacao_status: currentReminderStatus(
+      reminders,
+      "confirmacao",
+    ),
     lembrete_24h_status: currentReminderStatus(reminders, "24h"),
     lembrete_2h_status: currentReminderStatus(reminders, "2h"),
     lembrete_retorno_status: currentReminderStatus(reminders, "retorno"),
@@ -884,25 +1143,37 @@ function presentAppointment(row: AppointmentRow, reminders: ReminderRow[]): Json
   };
 }
 
-function sameIdempotentRequest(row: AppointmentRow, normalized: NormalizedAppointment): boolean {
+function sameIdempotentRequest(
+  row: AppointmentRow,
+  normalized: NormalizedAppointment,
+): boolean {
   return row.nome === normalized.nome &&
     row.telefone === normalized.telefone &&
     row.categoria === normalized.categoria &&
     row.procedimento === normalized.procedimento &&
+    row.retorno_de_id === normalized.retorno_de_id &&
+    row.retorno_em === normalized.retorno_em &&
     Date.parse(row.inicio_em) === Date.parse(normalized.inicio_em) &&
     Date.parse(row.fim_em) === Date.parse(normalized.fim_em);
 }
 
-async function handleList(req: Request, payload: JsonRecord): Promise<Response> {
+async function handleList(
+  req: Request,
+  payload: JsonRecord,
+): Promise<Response> {
   const limit = integerValue(payload.limite, 200, "limite", 1, MAX_LIST_ITEMS);
   let path = `/rest/v1/agendamentos_clinica?select=${APPOINTMENT_SELECT}` +
     `&arquivado_em=is.null&order=inicio_em.desc&limit=${limit}`;
 
   if (payload.de !== undefined) {
-    path += `&inicio_em=gte.${encodeURIComponent(normalizeDateTime(payload.de, "de"))}`;
+    path += `&inicio_em=gte.${
+      encodeURIComponent(normalizeDateTime(payload.de, "de"))
+    }`;
   }
   if (payload.ate !== undefined) {
-    path += `&inicio_em=lte.${encodeURIComponent(normalizeDateTime(payload.ate, "ate"))}`;
+    path += `&inicio_em=lte.${
+      encodeURIComponent(normalizeDateTime(payload.ate, "ate"))
+    }`;
   }
   if (payload.status !== undefined) {
     const status = stringValue(payload.status).toLowerCase();
@@ -914,7 +1185,11 @@ async function handleList(req: Request, payload: JsonRecord): Promise<Response> 
 
   const result = await admin(path);
   if (!result.response.ok) {
-    throw new ApiError(502, "agenda_read_failed", "Não foi possível carregar a agenda.");
+    throw new ApiError(
+      502,
+      "agenda_read_failed",
+      "Não foi possível carregar a agenda.",
+    );
   }
   const appointments = appointmentRows(result.data);
   let reminders = await getReminders(appointments.map((item) => item.id));
@@ -960,24 +1235,81 @@ async function handleList(req: Request, payload: JsonRecord): Promise<Response> 
       };
     })
     .sort((a, b) => Date.parse(a.previsto_em) - Date.parse(b.previsto_em));
+  const automation = await getAutomationState();
 
   return json(req, {
     agendamentos: presented,
     lembretes_pendentes: pending,
     total: presented.length,
     lembretes_sincronizados: remindersSynchronized,
+    automacao: automation,
     agora: new Date().toISOString(),
   });
 }
 
-async function handleCreate(req: Request, payload: JsonRecord): Promise<Response> {
+async function convertReturnReminder(parentId: string): Promise<boolean> {
+  const convertedAt = new Date().toISOString();
+  const converted = await admin(
+    `/rest/v1/agendamento_lembretes?agendamento_id=eq.${
+      encodeURIComponent(parentId)
+    }&tipo=eq.retorno&status=in.(pendente,pronto,falhou)`,
+    {
+      method: "PATCH",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({
+        status: "convertido",
+        convertido_em: convertedAt,
+        enviado_em: null,
+        provider_message_id: null,
+        erro_codigo: "retorno_convertido_em_agendamento",
+        marcado_manualmente: false,
+        updated_at: convertedAt,
+      }),
+    },
+  );
+  return converted.response.ok;
+}
+
+async function handleCreate(
+  req: Request,
+  payload: JsonRecord,
+): Promise<Response> {
   const key = hasOwn(payload, "idempotency_key")
     ? payload.idempotency_key
     : payload.chave_idempotencia;
   if (!validUuid(key)) {
-    throw new ApiError(422, "invalid_idempotency", "Atualize a página e tente novamente.");
+    throw new ApiError(
+      422,
+      "invalid_idempotency",
+      "Atualize a página e tente novamente.",
+    );
   }
   const normalized = normalizeAppointment(payload);
+  if (["concluido", "nao_compareceu"].includes(normalized.status)) {
+    throw new ApiError(
+      422,
+      "future_status_not_allowed",
+      "Um novo atendimento não pode começar como concluído ou não compareceu.",
+    );
+  }
+  let returnParent: AppointmentRow | null = null;
+  if (normalized.retorno_de_id) {
+    if (normalized.categoria !== "retorno") {
+      throw new ApiError(
+        422,
+        "invalid_return_parent",
+        "O vínculo com atendimento anterior é exclusivo de um retorno.",
+      );
+    }
+    returnParent = await getAppointmentById(normalized.retorno_de_id);
+    if (!returnParent || returnParent.arquivado_em) {
+      throw new ApiError(
+        404,
+        "return_parent_not_found",
+        "O atendimento de origem não foi encontrado.",
+      );
+    }
+  }
   const previous = await getAppointmentByIdempotency(key);
   if (previous) {
     if (!sameIdempotentRequest(previous, normalized)) {
@@ -988,56 +1320,91 @@ async function handleCreate(req: Request, payload: JsonRecord): Promise<Response
       );
     }
     const sync = await synchronizeAppointmentReminders(previous);
+    const returnConverted = returnParent
+      ? await convertReturnReminder(returnParent.id)
+      : true;
     return json(req, {
       agendamento: presentAppointment(previous, sync.reminders),
       idempotente: true,
-      lembretes_sincronizados: sync.synchronized,
+      lembretes_sincronizados: sync.synchronized && returnConverted,
+      retorno_vinculado: Boolean(returnParent),
     });
   }
 
   if (Date.parse(normalized.inicio_em) <= Date.now()) {
-    throw new ApiError(422, "appointment_not_future", "Escolha um horário futuro.");
+    throw new ApiError(
+      422,
+      "appointment_not_future",
+      "Escolha um horário futuro.",
+    );
   }
 
   if (
     ACTIVE_STATUSES.has(normalized.status) &&
     await hasConflict(normalized.inicio_em, normalized.fim_em)
   ) {
-    throw new ApiError(409, "schedule_conflict", "Já existe outro atendimento nesse período.");
+    throw new ApiError(
+      409,
+      "schedule_conflict",
+      "Já existe outro atendimento nesse período.",
+    );
   }
 
-  const result = await admin(`/rest/v1/agendamentos_clinica?select=${APPOINTMENT_SELECT}`, {
-    method: "POST",
-    headers: { Prefer: "return=representation" },
-    body: JSON.stringify({ idempotency_key: key, ...normalized }),
-  });
+  const result = await admin(
+    `/rest/v1/agendamentos_clinica?select=${APPOINTMENT_SELECT}`,
+    {
+      method: "POST",
+      headers: { Prefer: "return=representation" },
+      body: JSON.stringify({ idempotency_key: key, ...normalized }),
+    },
+  );
   if (!result.response.ok) {
     if (result.response.status === 409) {
       const concurrent = await getAppointmentByIdempotency(key);
       if (concurrent && sameIdempotentRequest(concurrent, normalized)) {
         const sync = await synchronizeAppointmentReminders(concurrent);
+        const returnConverted = returnParent
+          ? await convertReturnReminder(returnParent.id)
+          : true;
         return json(req, {
           agendamento: presentAppointment(concurrent, sync.reminders),
           idempotente: true,
-          lembretes_sincronizados: sync.synchronized,
+          lembretes_sincronizados: sync.synchronized && returnConverted,
+          retorno_vinculado: Boolean(returnParent),
         });
       }
-      throw new ApiError(409, "schedule_conflict", "Já existe outro atendimento nesse período.");
+      throw new ApiError(
+        409,
+        "schedule_conflict",
+        "Já existe outro atendimento nesse período.",
+      );
     }
-    throw new ApiError(502, "agenda_create_failed", "Não foi possível salvar o agendamento.");
+    throw new ApiError(
+      502,
+      "agenda_create_failed",
+      "Não foi possível salvar o agendamento.",
+    );
   }
 
   const created = appointmentRows(result.data)[0];
   if (!created) {
-    throw new ApiError(502, "agenda_create_failed", "Não foi possível confirmar o agendamento.");
+    throw new ApiError(
+      502,
+      "agenda_create_failed",
+      "Não foi possível confirmar o agendamento.",
+    );
   }
   const sync = await synchronizeAppointmentReminders(created);
+  const returnConverted = returnParent
+    ? await convertReturnReminder(returnParent.id)
+    : true;
   return json(
     req,
     {
       agendamento: presentAppointment(created, sync.reminders),
       idempotente: false,
-      lembretes_sincronizados: sync.synchronized,
+      lembretes_sincronizados: sync.synchronized && returnConverted,
+      retorno_vinculado: Boolean(returnParent),
     },
     201,
   );
@@ -1057,19 +1424,41 @@ function checkConcurrency(payload: JsonRecord, existing: AppointmentRow): void {
   }
   const updatedAt = stringValue(payload.updated_at);
   if (!updatedAt || Date.parse(updatedAt) !== Date.parse(existing.updated_at)) {
-    throw new ApiError(409, "stale_record", "Recarregue a agenda antes de alterar.");
+    throw new ApiError(
+      409,
+      "stale_record",
+      "Recarregue a agenda antes de alterar.",
+    );
   }
 }
 
-async function handleUpdate(req: Request, payload: JsonRecord): Promise<Response> {
-  if (!validUuid(payload.id)) throw new ApiError(422, "invalid_id", "Agendamento inválido.");
+async function handleUpdate(
+  req: Request,
+  payload: JsonRecord,
+): Promise<Response> {
+  if (!validUuid(payload.id)) {
+    throw new ApiError(422, "invalid_id", "Agendamento inválido.");
+  }
   const existing = await getAppointmentById(payload.id);
   if (!existing || existing.arquivado_em) {
     throw new ApiError(404, "not_found", "Agendamento não encontrado.");
   }
   checkConcurrency(payload, existing);
   const normalized = normalizeAppointment(payload, existing);
-  const scheduleChanged = Date.parse(existing.inicio_em) !== Date.parse(normalized.inicio_em);
+  const scheduleChanged =
+    Date.parse(existing.inicio_em) !== Date.parse(normalized.inicio_em);
+  if (
+    !scheduleChanged &&
+    normalized.status !== existing.status &&
+    ["concluido", "nao_compareceu"].includes(normalized.status) &&
+    Date.now() < Date.parse(existing.inicio_em)
+  ) {
+    throw new ApiError(
+      422,
+      "future_status_not_allowed",
+      "Concluir ou marcar falta só é permitido depois do início do atendimento.",
+    );
+  }
   if (scheduleChanged) {
     if (payload.reagendar !== true) {
       throw new ApiError(
@@ -1086,7 +1475,11 @@ async function handleUpdate(req: Request, payload: JsonRecord): Promise<Response
       );
     }
     if (Date.parse(normalized.inicio_em) <= Date.now()) {
-      throw new ApiError(422, "appointment_not_future", "Escolha um novo horário futuro.");
+      throw new ApiError(
+        422,
+        "appointment_not_future",
+        "Escolha um novo horário futuro.",
+      );
     }
     normalized.status = "aguardando_confirmacao";
     normalized.cancelado_em = null;
@@ -1099,7 +1492,11 @@ async function handleUpdate(req: Request, payload: JsonRecord): Promise<Response
     ACTIVE_STATUSES.has(normalized.status) &&
     await hasConflict(normalized.inicio_em, normalized.fim_em, existing.id)
   ) {
-    throw new ApiError(409, "schedule_conflict", "Já existe outro atendimento nesse período.");
+    throw new ApiError(
+      409,
+      "schedule_conflict",
+      "Já existe outro atendimento nesse período.",
+    );
   }
 
   const now = new Date().toISOString();
@@ -1110,18 +1507,34 @@ async function handleUpdate(req: Request, payload: JsonRecord): Promise<Response
     {
       method: "PATCH",
       headers: { Prefer: "return=representation" },
-      body: JSON.stringify({ ...normalized, versao: nextVersion, updated_at: now }),
+      body: JSON.stringify({
+        ...normalized,
+        versao: nextVersion,
+        updated_at: now,
+      }),
     },
   );
   if (!result.response.ok) {
     if (result.response.status === 409) {
-      throw new ApiError(409, "schedule_conflict", "Já existe outro atendimento nesse período.");
+      throw new ApiError(
+        409,
+        "schedule_conflict",
+        "Já existe outro atendimento nesse período.",
+      );
     }
-    throw new ApiError(502, "agenda_update_failed", "Não foi possível atualizar o agendamento.");
+    throw new ApiError(
+      502,
+      "agenda_update_failed",
+      "Não foi possível atualizar o agendamento.",
+    );
   }
   const updated = appointmentRows(result.data)[0];
   if (!updated) {
-    throw new ApiError(409, "stale_record", "O agendamento mudou. Recarregue a agenda.");
+    throw new ApiError(
+      409,
+      "stale_record",
+      "O agendamento mudou. Recarregue a agenda.",
+    );
   }
 
   let reminders = await getReminders([updated.id]);
@@ -1149,9 +1562,14 @@ async function handleUpdate(req: Request, payload: JsonRecord): Promise<Response
   });
 }
 
-async function handleStatus(req: Request, payload: JsonRecord): Promise<Response> {
+async function handleStatus(
+  req: Request,
+  payload: JsonRecord,
+): Promise<Response> {
   const statusPayload: JsonRecord = { ...payload };
-  if (!hasOwn(statusPayload, "status") && hasOwn(statusPayload, "novo_status")) {
+  if (
+    !hasOwn(statusPayload, "status") && hasOwn(statusPayload, "novo_status")
+  ) {
     statusPayload.status = statusPayload.novo_status;
   }
   return await handleUpdate(req, statusPayload);
@@ -1167,13 +1585,22 @@ function normalizeReminderType(value: unknown): string {
   };
   const type = aliases[raw] || raw;
   if (!REMINDER_TYPES.has(type)) {
-    throw new ApiError(422, "invalid_reminder_type", "Tipo de lembrete inválido.");
+    throw new ApiError(
+      422,
+      "invalid_reminder_type",
+      "Tipo de lembrete inválido.",
+    );
   }
   return type;
 }
 
-async function handleReminder(req: Request, payload: JsonRecord): Promise<Response> {
-  if (!validUuid(payload.id)) throw new ApiError(422, "invalid_id", "Agendamento inválido.");
+async function handleReminder(
+  req: Request,
+  payload: JsonRecord,
+): Promise<Response> {
+  if (!validUuid(payload.id)) {
+    throw new ApiError(422, "invalid_id", "Agendamento inválido.");
+  }
   if (!validUuid(payload.lembrete_id)) {
     throw new ApiError(
       422,
@@ -1186,7 +1613,11 @@ async function handleReminder(req: Request, payload: JsonRecord): Promise<Respon
     throw new ApiError(404, "not_found", "Agendamento não encontrado.");
   }
   if (!appointment.lembretes_autorizados) {
-    throw new ApiError(409, "reminders_not_authorized", "Os lembretes não estão autorizados.");
+    throw new ApiError(
+      409,
+      "reminders_not_authorized",
+      "Os lembretes não estão autorizados.",
+    );
   }
   const typeSource = hasOwn(payload, "tipo")
     ? payload.tipo
@@ -1196,7 +1627,11 @@ async function handleReminder(req: Request, payload: JsonRecord): Promise<Respon
   const type = normalizeReminderType(typeSource);
   const nextStatus = stringValue(payload.status || "enviado").toLowerCase();
   if (!["pronto", "enviado", "cancelado"].includes(nextStatus)) {
-    throw new ApiError(422, "invalid_reminder_status", "Status de lembrete inválido.");
+    throw new ApiError(
+      422,
+      "invalid_reminder_status",
+      "Status de lembrete inválido.",
+    );
   }
 
   const path = `/rest/v1/agendamento_lembretes?select=${REMINDER_SELECT}` +
@@ -1205,10 +1640,16 @@ async function handleReminder(req: Request, payload: JsonRecord): Promise<Respon
     `&tipo=eq.${encodeURIComponent(type)}&limit=1`;
   const currentResult = await admin(path);
   if (!currentResult.response.ok) {
-    throw new ApiError(502, "reminder_read_failed", "Não foi possível abrir o lembrete.");
+    throw new ApiError(
+      502,
+      "reminder_read_failed",
+      "Não foi possível abrir o lembrete.",
+    );
   }
   const current = reminderRows(currentResult.data)[0];
-  if (!current) throw new ApiError(404, "reminder_not_found", "Lembrete não encontrado.");
+  if (!current) {
+    throw new ApiError(404, "reminder_not_found", "Lembrete não encontrado.");
+  }
   const nowMs = Date.now();
   if (!reminderIsActionable(current, appointment, nowMs)) {
     throw new ApiError(
@@ -1222,8 +1663,11 @@ async function handleReminder(req: Request, payload: JsonRecord): Promise<Respon
   const update = {
     status: nextStatus,
     enviado_em: nextStatus === "enviado" ? now : null,
+    convertido_em: null,
     marcado_manualmente: nextStatus === "enviado",
-    tentativas: nextStatus === "pronto" ? Math.min(10, current.tentativas + 1) : current.tentativas,
+    tentativas: nextStatus === "pronto"
+      ? Math.min(10, current.tentativas + 1)
+      : current.tentativas,
     erro_codigo: null,
     updated_at: now,
   };
@@ -1238,11 +1682,19 @@ async function handleReminder(req: Request, payload: JsonRecord): Promise<Respon
     },
   );
   if (!updateResult.response.ok) {
-    throw new ApiError(502, "reminder_update_failed", "Não foi possível atualizar o lembrete.");
+    throw new ApiError(
+      502,
+      "reminder_update_failed",
+      "Não foi possível atualizar o lembrete.",
+    );
   }
   const updatedReminder = reminderRows(updateResult.data)[0];
   if (!updatedReminder) {
-    throw new ApiError(409, "reminder_changed", "O lembrete mudou. Atualize a agenda.");
+    throw new ApiError(
+      409,
+      "reminder_changed",
+      "O lembrete mudou. Atualize a agenda.",
+    );
   }
   let remindersSynchronized = true;
   if (nextStatus === "enviado" && type === "2h") {
@@ -1266,75 +1718,211 @@ async function handleReminder(req: Request, payload: JsonRecord): Promise<Respon
   });
 }
 
+async function auditAgendaResponse(
+  authContext: DualAuthContext,
+  action: string,
+  payload: JsonRecord,
+  response: Response,
+): Promise<void> {
+  let entityId = validUuid(payload.id) ? payload.id : null;
+  let resultCount: number | undefined;
+  let idempotent: boolean | undefined;
+  try {
+    const body = await response.clone().json() as JsonRecord;
+    if (!entityId) {
+      const appointment =
+        body.agendamento && typeof body.agendamento === "object"
+          ? body.agendamento as JsonRecord
+          : null;
+      if (appointment && validUuid(appointment.id)) entityId = appointment.id;
+    }
+    if (Array.isArray(body.agendamentos)) {
+      resultCount = body.agendamentos.length;
+    }
+    if (typeof body.idempotente === "boolean") idempotent = body.idempotente;
+  } catch {
+    // O corpo já está pronto para o cliente; falha de leitura da cópia não altera a operação.
+  }
+
+  await writeClinicAudit(AUTH_CONFIG, authContext, {
+    entity: "appointment",
+    entityId,
+    action,
+    outcome: response.ok ? "success" : "error",
+    details: {
+      endpoint: "agenda-fichas",
+      status_code: response.status,
+      result_count: resultCount,
+      idempotent,
+    },
+  });
+}
+
 Deno.serve(async (req: Request) => {
   const origin = req.headers.get("origin") || "";
   if (req.method === "OPTIONS") {
-    if (origin && !ALLOWED_ORIGINS.has(origin)) return new Response(null, { status: 403 });
+    if (origin && !ALLOWED_ORIGINS.has(origin)) {
+      return new Response(null, { status: 403 });
+    }
     return new Response(null, { status: 204, headers: cors(req) });
   }
-  if (req.method !== "POST") return fail(req, "method_not_allowed", "Método não permitido.", 405);
+  if (req.method !== "POST") {
+    return fail(req, "method_not_allowed", "Método não permitido.", 405);
+  }
   if (origin && !ALLOWED_ORIGINS.has(origin)) {
     return fail(req, "origin_not_allowed", "Origem não permitida.", 403);
   }
-  if (!HASH_SENHA_CONFIGURADO || !SUPABASE_URL || !SERVICE_ROLE) {
+  if (!SUPABASE_URL || !SERVICE_ROLE) {
     console.error("Agenda environment is not configured");
-    return fail(req, "backend_unavailable", "Agenda temporariamente indisponível.", 503);
+    return fail(
+      req,
+      "backend_unavailable",
+      "Agenda temporariamente indisponível.",
+      503,
+    );
   }
 
-  const contentType = (req.headers.get("content-type") || "").split(";", 1)[0].trim().toLowerCase();
+  const contentType = (req.headers.get("content-type") || "").split(";", 1)[0]
+    .trim().toLowerCase();
   if (contentType !== "application/json") {
     return fail(req, "invalid_content_type", "Envie os dados em JSON.", 415);
   }
   const declaredLength = Number(req.headers.get("content-length") || "0");
   if (Number.isFinite(declaredLength) && declaredLength > MAX_BODY_BYTES) {
-    return fail(req, "payload_too_large", "A solicitação excedeu o limite permitido.", 413);
+    return fail(
+      req,
+      "payload_too_large",
+      "A solicitação excedeu o limite permitido.",
+      413,
+    );
   }
 
+  const bearerPresent = Boolean(
+    (req.headers.get("authorization") || "").trim(),
+  );
   const ip = req.headers.get("cf-connecting-ip") ||
     req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
   const now = Date.now();
   const record = attempts.get(ip);
-  if (record && record.resetAt > now && record.count >= 12) {
-    return fail(req, "rate_limited", "Muitas tentativas. Aguarde alguns minutos.", 429);
+  if (!bearerPresent && record && record.resetAt > now && record.count >= 12) {
+    return fail(
+      req,
+      "rate_limited",
+      "Muitas tentativas. Aguarde alguns minutos.",
+      429,
+    );
   }
 
-  const sent = (req.headers.get("x-senha") || "").toLowerCase();
-  if (!equalConstantTime(sent, HASH_SENHA)) {
-    const current = record && record.resetAt > now
-      ? record
-      : { count: 0, resetAt: now + 10 * 60_000 };
-    current.count++;
-    attempts.set(ip, current);
-    await new Promise((resolve) => setTimeout(resolve, 700));
-    return fail(req, "invalid_password", "Senha incorreta.", 401);
-  }
-  attempts.delete(ip);
-
+  let authContext: DualAuthContext;
   try {
-    const payload = await readJsonBody(req);
-    const action = stringValue(payload.acao).toLowerCase();
+    authContext = await authenticateDual(req, AUTH_CONFIG);
+  } catch (error) {
+    if (error instanceof DualAuthError) {
+      if (!bearerPresent && error.code === "invalid_password") {
+        const current = record && record.resetAt > now
+          ? record
+          : { count: 0, resetAt: now + 10 * 60_000 };
+        current.count++;
+        attempts.set(ip, current);
+        await new Promise((resolve) => setTimeout(resolve, 700));
+      }
+      if (error.auditContext) {
+        requestAuth.set(req, error.auditContext);
+        await writeClinicAudit(AUTH_CONFIG, error.auditContext, {
+          entity: "access",
+          action: "authenticate",
+          outcome: "denied",
+          details: { endpoint: "agenda-fichas", reason_code: error.code },
+        });
+      }
+      return fail(req, error.code, error.publicMessage, error.status);
+    }
+    console.error("Agenda authentication failed");
+    return fail(
+      req,
+      "auth_unavailable",
+      "Autenticação temporariamente indisponível.",
+      503,
+    );
+  }
+  requestAuth.set(req, authContext);
+  if (!bearerPresent) attempts.delete(ip);
+
+  let payload: JsonRecord | null = null;
+  let action = "request";
+  try {
+    payload = await readJsonBody(req);
+    action = stringValue(payload.acao).toLowerCase();
+    let response: Response;
     switch (action) {
       case "listar":
-        return await handleList(req, payload);
+        response = await handleList(req, payload);
+        break;
       case "criar":
-        return await handleCreate(req, payload);
+        response = await handleCreate(req, payload);
+        break;
       case "atualizar":
-        return await handleUpdate(req, payload);
+        response = await handleUpdate(req, payload);
+        break;
       case "status":
       case "marcar_status":
-        return await handleStatus(req, payload);
+        response = await handleStatus(req, payload);
+        break;
       case "lembrete":
       case "marcar_lembrete":
-        return await handleReminder(req, payload);
+        response = await handleReminder(req, payload);
+        break;
       default:
+        await writeClinicAudit(AUTH_CONFIG, authContext, {
+          entity: "appointment",
+          action: "validate_request",
+          outcome: "error",
+          details: { endpoint: "agenda-fichas", reason_code: "invalid_action" },
+        });
         return fail(req, "invalid_action", "Ação de agenda inválida.", 422);
     }
+    const auditAction = action === "marcar_status"
+      ? "status"
+      : action === "marcar_lembrete"
+      ? "lembrete"
+      : action;
+    await auditAgendaResponse(authContext, auditAction, payload, response);
+    return response;
   } catch (error) {
-    if (error instanceof ApiError) return fail(req, error.code, error.message, error.status);
+    const entityId = payload && validUuid(payload.id) ? payload.id : null;
+    if (error instanceof ApiError) {
+      await writeClinicAudit(AUTH_CONFIG, authContext, {
+        entity: "appointment",
+        entityId,
+        action: "request",
+        outcome: "error",
+        details: {
+          endpoint: "agenda-fichas",
+          reason_code: error.code,
+          status_code: error.status,
+        },
+      });
+      return fail(req, error.code, error.message, error.status);
+    }
     console.error(
       "Agenda request failed",
       error instanceof Error ? error.message : "unknown_error",
     );
-    return fail(req, "internal_error", "Não foi possível concluir a operação agora.", 500);
+    await writeClinicAudit(AUTH_CONFIG, authContext, {
+      entity: "appointment",
+      entityId,
+      action: "request",
+      outcome: "error",
+      details: {
+        endpoint: "agenda-fichas",
+        reason_code: "unhandled_error",
+      },
+    });
+    return fail(
+      req,
+      "internal_error",
+      "Não foi possível concluir a operação agora.",
+      500,
+    );
   }
 });

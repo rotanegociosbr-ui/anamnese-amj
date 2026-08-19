@@ -1,11 +1,26 @@
 import "@supabase/functions-js/edge-runtime.d.ts";
+import {
+  authenticateDual,
+  authResponseFields,
+  DualAuthConfig,
+  DualAuthContext,
+  DualAuthError,
+  writeClinicAudit,
+} from "../_shared/dual-auth.ts";
 
-// Compatível com o painel atual. A senha em hash permanece durante esta etapa;
-// uma migração futura para Supabase Auth não deve ser misturada ao primeiro TCLE.
+// Transição DUAL: um Bearer presente é sempre validado pelo Supabase Auth e
+// nunca cai na senha compartilhada. Sem Bearer, o acesso legado segue ativo.
 const HASH_SENHA = (Deno.env.get("PAINEL_HASH_SENHA") || "").toLowerCase();
-const HASH_SENHA_CONFIGURADO = /^[0-9a-f]{64}$/.test(HASH_SENHA);
 const URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const AUTH_CONFIG: DualAuthConfig = {
+  supabaseUrl: URL,
+  serviceRoleKey: SERVICE,
+  legacyHash: HASH_SENHA,
+  legacyClinicId: Deno.env.get("CLINIC_ID") || "",
+  allowedRoles: ["owner", "professional"],
+  requireAal2: true,
+};
 const ALLOWED_ORIGINS = new Set([
   "https://anamariajacob.com.br",
   "https://www.anamariajacob.com.br",
@@ -41,6 +56,7 @@ const DOCUMENT_TYPES: Record<string, { label: string; filename: string }> = {
 };
 
 const attempts = new Map<string, { count: number; resetAt: number }>();
+const requestAuth = new WeakMap<Request, DualAuthContext>();
 
 function cors(req: Request): Record<string, string> {
   const origin = req.headers.get("origin") || "";
@@ -48,14 +64,20 @@ function cors(req: Request): Record<string, string> {
     "Access-Control-Allow-Origin": ALLOWED_ORIGINS.has(origin)
       ? origin
       : "https://anamariajacob.com.br",
-    "Access-Control-Allow-Headers": "content-type, x-senha",
+    "Access-Control-Allow-Headers":
+      "authorization, apikey, content-type, x-senha",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
     "Vary": "Origin",
   };
 }
 
 function json(req: Request, body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
+  const context = requestAuth.get(req);
+  const responseBody =
+    context && body && typeof body === "object" && !Array.isArray(body)
+      ? { ...(body as Record<string, unknown>), ...authResponseFields(context) }
+      : body;
+  return new Response(JSON.stringify(responseBody), {
     status,
     headers: {
       ...cors(req),
@@ -65,15 +87,6 @@ function json(req: Request, body: unknown, status = 200): Response {
       "X-Content-Type-Options": "nosniff",
     },
   });
-}
-
-function equalConstantTime(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  let difference = 0;
-  for (let index = 0; index < a.length; index++) {
-    difference |= a.charCodeAt(index) ^ b.charCodeAt(index);
-  }
-  return difference === 0;
 }
 
 async function admin(path: string, init: RequestInit = {}): Promise<Response> {
@@ -165,16 +178,19 @@ Deno.serve(async (req: Request) => {
   if (origin && !ALLOWED_ORIGINS.has(origin)) {
     return json(req, { erro: "Origem não permitida" }, 403);
   }
-  if (!HASH_SENHA_CONFIGURADO) {
-    console.error("PAINEL_HASH_SENHA ausente ou inválido");
+  if (!URL || !SERVICE) {
+    console.error("Painel backend environment is not configured");
     return json(req, { erro: "Acesso temporariamente indisponível" }, 503);
   }
 
+  const bearerPresent = Boolean(
+    (req.headers.get("authorization") || "").trim(),
+  );
   const ip = req.headers.get("cf-connecting-ip") ||
     req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
   const now = Date.now();
   const record = attempts.get(ip);
-  if (record && record.resetAt > now && record.count >= 12) {
+  if (!bearerPresent && record && record.resetAt > now && record.count >= 12) {
     return json(
       req,
       { erro: "Muitas tentativas. Aguarde alguns minutos." },
@@ -182,17 +198,39 @@ Deno.serve(async (req: Request) => {
     );
   }
 
-  const sent = (req.headers.get("x-senha") || "").toLowerCase();
-  if (!equalConstantTime(sent, HASH_SENHA)) {
-    const current = record && record.resetAt > now
-      ? record
-      : { count: 0, resetAt: now + 10 * 60_000 };
-    current.count++;
-    attempts.set(ip, current);
-    await new Promise((resolve) => setTimeout(resolve, 700));
-    return json(req, { erro: "Senha incorreta" }, 401);
+  let authContext: DualAuthContext;
+  try {
+    authContext = await authenticateDual(req, AUTH_CONFIG);
+  } catch (error) {
+    if (error instanceof DualAuthError) {
+      if (!bearerPresent && error.code === "invalid_password") {
+        const current = record && record.resetAt > now
+          ? record
+          : { count: 0, resetAt: now + 10 * 60_000 };
+        current.count++;
+        attempts.set(ip, current);
+        await new Promise((resolve) => setTimeout(resolve, 700));
+      }
+      if (error.auditContext) {
+        requestAuth.set(req, error.auditContext);
+        await writeClinicAudit(AUTH_CONFIG, error.auditContext, {
+          entity: "access",
+          action: "authenticate",
+          outcome: "denied",
+          details: { endpoint: "painel-fichas", reason_code: error.code },
+        });
+      }
+      return json(
+        req,
+        { erro: error.publicMessage, codigo: error.code },
+        error.status,
+      );
+    }
+    console.error("Painel authentication failed");
+    return json(req, { erro: "Acesso temporariamente indisponível" }, 503);
   }
-  attempts.delete(ip);
+  requestAuth.set(req, authContext);
+  if (!bearerPresent) attempts.delete(ip);
 
   try {
     const rawBody = await req.text();
@@ -231,10 +269,39 @@ Deno.serve(async (req: Request) => {
         !validUuid(documentId) ||
         reason.length < 3
       ) {
+        await writeClinicAudit(AUTH_CONFIG, authContext, {
+          entity: "clinical_records",
+          action: "validate_request",
+          outcome: "error",
+          details: {
+            endpoint: "painel-fichas",
+            reason_code: "invalid_archive_request",
+          },
+        });
         return json(
           req,
           { erro: "Informe a ficha e o motivo corretamente." },
           422,
+        );
+      }
+      if (
+        authContext.authMethod === "supabase_auth" &&
+        authContext.role !== "owner"
+      ) {
+        await writeClinicAudit(AUTH_CONFIG, authContext, {
+          entity: source === "anamnese" ? "anamnese" : "documento_clinico",
+          entityId: documentId,
+          action,
+          outcome: "denied",
+          details: { endpoint: "painel-fichas", reason_code: "role_forbidden" },
+        });
+        return json(
+          req,
+          {
+            erro: "Seu perfil não permite arquivar ou restaurar fichas.",
+            codigo: "role_forbidden",
+          },
+          403,
         );
       }
 
@@ -252,6 +319,16 @@ Deno.serve(async (req: Request) => {
       );
       if (!archiveResponse.ok) {
         console.error("Painel archive action failed", archiveResponse.status);
+        await writeClinicAudit(AUTH_CONFIG, authContext, {
+          entity: source === "anamnese" ? "anamnese" : "documento_clinico",
+          entityId: documentId,
+          action,
+          outcome: "error",
+          details: {
+            endpoint: "painel-fichas",
+            status_code: archiveResponse.status,
+          },
+        });
         return json(
           req,
           {
@@ -263,6 +340,13 @@ Deno.serve(async (req: Request) => {
         );
       }
       const result = await archiveResponse.json();
+      await writeClinicAudit(AUTH_CONFIG, authContext, {
+        entity: source === "anamnese" ? "anamnese" : "documento_clinico",
+        entityId: documentId,
+        action,
+        outcome: "success",
+        details: { endpoint: "painel-fichas", target_kind: source },
+      });
       return json(req, {
         ok: true,
         alterado: result?.alterado === true,
@@ -270,6 +354,12 @@ Deno.serve(async (req: Request) => {
       });
     }
     if (action && action !== "listar") {
+      await writeClinicAudit(AUTH_CONFIG, authContext, {
+        entity: "clinical_records",
+        action: "validate_request",
+        outcome: "error",
+        details: { endpoint: "painel-fichas", reason_code: "invalid_action" },
+      });
       return json(req, { erro: "Ação inválida" }, 422);
     }
 
@@ -441,6 +531,15 @@ Deno.serve(async (req: Request) => {
     const archivedForms = forms.length - activeForms;
     const archivedDocuments = documents.length - activeDocuments;
 
+    await writeClinicAudit(AUTH_CONFIG, authContext, {
+      entity: "clinical_records",
+      action: "list",
+      outcome: "success",
+      details: {
+        endpoint: "painel-fichas",
+        result_count: activeForms + activeDocuments,
+      },
+    });
     return json(req, {
       fichas: forms,
       total: forms.length,
@@ -455,6 +554,12 @@ Deno.serve(async (req: Request) => {
     });
   } catch (error) {
     console.error("Painel loading failed", String(error));
+    await writeClinicAudit(AUTH_CONFIG, authContext, {
+      entity: "clinical_records",
+      action: "request",
+      outcome: "error",
+      details: { endpoint: "painel-fichas", reason_code: "unhandled_error" },
+    });
     return json(
       req,
       { erro: "Não foi possível carregar os documentos agora." },
