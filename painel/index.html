@@ -38,7 +38,7 @@ header{background:#fff;border-bottom:1px solid var(--linha);padding:22px 0 16px;
 input{width:100%;padding:13px;border:1px solid var(--linha);border-radius:10px;background:var(--gelo);
   font-family:inherit;font-size:19px;text-align:center;letter-spacing:.22em;text-transform:uppercase;color:var(--tinta)}
 input:focus{outline:2px solid var(--dourado);outline-offset:1px}
-button:focus-visible,a:focus-visible,select:focus-visible{outline:3px solid var(--dourado);outline-offset:2px}
+button:focus-visible,a:focus-visible,select:focus-visible,textarea:focus-visible,summary:focus-visible{outline:3px solid var(--dourado);outline-offset:2px}
 button.principal{width:100%;margin-top:14px;background:var(--dourado);color:#fff;border:none;
   border-radius:10px;padding:13px;font-family:inherit;font-size:15px;font-weight:500;cursor:pointer}
 button.principal:disabled{opacity:.5}
@@ -71,9 +71,100 @@ button.principal:disabled{opacity:.5}
   font-family:inherit;font-size:11px;cursor:pointer}
 .filtro.ativo{border-color:var(--dourado);background:var(--dourado);color:#fff}
 
+/* ---- fichas, agenda e retornos ---- */
+.abas{display:flex;gap:8px;margin-top:18px;padding:5px;background:#F5EFE6;border:1px solid var(--linha);border-radius:12px}
+.aba{flex:1;min-height:44px;border:1px solid transparent;border-radius:9px;background:transparent;color:var(--cinza);
+  font-family:inherit;font-size:13px;font-weight:500;cursor:pointer}
+.aba[aria-selected="true"]{background:#fff;border-color:var(--linha);color:var(--dourado);box-shadow:0 2px 8px rgba(70,50,22,.08)}
+.painel-aba{min-width:0}
+.agenda-painel{padding-top:18px}
+.agenda-cabecalho{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:14px}
+.agenda-cabecalho h2{font-family:'Cormorant Garamond',Georgia,serif;font-size:25px;line-height:1.1;margin:0 0 4px}
+.agenda-cabecalho p{font-size:12.5px;color:var(--cinza);margin:0}
+.agenda-topo-acoes{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.agenda-botao{border:1px solid var(--dourado);border-radius:9px;background:var(--dourado);color:#fff;padding:9px 12px;
+  font-family:inherit;font-size:12.5px;font-weight:500;cursor:pointer}
+.agenda-botao.alt{background:#fff;color:var(--dourado)}
+.agenda-botao.perigo{background:#fff;color:var(--alerta);border-color:#D9A6A0}
+.agenda-botao:disabled{opacity:.48;cursor:default}
+.agenda-alerta-interno{margin:0 0 14px;padding:11px 13px;border-left:3px solid var(--dourado);background:#FFF9EE;
+  color:var(--tinta);font-size:12.5px;border-radius:0 8px 8px 0}
+.agenda-alerta-interno:empty{display:none}
+.agenda-status{min-height:18px;margin:8px 0;color:var(--dourado);font-size:12.5px}
+.agenda-status.erro{color:var(--alerta)}
+.agenda-resumos{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin-bottom:14px}
+.agenda-resumo{min-height:76px;padding:11px;border:1px solid var(--linha);border-radius:10px;background:#fff;color:var(--tinta);
+  text-align:left;font-family:inherit;cursor:pointer}
+.agenda-resumo strong,.agenda-resumo span{display:block}
+.agenda-resumo strong{font-family:'Cormorant Garamond',Georgia,serif;font-size:25px;line-height:1;color:var(--dourado)}
+.agenda-resumo span{margin-top:5px;color:var(--cinza);font-size:10.5px}
+.agenda-resumo.ativo{border-color:var(--dourado);box-shadow:inset 0 0 0 1px var(--dourado)}
+.agenda-editor{margin:14px 0;border:1px solid var(--linha);border-radius:var(--raio);background:#fff;overflow:hidden}
+.agenda-editor>summary{padding:14px 16px;color:var(--dourado);font-size:13px;font-weight:500;cursor:pointer}
+.agenda-editor[open]>summary{border-bottom:1px solid var(--linha)}
+.agenda-form{padding:16px}
+.agenda-form fieldset{min-width:0;margin:0 0 15px;padding:0;border:0}
+.agenda-form legend{width:100%;margin-bottom:11px;color:var(--dourado);font-family:'Cormorant Garamond',Georgia,serif;
+  font-size:20px;font-weight:600}
+.agenda-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px}
+.agenda-campo{display:block;min-width:0}
+.agenda-campo.largo{grid-column:1/-1}
+.agenda-campo>span{display:block;margin:0 0 5px;color:var(--tinta);font-size:11.5px;font-weight:500}
+.agenda-campo small{color:var(--cinza);font-weight:300}
+.agenda-form input,.agenda-form select,.agenda-form textarea{width:100%;min-height:44px;padding:10px 11px;border:1px solid var(--linha);
+  border-radius:8px;background:var(--gelo);color:var(--tinta);font-family:inherit;font-size:16px;text-align:left;
+  text-transform:none;letter-spacing:normal}
+.agenda-form textarea{min-height:82px;resize:vertical}
+.agenda-form input:focus,.agenda-form select:focus,.agenda-form textarea:focus{outline:3px solid rgba(133,97,29,.2);outline-offset:1px;border-color:var(--dourado)}
+.agenda-form [aria-invalid="true"]{border-color:var(--alerta)}
+.agenda-lembretes{padding:13px!important;border:1px solid var(--linha)!important;border-radius:9px;background:#FFFDF9}
+.agenda-transparencia{margin:-2px 0 11px;color:var(--cinza);font-size:11.5px}
+.agenda-check-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:9px}
+.agenda-check{display:grid;grid-template-columns:22px minmax(0,1fr);align-items:start;gap:8px;padding:10px;
+  border:1px solid var(--linha);border-radius:8px;background:#fff;cursor:pointer}
+.agenda-check input{width:20px;height:20px;min-height:0;margin:1px 0 0;padding:0;accent-color:var(--dourado)}
+.agenda-check span{font-size:11.5px}
+.agenda-check small{display:block;color:var(--cinza);font-size:10px}
+.agenda-check:has(input:disabled){opacity:.55;cursor:default}
+.agenda-form-acoes{display:flex;gap:9px;flex-wrap:wrap;margin-top:4px}
+.agenda-form-acoes .agenda-botao{flex:1;min-width:150px;min-height:44px}
+.agenda-filtros{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0 0}
+.agenda-filtro{min-height:40px;border:1px solid var(--linha);border-radius:20px;padding:7px 12px;background:#fff;color:var(--cinza);
+  font-family:inherit;font-size:11px;cursor:pointer}
+.agenda-filtro.ativo{border-color:var(--dourado);background:var(--dourado);color:#fff}
+.agenda-barra{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:15px 0 10px}
+.agenda-contagem{font-size:12.5px;color:var(--cinza)}
+.agenda-card{background:#fff;border:1px solid var(--linha);border-radius:var(--raio);padding:15px;margin-bottom:11px}
+.agenda-card.atencao{border-left:3px solid var(--dourado)}
+.agenda-card-topo{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.agenda-card h3{font-family:'Cormorant Garamond',Georgia,serif;font-size:20px;line-height:1.15;margin:0}
+.agenda-data{color:var(--dourado);font-size:12px;font-weight:500;text-align:right;white-space:nowrap}
+.agenda-meta{margin:4px 0 9px;color:var(--cinza);font-size:12px}
+.agenda-meta a{color:var(--dourado);text-decoration:none}
+.agenda-selo{display:inline-block;margin:0 5px 7px 0;padding:4px 9px;border:1px solid var(--linha);border-radius:20px;
+  background:#FFF9EE;color:var(--dourado);font-size:10.5px}
+.agenda-selo.status-confirmado,.agenda-selo.status-concluido{background:#F2F8F2;border-color:#BFD7BF;color:#356B35}
+.agenda-selo.status-cancelado,.agenda-selo.status-nao_compareceu,.agenda-selo.status-reagendado{background:var(--alerta-bg);border-color:#F0D5D0;color:var(--alerta)}
+.agenda-detalhe{margin-top:9px;padding-top:9px;border-top:1px solid var(--linha);font-size:12.5px}
+.agenda-detalhe strong{display:block;margin-bottom:2px;color:var(--dourado);font-size:10px;letter-spacing:.08em;text-transform:uppercase}
+.agenda-card-acoes{display:flex;gap:7px;flex-wrap:wrap;margin-top:12px}
+.agenda-card-acoes .agenda-botao{flex:1 1 112px;min-height:42px;padding:8px;font-size:11.5px}
+.agenda-vazio{padding:36px 16px;text-align:center;color:var(--cinza);font-size:13px}
+
+@media(max-width:640px){
+  .agenda-cabecalho,.agenda-card-topo{align-items:stretch;flex-direction:column}
+  .agenda-topo-acoes{justify-content:stretch}
+  .agenda-topo-acoes .agenda-botao{flex:1}
+  .agenda-resumos{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .agenda-grid,.agenda-check-grid{grid-template-columns:1fr}
+  .agenda-campo.largo{grid-column:auto}
+  .agenda-data{text-align:left;white-space:normal}
+}
+
 .ficha{background:#fff;border:1px solid var(--linha);border-radius:var(--raio);
   padding:16px;margin-bottom:12px}
 .ficha.atencao{border-left:3px solid var(--alerta)}
+.ficha.arquivada{border-style:dashed;background:#FCFAF7;opacity:.9}
 .topo{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:3px}
 .nome{font-family:'Cormorant Garamond',Georgia,serif;font-size:20px;font-weight:600;margin:0;line-height:1.2}
 .quando{font-size:11px;color:var(--cinza);white-space:nowrap;padding-top:5px}
@@ -94,7 +185,10 @@ button.principal:disabled{opacity:.5}
   font-family:inherit;font-size:13.5px;font-weight:500;padding:11px;border-radius:9px;cursor:pointer;
   background:var(--dourado);color:#fff;border:none;display:block}
 .acoes .alt{background:#fff;color:var(--dourado);border:1px solid var(--dourado)}
+.acoes .perigo{background:#fff;color:var(--alerta);border:1px solid #D9A6A0}
 .acoes .off{background:#fff;color:#B5AFA8;border:1px solid var(--linha);cursor:default}
+.fichas-status{min-height:18px;margin:0 0 8px;color:var(--dourado);font-size:12.5px}
+.fichas-status.erro{color:var(--alerta)}
 
 .vazio{text-align:center;padding:50px 20px;color:var(--cinza);font-size:14px}
 .carregando{text-align:center;padding:40px;color:var(--cinza);font-size:14px}
@@ -103,7 +197,8 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
 
 @media(max-width:640px){
   input,.linha-envio input,.linha-envio select{font-size:16px}
-  button.principal,.cv-acoes button,.recarregar,.filtro,.acoes a,.acoes button,.cv-qr a{
+  button.principal,.cv-acoes button,.recarregar,.filtro,.acoes a,.acoes button,.cv-qr a,.aba,
+  .agenda-botao,.agenda-filtro,.agenda-resumo{
     min-height:44px
   }
   .cv-qr a{display:inline-flex;align-items:center;justify-content:center}
@@ -118,7 +213,7 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
     <img class="simbolo" src="../assets/identidade-visual-transparente-v1.png" alt="Ana Maria Jacob Estética">
     <p class="marca">Ana Maria Jacob</p>
     <p class="marca-sub">Estética</p>
-    <h1 class="doc-titulo">Documentos recebidos</h1>
+    <h1 class="doc-titulo">Fichas · Agenda e retornos</h1>
   </div>
 </header>
 
@@ -134,6 +229,12 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
   </section>
 
   <section id="tela-lista" class="oculto">
+    <div class="abas" role="tablist" aria-label="Áreas do aplicativo Fichas">
+      <button class="aba" id="aba-bt-fichas" type="button" role="tab" aria-selected="true" aria-controls="aba-fichas" tabindex="0">Fichas</button>
+      <button class="aba" id="aba-bt-agenda" type="button" role="tab" aria-selected="false" aria-controls="aba-agenda" tabindex="-1">Agenda e retornos</button>
+    </div>
+
+    <section class="painel-aba" id="aba-fichas" role="tabpanel" aria-labelledby="aba-bt-fichas">
     <div class="convite">
       <p class="rot">Enviar um documento para a paciente</p>
       <div class="linha-envio">
@@ -166,13 +267,87 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
       <button class="filtro ativo" type="button" data-filtro="todos" aria-pressed="true">Todos</button>
       <button class="filtro" type="button" data-filtro="anamnese" aria-pressed="false">Anamneses</button>
       <button class="filtro" type="button" data-filtro="tcle" aria-pressed="false">TCLEs</button>
+      <button class="filtro" type="button" data-filtro="arquivadas" aria-pressed="false">Arquivadas</button>
     </div>
 
     <div class="barra">
       <span class="contagem" id="contagem"></span>
       <button class="recarregar" id="recarregar">Atualizar</button>
     </div>
+    <p class="fichas-status" id="fichas-status" role="status" aria-live="polite"></p>
     <div id="lista"></div>
+    </section>
+
+    <section class="painel-aba agenda-painel oculto" id="aba-agenda" role="tabpanel" aria-labelledby="aba-bt-agenda" hidden>
+      <div class="agenda-cabecalho">
+        <div>
+          <h2>Agenda e retornos</h2>
+          <p>Organize horários, confirmações e acompanhamentos sem expor informações clínicas nas mensagens.</p>
+        </div>
+        <div class="agenda-topo-acoes">
+          <button class="agenda-botao alt" id="agenda-alertas" type="button">Ativar alertas do navegador</button>
+          <button class="agenda-botao alt" id="agenda-atualizar" type="button">Atualizar agenda</button>
+        </div>
+      </div>
+      <p class="agenda-alerta-interno" id="agenda-alerta-interno" role="status" aria-live="polite"></p>
+      <p class="agenda-status" id="agenda-alertas-status" role="status" aria-live="polite"></p>
+
+      <div class="agenda-resumos" aria-label="Resumo da agenda">
+        <button class="agenda-resumo ativo" type="button" data-agenda-filtro="hoje" aria-pressed="true"><strong id="agenda-total-hoje">0</strong><span>Hoje</span></button>
+        <button class="agenda-resumo" type="button" data-agenda-filtro="proximos" aria-pressed="false"><strong id="agenda-total-proximos">0</strong><span>Próximos 7 dias</span></button>
+        <button class="agenda-resumo" type="button" data-agenda-filtro="lembretes" aria-pressed="false"><strong id="agenda-total-lembretes">0</strong><span>Lembretes pendentes</span></button>
+        <button class="agenda-resumo" type="button" data-agenda-filtro="retornos" aria-pressed="false"><strong id="agenda-total-retornos">0</strong><span>Retornos</span></button>
+      </div>
+
+      <details class="agenda-editor" id="agenda-editor" open>
+        <summary id="agenda-form-titulo">Novo agendamento</summary>
+        <form class="agenda-form" id="agenda-form" novalidate>
+          <input id="agenda-id" type="hidden">
+          <fieldset>
+            <legend>Cliente e horário</legend>
+            <div class="agenda-grid">
+              <label class="agenda-campo largo" for="agenda-nome"><span>Nome da cliente</span><input id="agenda-nome" name="nome" type="text" autocomplete="name" minlength="3" maxlength="120" required></label>
+              <label class="agenda-campo" for="agenda-telefone"><span>WhatsApp</span><input id="agenda-telefone" name="telefone" type="tel" autocomplete="tel" inputmode="tel" maxlength="18" placeholder="(31) 99999-9999" required></label>
+              <label class="agenda-campo" for="agenda-categoria"><span>Categoria</span><select id="agenda-categoria" name="categoria" required><option value="">Selecione</option><option value="avaliacao">Avaliação</option><option value="procedimento">Procedimento</option><option value="retorno">Retorno</option><option value="acompanhamento">Acompanhamento</option></select></label>
+              <label class="agenda-campo largo" for="agenda-procedimento"><span>Procedimento ou interesse <small>uso interno; não entra no WhatsApp</small></span><input id="agenda-procedimento" name="procedimento" type="text" maxlength="160" required></label>
+              <label class="agenda-campo" for="agenda-data"><span>Data</span><input id="agenda-data" name="data" type="date" required></label>
+              <label class="agenda-campo" for="agenda-hora"><span>Hora</span><input id="agenda-hora" name="hora" type="time" required></label>
+              <label class="agenda-campo" for="agenda-duracao"><span>Duração estimada</span><select id="agenda-duracao" name="duracao_min" required><option value="30">30 minutos</option><option value="45">45 minutos</option><option value="60" selected>1 hora</option><option value="90">1 hora e 30</option><option value="120">2 horas</option></select></label>
+              <label class="agenda-campo" for="agenda-retorno"><span>Retorno recomendado <small>opcional</small></span><input id="agenda-retorno" name="retorno_em" type="date"></label>
+              <label class="agenda-campo largo" for="agenda-observacoes"><span>Observações internas <small>não entram no WhatsApp</small></span><textarea id="agenda-observacoes" name="observacoes" maxlength="1000" rows="3"></textarea></label>
+            </div>
+          </fieldset>
+
+          <fieldset class="agenda-lembretes">
+            <legend>Lembretes</legend>
+            <p class="agenda-transparencia" id="agenda-transparencia">O Fichas cria avisos internos. O WhatsApp somente é aberto pela equipe e nunca é marcado como enviado automaticamente.</p>
+            <label class="agenda-check" for="agenda-autoriza-lembretes"><input id="agenda-autoriza-lembretes" name="lembretes_autorizados" type="checkbox" aria-describedby="agenda-transparencia"><span>A cliente autorizou lembretes de agendamento pelo WhatsApp.<small>Sem esta confirmação, os lembretes permanecem desligados.</small></span></label>
+            <div class="agenda-check-grid">
+              <label class="agenda-check" for="agenda-lembrete-24h"><input id="agenda-lembrete-24h" name="lembrete_24h" type="checkbox" disabled><span>Aviso de 24 horas<small>Aparece no Fichas quando estiver na hora de lembrar.</small></span></label>
+              <label class="agenda-check" for="agenda-lembrete-2h"><input id="agenda-lembrete-2h" name="lembrete_2h" type="checkbox" disabled><span>Aviso de 2 horas<small>Ajuda na conferência no dia do atendimento.</small></span></label>
+            </div>
+          </fieldset>
+
+          <div class="agenda-form-acoes">
+            <button class="agenda-botao" id="agenda-salvar" type="submit">Salvar agendamento</button>
+            <button class="agenda-botao alt oculto" id="agenda-cancelar-edicao" type="button">Cancelar edição</button>
+          </div>
+          <p class="agenda-status" id="agenda-form-status" role="status" aria-live="polite"></p>
+        </form>
+      </details>
+
+      <div class="agenda-filtros" role="group" aria-label="Filtrar agenda">
+        <button class="agenda-filtro ativo" type="button" data-agenda-filtro="hoje" aria-pressed="true">Hoje</button>
+        <button class="agenda-filtro" type="button" data-agenda-filtro="proximos" aria-pressed="false">Próximos</button>
+        <button class="agenda-filtro" type="button" data-agenda-filtro="lembretes" aria-pressed="false">Lembretes</button>
+        <button class="agenda-filtro" type="button" data-agenda-filtro="retornos" aria-pressed="false">Retornos</button>
+        <button class="agenda-filtro" type="button" data-agenda-filtro="aguardando" aria-pressed="false">Aguardando</button>
+        <button class="agenda-filtro" type="button" data-agenda-filtro="todos" aria-pressed="false">Todos</button>
+      </div>
+      <div class="agenda-barra"><span class="agenda-contagem" id="agenda-contagem"></span></div>
+      <div id="agenda-lista" aria-live="polite" aria-busy="false"></div>
+      <p class="agenda-status" id="agenda-status" role="status" aria-live="polite"></p>
+    </section>
   </section>
 
 </main>
@@ -181,6 +356,8 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
 
 <script>
 const API = 'https://rjxtxoqprnumouqakxbc.supabase.co/functions/v1/painel-fichas';
+const AGENDA_API = 'https://rjxtxoqprnumouqakxbc.supabase.co/functions/v1/agenda-fichas';
+const AGENDA_POLL_MS = 90000;
 const TIPOS_TCLE = {
   tcle_toxina_botulinica: { label: 'TCLE · Toxina botulínica', arquivo: 'TCLE-Toxina.pdf' },
   tcle_preenchimento_facial: { label: 'TCLE · Preenchimento facial', arquivo: 'TCLE-Preenchimento-Facial.pdf' },
@@ -192,6 +369,18 @@ const TIPOS_TCLE = {
 let hashSenha = null;
 let filtroAtual = 'todos';
 let cachePainel = { fichas: [], documentos: [], totais: { anamneses: 0, tcles: 0, geral: 0 } };
+let agendaCache = [];
+let agendaLembretes = [];
+let agendaFiltro = 'hoje';
+let agendaCarregada = false;
+let agendaCarregando = false;
+let agendaPoll = null;
+let agendaIdempotencyKey = null;
+let agendaEnviando = false;
+let agendaReagendando = false;
+let agendaUltimaAssinaturaAlerta = '';
+let agendaAgoraServidor = Date.now();
+let agendaAgoraRecebidoEm = performance.now();
 
 const el = id => document.getElementById(id);
 
@@ -218,9 +407,10 @@ function cartao(f) {
   const meds = (f.alertas_medicamentos || '').split(' | ').filter(Boolean);
   const permanente = f.usou_preenchedor_permanente === true;
   const atencao = permanente || alertas.length > 0;
+  const arquivada = Boolean(f.arquivado_em);
 
   const div = document.createElement('div');
-  div.className = 'ficha' + (atencao ? ' atencao' : '');
+  div.className = 'ficha' + (atencao ? ' atencao' : '') + (arquivada ? ' arquivada' : '');
 
   let html = '';
   html += '<div class="topo"><h3 class="nome">' + esc(f.nome) + '</h3>' +
@@ -235,6 +425,11 @@ function cartao(f) {
 
   if (permanente) html += '<span class="selo">Preenchedor permanente</span>';
   if (alertas.length) html += '<span class="selo">' + alertas.length + ' alerta' + (alertas.length > 1 ? 's' : '') + ' de saúde</span>';
+  if (arquivada) html += '<span class="selo tipo">Arquivada</span>';
+  if (arquivada && f.arquivado_motivo) {
+    html += '<div class="bloco"><p class="rot">Motivo do arquivamento</p><p class="txt">' +
+      esc(f.arquivado_motivo) + '</p></div>';
+  }
 
   if (f.objetivo) {
     html += '<div class="bloco"><p class="rot">Objetivo</p><p class="txt">' + esc(f.objetivo) + '</p></div>';
@@ -257,12 +452,17 @@ function cartao(f) {
   }
 
   html += '<div class="acoes">';
-  if (f.pdf) {
-    html += '<a href="' + f.pdf + '" target="_blank" rel="noopener">Abrir PDF</a>';
-    html += '<a class="alt" href="' + f.pdf + '" download>Baixar</a>';
+  const pdf = urlPdfSegura(f.pdf);
+  if (pdf) {
+    html += '<a href="' + esc(pdf) + '" target="_blank" rel="noopener">Abrir PDF</a>';
+    html += '<a class="alt" href="' + esc(pdf) + '" download>Baixar</a>';
   } else {
     html += '<button class="off" disabled>PDF não disponível</button>';
   }
+  html += '<button class="' + (arquivada ? 'alt' : 'perigo') + '" type="button" data-ficha-acao="' +
+    (arquivada ? 'restaurar' : 'arquivar') + '" data-ficha-origem="anamnese" data-ficha-id="' +
+    esc(f.id) + '" data-ficha-nome="' + esc(f.nome) + '">' +
+    (arquivada ? 'Restaurar ficha' : 'Arquivar ficha') + '</button>';
   html += '</div>';
 
   div.innerHTML = html;
@@ -281,8 +481,9 @@ function urlPdfSegura(valor) {
 function cartaoDocumento(d) {
   const alertas = Array.isArray(d.alertas_saude) ? d.alertas_saude : [];
   const tipo = TIPOS_TCLE[d.tipo] || { label: 'Documento clínico', arquivo: 'Documento-Clinico.pdf' };
+  const arquivada = Boolean(d.arquivado_em);
   const div = document.createElement('div');
-  div.className = 'ficha' + (alertas.length ? ' atencao' : '');
+  div.className = 'ficha' + (alertas.length ? ' atencao' : '') + (arquivada ? ' arquivada' : '');
 
   let html = '<div class="topo"><h3 class="nome">' + esc(d.nome) + '</h3>' +
     '<span class="quando">' + quando(d.recebido_em) + '</span></div>';
@@ -293,6 +494,11 @@ function cartaoDocumento(d) {
   html += '<span class="selo tipo">' + esc(d.tipo_label || tipo.label) + '</span>';
   html += '<span class="selo">Aguardando revisão profissional</span>';
   if (alertas.length) html += '<span class="selo">' + alertas.length + ' resposta' + (alertas.length > 1 ? 's' : '') + ' para revisar</span>';
+  if (arquivada) html += '<span class="selo tipo">Arquivada</span>';
+  if (arquivada && d.arquivado_motivo) {
+    html += '<div class="bloco"><p class="rot">Motivo do arquivamento</p><p class="txt">' +
+      esc(d.arquivado_motivo) + '</p></div>';
+  }
 
   if (Array.isArray(d.modalidades) && d.modalidades.length) html += '<div class="bloco"><p class="rot">Modalidades de interesse</p><p class="txt">' + d.modalidades.map(esc).join('; ') + '</p></div>';
   if (Array.isArray(d.regioes) && d.regioes.length) html += '<div class="bloco"><p class="rot">Regiões de interesse</p><p class="txt">' + d.regioes.map(esc).join('; ') + '</p></div>';
@@ -315,6 +521,10 @@ function cartaoDocumento(d) {
   } else {
     html += '<button class="off" disabled>PDF não disponível</button>';
   }
+  html += '<button class="' + (arquivada ? 'alt' : 'perigo') + '" type="button" data-ficha-acao="' +
+    (arquivada ? 'restaurar' : 'arquivar') + '" data-ficha-origem="documento_clinico" data-ficha-id="' +
+    esc(d.id) + '" data-ficha-nome="' + esc(d.nome) + '">' +
+    (arquivada ? 'Restaurar ficha' : 'Arquivar ficha') + '</button>';
   html += '</div>';
   div.innerHTML = html;
   return div;
@@ -323,18 +533,29 @@ function cartaoDocumento(d) {
 function renderizarPainel() {
   const lista = el('lista');
   lista.innerHTML = '';
-  const fichas = filtroAtual === 'tcle' ? [] : cachePainel.fichas;
-  const documentos = filtroAtual === 'anamnese' ? [] : cachePainel.documentos;
+  const mostrarArquivadas = filtroAtual === 'arquivadas';
+  const fichas = (filtroAtual === 'tcle' ? [] : cachePainel.fichas)
+    .filter(item => Boolean(item.arquivado_em) === mostrarArquivadas);
+  const documentos = (filtroAtual === 'anamnese' ? [] : cachePainel.documentos)
+    .filter(item => Boolean(item.arquivado_em) === mostrarArquivadas);
   if (!fichas.length && !documentos.length) {
-    lista.innerHTML = '<p class="vazio">Nenhum documento neste filtro.</p>';
+    lista.innerHTML = '<p class="vazio">' +
+      (mostrarArquivadas ? 'Nenhuma ficha arquivada.' : 'Nenhum documento neste filtro.') + '</p>';
   } else {
     documentos.forEach(d => lista.appendChild(cartaoDocumento(d)));
     fichas.forEach(f => lista.appendChild(cartao(f)));
   }
   const t = cachePainel.totais;
-  el('contagem').textContent = t.geral + (t.geral === 1 ? ' documento' : ' documentos') +
-    ' · ' + t.anamneses + ' anamnese' + (t.anamneses === 1 ? '' : 's') +
-    ' · ' + t.tcles + ' TCLE' + (t.tcles === 1 ? '' : 's');
+  if (mostrarArquivadas) {
+    const totalArquivadas = fichas.length + documentos.length;
+    el('contagem').textContent = totalArquivadas + (totalArquivadas === 1 ? ' ficha arquivada' : ' fichas arquivadas') +
+      ' · documentos preservados';
+  } else {
+    el('contagem').textContent = t.geral + (t.geral === 1 ? ' documento ativo' : ' documentos ativos') +
+      ' · ' + t.anamneses + ' anamnese' + (t.anamneses === 1 ? '' : 's') +
+      ' · ' + t.tcles + ' TCLE' + (t.tcles === 1 ? '' : 's') +
+      (t.arquivados ? ' · ' + t.arquivados + ' arquivado' + (t.arquivados === 1 ? '' : 's') : '');
+  }
 }
 
 function esc(s) {
@@ -354,10 +575,18 @@ async function carregar() {
 
     const fichas = Array.isArray(d.fichas) ? d.fichas : [];
     const documentos = Array.isArray(d.documentos) ? d.documentos : [];
+    const anamnesesAtivas = fichas.filter(item => !item.arquivado_em).length;
+    const tclesAtivos = documentos.filter(item => !item.arquivado_em).length;
+    const arquivados = fichas.length + documentos.length - anamnesesAtivas - tclesAtivos;
     cachePainel = {
       fichas,
       documentos,
-      totais: d.totais || { anamneses: fichas.length, tcles: documentos.length, geral: fichas.length + documentos.length }
+      totais: d.totais || {
+        anamneses: anamnesesAtivas,
+        tcles: tclesAtivos,
+        geral: anamnesesAtivas + tclesAtivos,
+        arquivados
+      }
     };
     renderizarPainel();
   } catch (e) {
@@ -366,8 +595,79 @@ async function carregar() {
   }
 }
 
+async function alterarArquivamentoFicha(botao) {
+  const acao = botao.dataset.fichaAcao;
+  const origem = botao.dataset.fichaOrigem;
+  const documentoId = botao.dataset.fichaId;
+  const nome = botao.dataset.fichaNome || 'esta paciente';
+  const palavra = acao === 'arquivar' ? 'ARQUIVAR' : 'RESTAURAR';
+  const explicacao = acao === 'arquivar'
+    ? 'A ficha sairá da lista principal, mas continuará guardada conforme a legislação.'
+    : 'A ficha voltará para a lista principal.';
+
+  const confirmacao = window.prompt(
+    explicacao + '\n\nPara confirmar ' + nome + ', digite ' + palavra + '.'
+  );
+  if (confirmacao === null) return;
+  if (confirmacao.trim().toUpperCase() !== palavra) {
+    el('fichas-status').className = 'fichas-status erro';
+    el('fichas-status').textContent = 'Confirmação cancelada: a palavra digitada não confere.';
+    return;
+  }
+
+  const motivo = window.prompt(
+    'Informe um motivo administrativo breve (obrigatório). Não inclua CPF, diagnóstico ou outros dados de saúde.'
+  );
+  if (motivo === null) return;
+  const motivoLimpo = motivo.trim();
+  if (motivoLimpo.length < 3 || motivoLimpo.length > 500) {
+    el('fichas-status').className = 'fichas-status erro';
+    el('fichas-status').textContent = 'Informe um motivo entre 3 e 500 caracteres.';
+    return;
+  }
+
+  const textoOriginal = botao.textContent;
+  botao.disabled = true;
+  botao.textContent = acao === 'arquivar' ? 'Arquivando…' : 'Restaurando…';
+  el('fichas-status').className = 'fichas-status';
+  el('fichas-status').textContent = 'Atualizando a ficha…';
+  try {
+    const resposta = await fetch(API, {
+      method: 'POST',
+      headers: { 'x-senha': hashSenha, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        acao,
+        origem,
+        documento_id: documentoId,
+        motivo: motivoLimpo
+      })
+    });
+    if (resposta.status === 401) { sair('Senha incorreta'); return; }
+    const dados = await resposta.json().catch(() => ({}));
+    if (!resposta.ok || dados.erro) throw new Error(dados.erro || 'Não foi possível atualizar a ficha.');
+    await carregar();
+    el('fichas-status').className = 'fichas-status';
+    el('fichas-status').textContent = acao === 'arquivar'
+      ? 'Ficha arquivada. O prontuário e o PDF continuam preservados.'
+      : 'Ficha restaurada para a lista principal.';
+  } catch (erro) {
+    el('fichas-status').className = 'fichas-status erro';
+    el('fichas-status').textContent = erro.message || 'Não foi possível atualizar a ficha agora.';
+  } finally {
+    if (botao.isConnected) {
+      botao.disabled = false;
+      botao.textContent = textoOriginal;
+    }
+  }
+}
+
 function sair(msg) {
   hashSenha = null;
+  agendaPararPolling();
+  agendaCache = [];
+  agendaLembretes = [];
+  agendaCarregada = false;
+  agendaAtivarAba('fichas', false);
   sessionStorage.removeItem('amj_s');
   el('tela-lista').classList.add('oculto');
   el('tela-login').classList.remove('oculto');
@@ -389,6 +689,8 @@ async function entrar(valor) {
     el('tela-login').classList.add('oculto');
     el('tela-lista').classList.remove('oculto');
     await carregar();
+    await carregarAgenda({ silencioso: true });
+    agendaIniciarPolling();
   } catch (e) {
     el('erro').textContent = 'Erro ao conectar. Tente de novo.';
   } finally {
@@ -403,6 +705,10 @@ el('entrar').addEventListener('click', () => {
 });
 el('senha').addEventListener('keydown', e => { if (e.key === 'Enter') el('entrar').click(); });
 el('recarregar').addEventListener('click', carregar);
+el('lista').addEventListener('click', evento => {
+  const botao = evento.target.closest('button[data-ficha-acao]');
+  if (botao) alterarArquivamentoFicha(botao);
+});
 document.querySelectorAll('.filtro').forEach(bt => bt.addEventListener('click', () => {
   filtroAtual = bt.dataset.filtro;
   document.querySelectorAll('.filtro').forEach(item => {
@@ -412,6 +718,799 @@ document.querySelectorAll('.filtro').forEach(bt => bt.addEventListener('click', 
   });
   renderizarPainel();
 }));
+
+/* ---------- agenda e retornos ---------- */
+const AGENDA_STATUS_LABELS = {
+  solicitado: 'Solicitado',
+  aguardando_confirmacao: 'Aguardando confirmação',
+  confirmado: 'Confirmado',
+  concluido: 'Concluído',
+  nao_compareceu: 'Não compareceu',
+  reagendado: 'Reagendado',
+  cancelado: 'Cancelado'
+};
+const AGENDA_CATEGORIA_LABELS = {
+  avaliacao: 'Avaliação',
+  procedimento: 'Procedimento',
+  retorno: 'Retorno',
+  acompanhamento: 'Acompanhamento'
+};
+const AGENDA_STATUS_FINAIS = new Set(['concluido', 'nao_compareceu', 'reagendado', 'cancelado']);
+const AGENDA_STATUS_ATIVOS = new Set(['solicitado', 'aguardando_confirmacao', 'confirmado']);
+
+function agendaData(valor) {
+  const d = valor ? new Date(valor) : null;
+  return d && !Number.isNaN(d.getTime()) ? d : null;
+}
+
+function agendaChaveData(d) {
+  if (!(d instanceof Date) || Number.isNaN(d.getTime())) return '';
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' +
+    String(d.getDate()).padStart(2, '0');
+}
+
+function agendaAgoraMs() {
+  return agendaAgoraServidor + Math.max(0, performance.now() - agendaAgoraRecebidoEm);
+}
+
+function agendaHoje() {
+  const partes = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit'
+  }).formatToParts(new Date(agendaAgoraMs()));
+  const valor = tipo => (partes.find(parte => parte.type === tipo) || {}).value || '';
+  return valor('year') + '-' + valor('month') + '-' + valor('day');
+}
+
+function agendaFormatarDataHora(valor) {
+  const d = agendaData(valor);
+  if (!d) return 'Horário não informado';
+  return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }) +
+    ' às ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+}
+
+function agendaFormatarRetorno(valor) {
+  const partes = String(valor || '').slice(0, 10).split('-');
+  if (partes.length !== 3) return '';
+  return partes[2] + '/' + partes[1] + '/' + partes[0];
+}
+
+function agendaDataParaInput(valor) {
+  const d = agendaData(valor);
+  return d ? agendaChaveData(d) : '';
+}
+
+function agendaHoraParaInput(valor) {
+  const d = agendaData(valor);
+  return d ? String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0') : '';
+}
+
+function agendaTelefoneFormatado(valor) {
+  let digitos = soDigitos(valor);
+  if ((digitos.length === 12 || digitos.length === 13) && digitos.startsWith('55')) digitos = digitos.slice(2);
+  digitos = digitos.slice(0, 11);
+  if (digitos.length <= 2) return digitos ? '(' + digitos : '';
+  if (digitos.length <= 6) return '(' + digitos.slice(0, 2) + ') ' + digitos.slice(2);
+  if (digitos.length <= 10) return '(' + digitos.slice(0, 2) + ') ' + digitos.slice(2, 6) + '-' + digitos.slice(6);
+  return '(' + digitos.slice(0, 2) + ') ' + digitos.slice(2, 7) + '-' + digitos.slice(7);
+}
+
+function agendaNumeroWhatsApp(valor) {
+  const digitos = soDigitos(valor);
+  if (digitos.length === 12 || digitos.length === 13) return digitos.startsWith('55') ? digitos : '';
+  return digitos.length >= 10 && digitos.length <= 11 ? '55' + digitos : '';
+}
+
+function agendaNormalizar(item) {
+  const a = item && typeof item === 'object' ? item : {};
+  return {
+    id: String(a.id || ''),
+    nome: String(a.nome || ''),
+    telefone: String(a.telefone || ''),
+    categoria: String(a.categoria || 'avaliacao'),
+    procedimento: String(a.procedimento || ''),
+    data_hora: String(a.data_hora || ''),
+    duracao_min: Number(a.duracao_min) || 60,
+    retorno_em: a.retorno_em ? String(a.retorno_em).slice(0, 10) : '',
+    observacoes: String(a.observacoes || ''),
+    lembretes_autorizados: a.lembretes_autorizados === true || a.autoriza_lembretes === true ||
+      a.lembrete_24h === true || a.lembrete_2h === true,
+    lembrete_24h: a.lembrete_24h === true,
+    lembrete_2h: a.lembrete_2h === true,
+    status: String(a.status || 'aguardando_confirmacao'),
+    lembrete_confirmacao_enviado_em: a.lembrete_confirmacao_enviado_em || null,
+    lembrete_24h_enviado_em: a.lembrete_24h_enviado_em || null,
+    lembrete_2h_enviado_em: a.lembrete_2h_enviado_em || null,
+    lembrete_retorno_enviado_em: a.lembrete_retorno_enviado_em || null,
+    versao: Number(a.versao) || 1,
+    updated_at: a.updated_at || null
+  };
+}
+
+async function agendaRequest(acao, payload) {
+  const resposta = await fetch(AGENDA_API, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-senha': hashSenha },
+    body: JSON.stringify(Object.assign({ acao: acao }, payload || {}))
+  });
+  let dados = {};
+  try { dados = await resposta.json(); } catch (_) {}
+  if (resposta.status === 401) {
+    sair('Sua sessão expirou. Entre novamente.');
+    throw new Error('Sessão encerrada');
+  }
+  if (!resposta.ok || dados.erro) {
+    throw new Error(dados.erro || ('Não foi possível acessar a agenda (' + resposta.status + ').'));
+  }
+  return dados;
+}
+
+function agendaNormalizarLembrete(item) {
+  const lembrete = item && typeof item === 'object' ? item : {};
+  return {
+    id: String(lembrete.id || ''),
+    agendamento_id: String(lembrete.agendamento_id || lembrete.agenda_id || lembrete.id_agendamento || ''),
+    tipo: String(lembrete.tipo || lembrete.lembrete_tipo || '').toLowerCase(),
+    previsto_em: String(lembrete.previsto_em || ''),
+    status: String(lembrete.status || '')
+  };
+}
+
+function agendaLembreteDaFila(agendamento) {
+  const itens = agendaLembretes.filter(lembrete => {
+    return lembrete.agendamento_id === agendamento.id && lembrete.id;
+  });
+  const prioridade = ['retorno', '2h', '24h', 'confirmacao'];
+  for (const tipoPrioritario of prioridade) {
+    const item = itens.find(lembrete => lembrete.tipo === tipoPrioritario);
+    if (item) return item;
+  }
+  return null;
+}
+
+function agendaTipoLembrete(agendamento) {
+  if (!agendamento.lembretes_autorizados) return '';
+  const fila = agendaLembreteDaFila(agendamento);
+  return fila ? fila.tipo : '';
+}
+
+function agendaEhRetorno(agendamento) {
+  return agendamento.categoria === 'retorno' ||
+    (Boolean(agendamento.retorno_em) && !agendamento.lembrete_retorno_enviado_em &&
+      (AGENDA_STATUS_ATIVOS.has(agendamento.status) || agendamento.status === 'concluido'));
+}
+
+function agendaNoFiltro(agendamento, filtro) {
+  const inicio = agendaData(agendamento.data_hora);
+  const hoje = agendaHoje();
+  const inicioChave = inicio ? agendaChaveData(inicio) : '';
+  const fim = new Date();
+  fim.setHours(23, 59, 59, 999);
+  fim.setDate(fim.getDate() + 7);
+  if (filtro === 'hoje') return inicioChave === hoje;
+  if (filtro === 'proximos') return inicio && inicio.getTime() >= agendaAgoraMs() &&
+    inicio.getTime() <= fim.getTime() && !AGENDA_STATUS_FINAIS.has(agendamento.status);
+  if (filtro === 'lembretes') return Boolean(agendaTipoLembrete(agendamento));
+  if (filtro === 'retornos') return agendaEhRetorno(agendamento);
+  if (filtro === 'aguardando') return agendamento.status === 'solicitado' ||
+    agendamento.status === 'aguardando_confirmacao';
+  return true;
+}
+
+function agendaSelecionarFiltro(filtro) {
+  agendaFiltro = filtro;
+  document.querySelectorAll('[data-agenda-filtro]').forEach(item => {
+    const ativo = item.dataset.agendaFiltro === filtro;
+    item.classList.toggle('ativo', ativo);
+    item.setAttribute('aria-pressed', String(ativo));
+  });
+  renderizarAgenda();
+}
+
+function agendaResumo() {
+  return {
+    hoje: agendaCache.filter(a => agendaNoFiltro(a, 'hoje')).length,
+    proximos: agendaCache.filter(a => agendaNoFiltro(a, 'proximos')).length,
+    lembretes: agendaCache.filter(a => agendaNoFiltro(a, 'lembretes')).length,
+    retornos: agendaCache.filter(a => agendaNoFiltro(a, 'retornos')).length
+  };
+}
+
+function agendaMensagemWhatsApp(agendamento, tipo) {
+  const primeiroNome = agendamento.nome.trim().split(' ').filter(Boolean)[0] || '';
+  const saudacao = primeiroNome ? 'Olá, ' + primeiroNome + '!' : 'Olá!';
+  const quandoAgenda = agendaFormatarDataHora(agendamento.data_hora);
+  if (tipo === 'retorno') {
+    return saudacao + ' Aqui é a Ana Maria, da Ana Maria Jacob Estética. Chegou o período indicado para seu retorno de acompanhamento. Esse acompanhamento não significa retoque automático; qualquer necessidade será avaliada individualmente. Gostaria que eu verificasse os horários disponíveis para você?';
+  }
+  if (tipo === 'confirmacao') {
+    return saudacao + ' Aqui é a Ana Maria, da Ana Maria Jacob Estética. Seu atendimento está agendado para ' +
+      quandoAgenda + '. Você pode confirmar sua presença? Se precisar reagendar, responda por aqui.';
+  }
+  return saudacao + ' Aqui é a Ana Maria, da Ana Maria Jacob Estética. Passando para lembrar que seu atendimento está agendado para ' +
+    quandoAgenda + '. Se precisar reagendar, responda por aqui.';
+}
+
+async function agendaAbrirWhatsApp(agendamento, lembrete, botao) {
+  const numero = agendaNumeroWhatsApp(agendamento.telefone);
+  const status = el('agenda-status');
+  if (!numero) {
+    status.classList.add('erro');
+    status.textContent = 'O WhatsApp desta cliente está incompleto.';
+    return;
+  }
+  if (!lembrete || !lembrete.id) {
+    status.classList.add('erro');
+    status.textContent = 'Atualize a agenda antes de abrir este lembrete.';
+    return;
+  }
+  const janela = window.open('about:blank', '_blank');
+  if (!janela) {
+    status.classList.add('erro');
+    status.textContent = 'O navegador bloqueou a nova aba. Permita pop-ups e tente novamente.';
+    return;
+  }
+  janela.opener = null;
+  botao.disabled = true;
+  status.classList.remove('erro');
+  status.textContent = 'Registrando a abertura segura do lembrete…';
+  try {
+    const resposta = await agendaRequest('marcar_lembrete', {
+      id: agendamento.id,
+      lembrete_id: lembrete.id,
+      tipo: lembrete.tipo,
+      status: 'pronto'
+    });
+    const url = 'https://wa.me/' + numero + '?text=' +
+      encodeURIComponent(agendaMensagemWhatsApp(agendamento, lembrete.tipo));
+    janela.location.replace(url);
+    status.textContent = resposta.lembretes_sincronizados === false
+      ? 'WhatsApp aberto. Atualize a agenda para conferir os demais lembretes.'
+      : 'WhatsApp aberto. Depois do envio, use “Marcar como enviado”.';
+  } catch (erro) {
+    janela.close();
+    status.classList.add('erro');
+    status.textContent = erro.message || 'Não foi possível abrir o lembrete.';
+    await carregarAgenda({ silencioso: true });
+  } finally {
+    botao.disabled = false;
+  }
+}
+
+function agendaCartao(agendamento) {
+  const artigo = document.createElement('article');
+  const lembreteAtual = agendamento.lembretes_autorizados ? agendaLembreteDaFila(agendamento) : null;
+  artigo.className = 'agenda-card' + (lembreteAtual ? ' atencao' : '');
+  artigo.id = 'agenda-card-' + agendamento.id;
+  artigo.dataset.agendaId = agendamento.id;
+  artigo.tabIndex = -1;
+  const statusLabel = AGENDA_STATUS_LABELS[agendamento.status] ||
+    agendamento.status.replace(/_/g, ' ');
+  const categoriaLabel = AGENDA_CATEGORIA_LABELS[agendamento.categoria] || agendamento.categoria;
+  const statusClasse = Object.prototype.hasOwnProperty.call(AGENDA_STATUS_LABELS, agendamento.status)
+    ? agendamento.status : '';
+  const numero = agendaNumeroWhatsApp(agendamento.telefone);
+  const lembrete = lembreteAtual ? lembreteAtual.tipo : '';
+  const podeEnviarWhatsApp = agendamento.lembretes_autorizados && Boolean(lembreteAtual);
+  let html = '<div class="agenda-card-topo"><div><h3>' + esc(agendamento.nome) + '</h3>' +
+    '<p class="agenda-meta">' +
+    (numero && podeEnviarWhatsApp ? '<a href="https://wa.me/' + numero + '" target="_blank" rel="noopener noreferrer">' +
+      esc(agendaTelefoneFormatado(agendamento.telefone)) + '</a>' : esc(agendaTelefoneFormatado(agendamento.telefone))) +
+    '</p></div><time class="agenda-data" datetime="' + esc(agendamento.data_hora) + '">' +
+    esc(agendaFormatarDataHora(agendamento.data_hora)) + '</time></div>';
+  html += '<span class="agenda-selo">' + esc(categoriaLabel) + '</span>';
+  html += '<span class="agenda-selo status-' + esc(statusClasse) + '">' + esc(statusLabel) + '</span>';
+  html += '<span class="agenda-selo">' + esc(String(agendamento.duracao_min)) + ' min</span>';
+  if (lembrete) {
+    const lembreteLabel = lembrete === 'confirmacao' ? 'Confirmação pendente' :
+      lembrete === 'retorno' ? 'Retorno para lembrar' : 'Lembrete de ' + lembrete + ' pendente';
+    html += '<span class="agenda-selo">' + esc(lembreteLabel) + '</span>';
+  }
+  if (agendamento.procedimento) {
+    html += '<div class="agenda-detalhe"><strong>Uso interno — procedimento ou interesse</strong>' +
+      esc(agendamento.procedimento) + '</div>';
+  }
+  if (agendamento.retorno_em) {
+    html += '<div class="agenda-detalhe"><strong>Retorno recomendado</strong>' +
+      esc(agendaFormatarRetorno(agendamento.retorno_em)) + '</div>';
+  }
+  if (agendamento.observacoes) {
+    html += '<div class="agenda-detalhe"><strong>Observações internas</strong>' +
+      esc(agendamento.observacoes) + '</div>';
+  }
+  html += '<div class="agenda-card-acoes">';
+  if (podeEnviarWhatsApp) {
+    html += '<button class="agenda-botao" type="button" data-agenda-acao="whatsapp" data-agenda-id="' +
+      esc(agendamento.id) + '" data-lembrete-id="' + esc(lembreteAtual.id) +
+      '" data-lembrete-tipo="' + esc(lembrete) + '">Abrir WhatsApp</button>';
+  } else if (!agendamento.lembretes_autorizados) {
+    html += '<span class="agenda-selo">Lembretes pelo WhatsApp não autorizados</span>';
+  }
+  if (lembrete) {
+    html += '<button class="agenda-botao alt" type="button" data-agenda-acao="marcar-lembrete" data-agenda-id="' +
+      esc(agendamento.id) + '" data-lembrete-id="' + esc(lembreteAtual.id) +
+      '" data-lembrete-tipo="' + esc(lembrete) + '">Marcar como enviado</button>';
+  }
+  if (agendamento.status !== 'cancelado') {
+    html += '<button class="agenda-botao alt" type="button" data-agenda-acao="editar" data-agenda-id="' +
+      esc(agendamento.id) + '">Editar</button>';
+  }
+  if (!AGENDA_STATUS_FINAIS.has(agendamento.status) && agendamento.status !== 'confirmado') {
+    html += '<button class="agenda-botao alt" type="button" data-agenda-acao="status" data-status="confirmado" data-agenda-id="' +
+      esc(agendamento.id) + '">Confirmar</button>';
+  }
+  if (!AGENDA_STATUS_FINAIS.has(agendamento.status)) {
+    html += '<button class="agenda-botao alt" type="button" data-agenda-acao="reagendar" data-agenda-id="' +
+      esc(agendamento.id) + '">Reagendar</button>';
+    html += '<button class="agenda-botao alt" type="button" data-agenda-acao="status" data-status="concluido" data-agenda-id="' +
+      esc(agendamento.id) + '">Concluir</button>';
+    html += '<button class="agenda-botao alt" type="button" data-agenda-acao="status" data-status="nao_compareceu" data-agenda-id="' +
+      esc(agendamento.id) + '">Faltou</button>';
+    html += '<button class="agenda-botao perigo" type="button" data-agenda-acao="status" data-status="cancelado" data-agenda-id="' +
+      esc(agendamento.id) + '">Cancelar</button>';
+  }
+  html += '</div>';
+  artigo.innerHTML = html;
+  return artigo;
+}
+
+async function agendaNotificarSistema() {
+  const titulo = 'Fichas · Agenda';
+  const opcoes = {
+    body: 'Há avisos de agenda que precisam da atenção da equipe.',
+    tag: 'amj-agenda-pendencias'
+  };
+  try {
+    if ('serviceWorker' in navigator) {
+      const registro = await navigator.serviceWorker.register('./agenda-sw.js', { scope: './' });
+      await registro.showNotification(titulo, opcoes);
+      return;
+    }
+    new Notification(titulo, opcoes);
+  } catch (_) {
+    /* O aviso interno permanece visível quando o sistema não permite notificações. */
+  }
+}
+
+function agendaAtualizarAvisos() {
+  const resumo = agendaResumo();
+  const partes = [];
+  if (resumo.lembretes) partes.push(resumo.lembretes + (resumo.lembretes === 1 ? ' lembrete pendente' : ' lembretes pendentes'));
+  const retornosVencidos = new Set(agendaLembretes
+    .filter(lembrete => lembrete.tipo === 'retorno')
+    .map(lembrete => lembrete.agendamento_id)).size;
+  if (retornosVencidos) partes.push(retornosVencidos + (retornosVencidos === 1 ? ' retorno para acompanhar' : ' retornos para acompanhar'));
+  const texto = partes.length ? 'Atenção: ' + partes.join(' e ') + '.' : '';
+  el('agenda-alerta-interno').textContent = texto;
+
+  const assinatura = resumo.lembretes + '|' + retornosVencidos;
+  if (texto && 'Notification' in window && Notification.permission === 'granted' &&
+      assinatura !== agendaUltimaAssinaturaAlerta) {
+    agendaUltimaAssinaturaAlerta = assinatura;
+    void agendaNotificarSistema();
+  }
+  if (!texto) agendaUltimaAssinaturaAlerta = '';
+}
+
+function renderizarAgenda() {
+  const lista = el('agenda-lista');
+  const resumo = agendaResumo();
+  el('agenda-total-hoje').textContent = resumo.hoje;
+  el('agenda-total-proximos').textContent = resumo.proximos;
+  el('agenda-total-lembretes').textContent = resumo.lembretes;
+  el('agenda-total-retornos').textContent = resumo.retornos;
+
+  const itens = agendaCache.filter(a => agendaNoFiltro(a, agendaFiltro)).sort((a, b) => {
+    const dataA = agendaData(a.data_hora);
+    const dataB = agendaData(b.data_hora);
+    return (dataA ? dataA.getTime() : Number.MAX_SAFE_INTEGER) -
+      (dataB ? dataB.getTime() : Number.MAX_SAFE_INTEGER);
+  });
+  lista.innerHTML = '';
+  if (!itens.length) {
+    lista.innerHTML = '<p class="agenda-vazio">' +
+      (agendaCarregada ? 'Nenhum agendamento neste filtro.' : 'A agenda ainda não foi carregada.') + '</p>';
+  } else {
+    itens.forEach(item => lista.appendChild(agendaCartao(item)));
+  }
+  el('agenda-contagem').textContent = itens.length +
+    (itens.length === 1 ? ' compromisso neste filtro' : ' compromissos neste filtro');
+  agendaAtualizarAvisos();
+}
+
+async function carregarAgenda(opcoes) {
+  const silencioso = opcoes && opcoes.silencioso === true;
+  if (!hashSenha || agendaCarregando) return;
+  agendaCarregando = true;
+  const lista = el('agenda-lista');
+  lista.setAttribute('aria-busy', 'true');
+  if (!silencioso && !agendaCarregada) lista.innerHTML = '<p class="carregando">Carregando agenda…</p>';
+  try {
+    const dados = await agendaRequest('listar');
+    const agoraRecebido = Date.parse(dados.agora || '');
+    if (Number.isFinite(agoraRecebido)) {
+      agendaAgoraServidor = agoraRecebido;
+      agendaAgoraRecebidoEm = performance.now();
+    }
+    agendaCache = Array.isArray(dados.agendamentos) ? dados.agendamentos.map(agendaNormalizar) : [];
+    agendaLembretes = Array.isArray(dados.lembretes_pendentes)
+      ? dados.lembretes_pendentes.map(agendaNormalizarLembrete).filter(lembrete => lembrete.id)
+      : [];
+    agendaCarregada = true;
+    const falhaSincronizacao = dados.lembretes_sincronizados === false;
+    el('agenda-status').classList.toggle('erro', falhaSincronizacao);
+    el('agenda-status').textContent = falhaSincronizacao
+      ? 'Agenda carregada, mas alguns lembretes não foram sincronizados. Clique em “Atualizar”.'
+      : (silencioso ? '' : 'Agenda atualizada.');
+    renderizarAgenda();
+  } catch (erro) {
+    el('agenda-status').classList.add('erro');
+    el('agenda-status').textContent = erro.message || 'Não foi possível carregar a agenda agora.';
+    if (!agendaCarregada) lista.innerHTML = '<p class="agenda-vazio">A agenda está temporariamente indisponível. As fichas continuam funcionando normalmente.</p>';
+  } finally {
+    agendaCarregando = false;
+    lista.setAttribute('aria-busy', 'false');
+  }
+}
+
+function agendaPararPolling() {
+  if (agendaPoll) clearInterval(agendaPoll);
+  agendaPoll = null;
+}
+
+function agendaIniciarPolling() {
+  agendaPararPolling();
+  if (!hashSenha || document.hidden) return;
+  agendaPoll = setInterval(() => carregarAgenda({ silencioso: true }), AGENDA_POLL_MS);
+}
+
+function agendaAtivarAba(nome, moverFoco) {
+  const agendaAtiva = nome === 'agenda';
+  const btFichas = el('aba-bt-fichas');
+  const btAgenda = el('aba-bt-agenda');
+  const painelFichas = el('aba-fichas');
+  const painelAgenda = el('aba-agenda');
+  btFichas.setAttribute('aria-selected', String(!agendaAtiva));
+  btAgenda.setAttribute('aria-selected', String(agendaAtiva));
+  btFichas.tabIndex = agendaAtiva ? -1 : 0;
+  btAgenda.tabIndex = agendaAtiva ? 0 : -1;
+  painelFichas.classList.toggle('oculto', agendaAtiva);
+  painelAgenda.classList.toggle('oculto', !agendaAtiva);
+  painelFichas.hidden = agendaAtiva;
+  painelAgenda.hidden = !agendaAtiva;
+  if (moverFoco) (agendaAtiva ? btAgenda : btFichas).focus();
+  if (agendaAtiva && !agendaCarregada) carregarAgenda();
+}
+
+function agendaAtualizarEstadoAlertas() {
+  const bt = el('agenda-alertas');
+  if (!('Notification' in window)) {
+    bt.textContent = 'Alertas internos ativos';
+    el('agenda-alertas-status').textContent = 'Este navegador não oferece alertas do sistema. Os avisos internos continuam ativos.';
+    return;
+  }
+  if (Notification.permission === 'granted') {
+    bt.textContent = 'Alertas do navegador ativos';
+    el('agenda-alertas-status').textContent = 'Alertas ativos enquanto o Fichas estiver aberto. Nenhum nome ou procedimento aparece fora do aplicativo.';
+  } else if (Notification.permission === 'denied') {
+    bt.textContent = 'Alertas internos ativos';
+    el('agenda-alertas-status').textContent = 'Os alertas do navegador estão bloqueados. Mantenha o Fichas aberto para ver os avisos internos.';
+  } else {
+    bt.textContent = 'Ativar alertas do navegador';
+    el('agenda-alertas-status').textContent = 'Os avisos internos já estão ativos com o Fichas aberto. O navegador só pedirá permissão após seu clique.';
+  }
+}
+
+async function agendaSolicitarAlertas() {
+  if (!('Notification' in window)) {
+    agendaAtualizarEstadoAlertas();
+    return;
+  }
+  if (Notification.permission === 'default') {
+    try { await Notification.requestPermission(); } catch (_) {}
+  }
+  agendaAtualizarEstadoAlertas();
+  agendaAtualizarAvisos();
+}
+
+function agendaSincronizarAutorizacao() {
+  const autorizou = el('agenda-autoriza-lembretes').checked;
+  ['agenda-lembrete-24h', 'agenda-lembrete-2h'].forEach(id => {
+    el(id).disabled = !autorizou;
+    if (!autorizou) el(id).checked = false;
+  });
+}
+
+function agendaLimparFormulario() {
+  const form = el('agenda-form');
+  form.reset();
+  el('agenda-id').value = '';
+  el('agenda-data').min = agendaHoje();
+  el('agenda-data').value = agendaHoje();
+  el('agenda-duracao').value = '60';
+  el('agenda-form-titulo').textContent = 'Novo agendamento';
+  el('agenda-salvar').textContent = 'Salvar agendamento';
+  el('agenda-cancelar-edicao').classList.add('oculto');
+  el('agenda-form-status').classList.remove('erro');
+  el('agenda-form-status').textContent = '';
+  agendaIdempotencyKey = null;
+  agendaReagendando = false;
+  agendaSincronizarAutorizacao();
+}
+
+function agendaEditar(agendamento, reagendar) {
+  agendaReagendando = reagendar === true;
+  el('agenda-id').value = agendamento.id;
+  el('agenda-nome').value = agendamento.nome;
+  el('agenda-telefone').value = agendaTelefoneFormatado(agendamento.telefone);
+  el('agenda-categoria').value = agendamento.categoria;
+  el('agenda-procedimento').value = agendamento.procedimento;
+  el('agenda-data').min = '';
+  el('agenda-data').value = agendaDataParaInput(agendamento.data_hora);
+  el('agenda-hora').value = agendaHoraParaInput(agendamento.data_hora);
+  el('agenda-duracao').value = String(agendamento.duracao_min);
+  el('agenda-retorno').value = agendamento.retorno_em;
+  el('agenda-observacoes').value = agendamento.observacoes;
+  el('agenda-autoriza-lembretes').checked = agendamento.lembretes_autorizados;
+  el('agenda-lembrete-24h').checked = agendamento.lembrete_24h;
+  el('agenda-lembrete-2h').checked = agendamento.lembrete_2h;
+  agendaSincronizarAutorizacao();
+  el('agenda-form-titulo').textContent = agendaReagendando ? 'Reagendar atendimento' : 'Editar agendamento';
+  el('agenda-salvar').textContent = agendaReagendando ? 'Confirmar novo horário' : 'Salvar alterações';
+  el('agenda-cancelar-edicao').classList.remove('oculto');
+  el('agenda-editor').open = true;
+  agendaIdempotencyKey = null;
+  el('agenda-editor').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  setTimeout(() => (agendaReagendando ? el('agenda-data') : el('agenda-nome')).focus(), 250);
+}
+
+async function agendaAlterarStatus(agendamento, novoStatus, botao) {
+  let motivoCancelamento = '';
+  if (novoStatus === 'cancelado') {
+    const resposta = window.prompt('Informe o motivo do cancelamento:');
+    if (resposta === null) return;
+    motivoCancelamento = resposta.trim();
+    if (motivoCancelamento.length < 2) {
+      el('agenda-status').classList.add('erro');
+      el('agenda-status').textContent = 'Informe o motivo do cancelamento.';
+      return;
+    }
+  }
+  const confirmacoes = {
+    confirmado: 'Confirmar a presença desta cliente no horário agendado?',
+    concluido: 'Confirmar que este atendimento foi concluído?',
+    nao_compareceu: 'Confirmar que a cliente não compareceu a este atendimento?',
+    cancelado: 'Confirmar o cancelamento deste atendimento?'
+  };
+  if (confirmacoes[novoStatus] && !window.confirm(confirmacoes[novoStatus])) return;
+  botao.disabled = true;
+  el('agenda-status').classList.remove('erro');
+  el('agenda-status').textContent = 'Atualizando agendamento…';
+  try {
+    const resposta = await agendaRequest('status', {
+      id: agendamento.id,
+      status: novoStatus,
+      versao: agendamento.versao,
+      updated_at: agendamento.updated_at,
+      motivo_cancelamento: novoStatus === 'cancelado' ? motivoCancelamento : null,
+      idempotency_key: crypto.randomUUID ? crypto.randomUUID() : String(Date.now())
+    });
+    await carregarAgenda({ silencioso: true });
+    if (resposta.lembretes_sincronizados === false) {
+      el('agenda-status').classList.add('erro');
+      el('agenda-status').textContent = 'Status atualizado, mas os lembretes precisam ser conferidos. Clique em “Atualizar”.';
+    } else {
+      el('agenda-status').classList.remove('erro');
+      el('agenda-status').textContent = 'Status atualizado.';
+    }
+  } catch (erro) {
+    el('agenda-status').classList.add('erro');
+    el('agenda-status').textContent = erro.message || 'Não foi possível atualizar o status.';
+  } finally {
+    botao.disabled = false;
+  }
+}
+
+async function agendaMarcarLembrete(agendamento, lembrete, botao) {
+  if (!lembrete || !lembrete.id) {
+    el('agenda-status').classList.add('erro');
+    el('agenda-status').textContent = 'Atualize a agenda antes de registrar este lembrete.';
+    return;
+  }
+  botao.disabled = true;
+  el('agenda-status').classList.remove('erro');
+  el('agenda-status').textContent = 'Registrando o envio…';
+  try {
+    const resposta = await agendaRequest('marcar_lembrete', {
+      id: agendamento.id,
+      lembrete_id: lembrete.id,
+      tipo: lembrete.tipo,
+      status: 'enviado',
+      versao: agendamento.versao,
+      updated_at: agendamento.updated_at,
+      idempotency_key: crypto.randomUUID ? crypto.randomUUID() : String(Date.now())
+    });
+    await carregarAgenda({ silencioso: true });
+    if (resposta.lembretes_sincronizados === false) {
+      el('agenda-status').classList.add('erro');
+      el('agenda-status').textContent = 'Envio registrado, mas os demais lembretes precisam ser conferidos. Clique em “Atualizar”.';
+    } else {
+      el('agenda-status').classList.remove('erro');
+      el('agenda-status').textContent = 'Lembrete marcado como enviado.';
+    }
+  } catch (erro) {
+    el('agenda-status').classList.add('erro');
+    el('agenda-status').textContent = erro.message || 'Não foi possível registrar o lembrete.';
+  } finally {
+    botao.disabled = false;
+  }
+}
+
+el('aba-bt-fichas').addEventListener('click', () => agendaAtivarAba('fichas', false));
+el('aba-bt-agenda').addEventListener('click', () => agendaAtivarAba('agenda', false));
+document.querySelector('.abas').addEventListener('keydown', evento => {
+  if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(evento.key)) return;
+  evento.preventDefault();
+  const agendaAtiva = el('aba-bt-agenda').getAttribute('aria-selected') === 'true';
+  const proxima = evento.key === 'ArrowRight' || evento.key === 'End' ? 'agenda' :
+    evento.key === 'ArrowLeft' || evento.key === 'Home' ? 'fichas' : (agendaAtiva ? 'agenda' : 'fichas');
+  agendaAtivarAba(proxima, true);
+});
+
+document.querySelectorAll('[data-agenda-filtro]').forEach(bt => {
+  bt.addEventListener('click', () => agendaSelecionarFiltro(bt.dataset.agendaFiltro));
+});
+el('agenda-atualizar').addEventListener('click', () => carregarAgenda());
+el('agenda-alertas').addEventListener('click', agendaSolicitarAlertas);
+el('agenda-autoriza-lembretes').addEventListener('change', agendaSincronizarAutorizacao);
+el('agenda-cancelar-edicao').addEventListener('click', agendaLimparFormulario);
+el('agenda-telefone').addEventListener('input', evento => {
+  evento.target.value = agendaTelefoneFormatado(evento.target.value);
+});
+
+el('agenda-form').addEventListener('input', evento => {
+  if (evento.target.matches('input, select, textarea')) {
+    evento.target.removeAttribute('aria-invalid');
+    el('agenda-form-status').textContent = '';
+    if (!agendaEnviando) agendaIdempotencyKey = null;
+  }
+});
+
+el('agenda-form').addEventListener('submit', async evento => {
+  evento.preventDefault();
+  const form = evento.currentTarget;
+  const controles = [...form.querySelectorAll('input, select, textarea')];
+  controles.forEach(controle => {
+    controle.removeAttribute('aria-invalid');
+    if (typeof controle.setCustomValidity === 'function') controle.setCustomValidity('');
+  });
+  const telefone = el('agenda-telefone');
+  const numero = agendaNumeroWhatsApp(telefone.value);
+  if (!numero) telefone.setCustomValidity('Informe um WhatsApp com DDD.');
+  const dataHora = new Date(el('agenda-data').value + 'T' + el('agenda-hora').value + ':00-03:00');
+  if (Number.isNaN(dataHora.getTime())) el('agenda-hora').setCustomValidity('Informe uma data e hora válidas.');
+  const id = el('agenda-id').value;
+  if (!id && !Number.isNaN(dataHora.getTime()) && dataHora.getTime() < agendaAgoraMs() - 60000) {
+    el('agenda-data').setCustomValidity('Escolha um horário futuro.');
+  }
+  const retorno = el('agenda-retorno').value;
+  if (retorno && el('agenda-data').value && retorno < el('agenda-data').value) {
+    el('agenda-retorno').setCustomValidity('O retorno não pode ser anterior ao atendimento.');
+  }
+  if (!form.checkValidity()) {
+    const invalido = controles.find(controle => !controle.validity.valid);
+    if (invalido) {
+      invalido.setAttribute('aria-invalid', 'true');
+      invalido.focus();
+      el('agenda-form-status').classList.add('erro');
+      el('agenda-form-status').textContent = invalido.validationMessage || 'Confira os campos indicados.';
+    }
+    return;
+  }
+
+  const atual = id ? agendaCache.find(item => item.id === id) : null;
+  const inicioAtual = atual ? agendaData(atual.data_hora) : null;
+  const mudouHorario = Boolean(atual && inicioAtual &&
+    inicioAtual.getTime() !== dataHora.getTime());
+  if (mudouHorario && !AGENDA_STATUS_ATIVOS.has(atual.status)) {
+    el('agenda-form-status').classList.add('erro');
+    el('agenda-form-status').textContent = 'Este atendimento não pode ser reagendado.';
+    return;
+  }
+  if (mudouHorario && !window.confirm('Confirmar o novo horário? O status voltará para “Aguardando confirmação” e os lembretes anteriores serão substituídos.')) {
+    return;
+  }
+  const autorizou = el('agenda-autoriza-lembretes').checked;
+  if (!agendaIdempotencyKey) {
+    agendaIdempotencyKey = crypto.randomUUID ? crypto.randomUUID() :
+      Date.now().toString(36) + '-' + Math.random().toString(36).slice(2);
+  }
+  const payload = {
+    nome: el('agenda-nome').value.trim(),
+    telefone: telefone.value,
+    categoria: el('agenda-categoria').value,
+    procedimento: el('agenda-procedimento').value.trim(),
+    data_hora: dataHora.toISOString(),
+    duracao_min: Number(el('agenda-duracao').value),
+    retorno_em: retorno || null,
+    observacoes: el('agenda-observacoes').value.trim(),
+    lembretes_autorizados: autorizou,
+    autoriza_lembretes: autorizou,
+    lembrete_24h: autorizou && el('agenda-lembrete-24h').checked,
+    lembrete_2h: autorizou && el('agenda-lembrete-2h').checked,
+    status: atual ? atual.status : 'aguardando_confirmacao',
+    reagendar: mudouHorario,
+    idempotency_key: agendaIdempotencyKey
+  };
+  if (atual) {
+    payload.id = atual.id;
+    payload.versao = atual.versao;
+    payload.updated_at = atual.updated_at;
+  }
+
+  const botao = el('agenda-salvar');
+  agendaEnviando = true;
+  botao.disabled = true;
+  botao.textContent = atual ? 'Salvando alterações…' : 'Salvando…';
+  el('agenda-form-status').classList.remove('erro');
+  el('agenda-form-status').textContent = 'Salvando com segurança…';
+  try {
+    const resposta = await agendaRequest(atual ? 'atualizar' : 'criar', payload);
+    const salvo = resposta.agendamento && resposta.agendamento.id ? String(resposta.agendamento.id) : id;
+    const avisoSincronizacao = resposta.lembretes_sincronizados === false;
+    agendaIdempotencyKey = null;
+    agendaLimparFormulario();
+    el('agenda-form-status').textContent = avisoSincronizacao
+      ? 'Agendamento salvo. Atualize a agenda para conferir os lembretes.'
+      : (mudouHorario ? 'Atendimento reagendado. A nova confirmação foi preparada.' :
+        (atual ? 'Alterações salvas.' : 'Agendamento criado.'));
+    await carregarAgenda({ silencioso: true });
+    const cartao = salvo ? document.querySelector('[data-agenda-id="' + salvo + '"]') : null;
+    if (cartao) cartao.focus();
+  } catch (erro) {
+    el('agenda-form-status').classList.add('erro');
+    el('agenda-form-status').textContent = erro.message || 'Não foi possível salvar. Tente novamente.';
+    await carregarAgenda({ silencioso: true });
+  } finally {
+    agendaEnviando = false;
+    botao.disabled = false;
+    botao.textContent = el('agenda-id').value ? 'Salvar alterações' : 'Salvar agendamento';
+  }
+});
+
+el('agenda-lista').addEventListener('click', evento => {
+  const botao = evento.target.closest('button[data-agenda-acao]');
+  if (!botao) return;
+  const agendamento = agendaCache.find(item => item.id === botao.dataset.agendaId);
+  if (!agendamento) return;
+  const acao = botao.dataset.agendaAcao;
+  const lembrete = botao.dataset.lembreteId
+    ? agendaLembretes.find(item => item.id === botao.dataset.lembreteId &&
+      item.agendamento_id === agendamento.id)
+    : null;
+  if (acao === 'whatsapp') {
+    void agendaAbrirWhatsApp(agendamento, lembrete, botao);
+  } else if (acao === 'editar') {
+    agendaEditar(agendamento);
+  } else if (acao === 'reagendar') {
+    agendaEditar(agendamento, true);
+  } else if (acao === 'status') {
+    void agendaAlterarStatus(agendamento, botao.dataset.status, botao);
+  } else if (acao === 'marcar-lembrete') {
+    void agendaMarcarLembrete(agendamento, lembrete, botao);
+  }
+});
+
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    agendaPararPolling();
+  } else if (hashSenha) {
+    carregarAgenda({ silencioso: true });
+    agendaIniciarPolling();
+  }
+});
+
+agendaLimparFormulario();
+agendaAtualizarEstadoAlertas();
 
 /* ---------- convidar paciente ---------- */
 const DOCUMENTOS_CONVITE = {
@@ -547,6 +1646,8 @@ el('cv-qr').addEventListener('click', () => {
     el('tela-login').classList.add('oculto');
     el('tela-lista').classList.remove('oculto');
     await carregar();
+    await carregarAgenda({ silencioso: true });
+    agendaIniciarPolling();
   }
 })();
 </script>

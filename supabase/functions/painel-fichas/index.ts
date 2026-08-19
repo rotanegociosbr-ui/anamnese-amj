@@ -1,4 +1,4 @@
-import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import "@supabase/functions-js/edge-runtime.d.ts";
 
 // Compatível com o painel atual. A senha em hash permanece durante esta etapa;
 // uma migração futura para Supabase Auth não deve ser misturada ao primeiro TCLE.
@@ -88,7 +88,10 @@ async function admin(path: string, init: RequestInit = {}): Promise<Response> {
   });
 }
 
-async function signedLinks(bucket: string, paths: string[]): Promise<Record<string, string>> {
+async function signedLinks(
+  bucket: string,
+  paths: string[],
+): Promise<Record<string, string>> {
   const result: Record<string, string> = {};
   if (!paths.length) return result;
   const response = await admin("/storage/v1/object/sign/" + bucket, {
@@ -97,7 +100,9 @@ async function signedLinks(bucket: string, paths: string[]): Promise<Record<stri
   });
   if (!response.ok) return result;
   for (const item of await response.json()) {
-    if (item.signedURL && item.path) result[item.path] = URL + "/storage/v1" + item.signedURL;
+    if (item.signedURL && item.path) {
+      result[item.path] = URL + "/storage/v1" + item.signedURL;
+    }
   }
   return result;
 }
@@ -106,29 +111,47 @@ function safeText(value: unknown, max = 300): string {
   return typeof value === "string" ? value.slice(0, max) : "";
 }
 
+function validUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+    .test(value);
+}
+
 Deno.serve(async (req: Request) => {
   const origin = req.headers.get("origin") || "";
   if (req.method === "OPTIONS") {
-    if (origin && !ALLOWED_ORIGINS.has(origin)) return new Response(null, { status: 403 });
+    if (origin && !ALLOWED_ORIGINS.has(origin)) {
+      return new Response(null, { status: 403 });
+    }
     return new Response(null, { status: 204, headers: cors(req) });
   }
-  if (req.method !== "POST") return json(req, { erro: "Método não permitido" }, 405);
-  if (origin && !ALLOWED_ORIGINS.has(origin)) return json(req, { erro: "Origem não permitida" }, 403);
+  if (req.method !== "POST") {
+    return json(req, { erro: "Método não permitido" }, 405);
+  }
+  if (origin && !ALLOWED_ORIGINS.has(origin)) {
+    return json(req, { erro: "Origem não permitida" }, 403);
+  }
   if (!HASH_SENHA_CONFIGURADO) {
     console.error("PAINEL_HASH_SENHA ausente ou inválido");
     return json(req, { erro: "Acesso temporariamente indisponível" }, 503);
   }
 
-  const ip = req.headers.get("cf-connecting-ip") || req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  const ip = req.headers.get("cf-connecting-ip") ||
+    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
   const now = Date.now();
   const record = attempts.get(ip);
   if (record && record.resetAt > now && record.count >= 12) {
-    return json(req, { erro: "Muitas tentativas. Aguarde alguns minutos." }, 429);
+    return json(
+      req,
+      { erro: "Muitas tentativas. Aguarde alguns minutos." },
+      429,
+    );
   }
 
   const sent = (req.headers.get("x-senha") || "").toLowerCase();
   if (!equalConstantTime(sent, HASH_SENHA)) {
-    const current = record && record.resetAt > now ? record : { count: 0, resetAt: now + 10 * 60_000 };
+    const current = record && record.resetAt > now
+      ? record
+      : { count: 0, resetAt: now + 10 * 60_000 };
     current.count++;
     attempts.set(ip, current);
     await new Promise((resolve) => setTimeout(resolve, 700));
@@ -137,47 +160,162 @@ Deno.serve(async (req: Request) => {
   attempts.delete(ip);
 
   try {
+    const rawBody = await req.text();
+    if (rawBody.length > 8192) {
+      return json(req, { erro: "Requisição muito grande" }, 413);
+    }
+    if (
+      rawBody &&
+      !(req.headers.get("content-type") || "").toLowerCase().includes(
+        "application/json",
+      )
+    ) {
+      return json(req, { erro: "Conteúdo inválido" }, 415);
+    }
+
+    let payload: Record<string, unknown> = {};
+    if (rawBody) {
+      try {
+        const parsed = JSON.parse(rawBody);
+        if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+          return json(req, { erro: "Dados inválidos" }, 400);
+        }
+        payload = parsed;
+      } catch {
+        return json(req, { erro: "JSON inválido" }, 400);
+      }
+    }
+
+    const action = safeText(payload.acao, 30);
+    if (action === "arquivar" || action === "restaurar") {
+      const source = safeText(payload.origem, 30);
+      const documentId = safeText(payload.documento_id, 40);
+      const reason = safeText(payload.motivo, 500).trim();
+      if (
+        !["anamnese", "documento_clinico"].includes(source) ||
+        !validUuid(documentId) ||
+        reason.length < 3
+      ) {
+        return json(
+          req,
+          { erro: "Informe a ficha e o motivo corretamente." },
+          422,
+        );
+      }
+
+      const archiveResponse = await admin(
+        "/rest/v1/rpc/painel_arquivar_ficha",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            p_origem: source,
+            p_documento_id: documentId,
+            p_acao: action,
+            p_motivo: reason,
+          }),
+        },
+      );
+      if (!archiveResponse.ok) {
+        console.error("Painel archive action failed", archiveResponse.status);
+        return json(
+          req,
+          {
+            erro: archiveResponse.status === 404
+              ? "Ficha não encontrada."
+              : "Não foi possível atualizar a ficha agora.",
+          },
+          archiveResponse.status === 404 ? 404 : 409,
+        );
+      }
+      const result = await archiveResponse.json();
+      return json(req, {
+        ok: true,
+        alterado: result?.alterado === true,
+        arquivado: result?.arquivado === true,
+      });
+    }
+    if (action && action !== "listar") {
+      return json(req, { erro: "Ação inválida" }, 422);
+    }
+
     // Resposta original da anamnese, preservada integralmente.
     const formsResponse = await admin("/rest/v1/anamneses_resumo?select=*");
-    if (!formsResponse.ok) throw new Error("anamneses_read_" + formsResponse.status);
+    if (!formsResponse.ok) {
+      throw new Error("anamneses_read_" + formsResponse.status);
+    }
     const forms = await formsResponse.json();
 
     const filesResponse = await admin("/storage/v1/object/list/fichas-pdf", {
       method: "POST",
-      body: JSON.stringify({ prefix: "", limit: 500, sortBy: { column: "name", order: "desc" } }),
+      body: JSON.stringify({
+        prefix: "",
+        limit: 500,
+        sortBy: { column: "name", order: "desc" },
+      }),
     });
     const files = filesResponse.ok ? await filesResponse.json() : [];
-    const names = files.map((item: { name?: string }) => item.name).filter(Boolean);
+    const names = files.map((item: { name?: string }) => item.name).filter(
+      Boolean,
+    );
     const formLinks = await signedLinks("fichas-pdf", names);
 
-    const codesResponse = await admin("/rest/v1/anamneses?select=id,codigo_verificacao");
+    const codesResponse = await admin(
+      "/rest/v1/anamneses?select=id,codigo_verificacao,arquivado_em,arquivado_motivo",
+    );
     const codes = codesResponse.ok ? await codesResponse.json() : [];
-    const codeById: Record<string, string> = {};
-    for (const item of codes) codeById[item.id] = (item.codigo_verificacao || "").slice(0, 8);
+    const formMetaById: Record<string, {
+      marker: string;
+      archivedAt: string | null;
+      archiveReason: string | null;
+    }> = {};
+    for (const item of codes) {
+      formMetaById[item.id] = {
+        marker: (item.codigo_verificacao || "").slice(0, 8),
+        archivedAt: safeText(item.arquivado_em, 40) || null,
+        archiveReason: safeText(item.arquivado_motivo, 500) || null,
+      };
+    }
 
     for (const form of forms) {
-      const marker = codeById[form.id];
-      const filename = marker ? names.find((name: string) => name.includes(marker)) : null;
+      const metadata = formMetaById[form.id];
+      const marker = metadata?.marker;
+      const filename = marker
+        ? names.find((name: string) => name.includes(marker))
+        : null;
       form.pdf = filename ? formLinks[filename] || null : null;
       form.pdf_nome = filename || null;
+      form.arquivado_em = metadata?.archivedAt || null;
+      form.arquivado_motivo = metadata?.archiveReason || null;
     }
 
     // Nova coleção: apenas resumo do TCLE, nunca o JSON clínico completo.
     const documentsResponse = await admin(
-      "/rest/v1/documentos_clinicos?select=id,tipo,versao_termo,nome,telefone,recebido_em,codigo_verificacao,pdf_path,revisado,dados,status" +
+      "/rest/v1/documentos_clinicos?select=id,tipo,versao_termo,nome,telefone,recebido_em,codigo_verificacao,pdf_path,revisado,dados,status,arquivado_em,arquivado_motivo" +
         "&status=eq.recebido&order=recebido_em.desc",
     );
-    if (!documentsResponse.ok) throw new Error("documents_read_" + documentsResponse.status);
+    if (!documentsResponse.ok) {
+      throw new Error("documents_read_" + documentsResponse.status);
+    }
     const documentRows = await documentsResponse.json();
-    const documentPaths = documentRows.map((item: { pdf_path?: string }) => item.pdf_path).filter(Boolean);
-    const documentLinks = await signedLinks("documentos-clinicos", documentPaths);
+    const documentPaths = documentRows.map((item: { pdf_path?: string }) =>
+      item.pdf_path
+    ).filter(Boolean);
+    const documentLinks = await signedLinks(
+      "documentos-clinicos",
+      documentPaths,
+    );
 
     const documents = documentRows.map((row: Record<string, unknown>) => {
-      const data = row.dados && typeof row.dados === "object" ? row.dados as Record<string, unknown> : {};
-      const procedure = data.procedimento && typeof data.procedimento === "object"
-        ? data.procedimento as Record<string, unknown>
+      const data = row.dados && typeof row.dados === "object"
+        ? row.dados as Record<string, unknown>
         : {};
-      const health = Array.isArray(data.confirmacoes_saude) ? data.confirmacoes_saude : [];
+      const procedure =
+        data.procedimento && typeof data.procedimento === "object"
+          ? data.procedimento as Record<string, unknown>
+          : {};
+      const health = Array.isArray(data.confirmacoes_saude)
+        ? data.confirmacoes_saude
+        : [];
       const alerts = health
         .filter((item) => {
           if (!item || typeof item !== "object") return false;
@@ -206,20 +344,43 @@ Deno.serve(async (req: Request) => {
         codigo_verificacao: row.codigo_verificacao,
         revisado: row.revisado === true,
         status_profissional: "aguardando_revisao_profissional",
-        modalidades: Array.isArray(procedure.modalidades) ? procedure.modalidades.slice(0, 3) : [],
+        modalidades: Array.isArray(procedure.modalidades)
+          ? procedure.modalidades.slice(0, 3)
+          : [],
         regioes: Array.isArray(procedure.regioes)
           ? procedure.regioes.slice(0, 10)
           : safeText(procedure.regioes, 600),
         objetivo: safeText(procedure.objetivo, 600),
-        detalhamento_volume_previsto: safeText(procedure.detalhamento_volume_previsto, 600),
-        detalhamento_plano_previsto: safeText(procedure.detalhamento_plano_previsto, 600),
+        detalhamento_volume_previsto: safeText(
+          procedure.detalhamento_volume_previsto,
+          600,
+        ),
+        detalhamento_plano_previsto: safeText(
+          procedure.detalhamento_plano_previsto,
+          600,
+        ),
         status_anamnese: safeText(procedure.status_anamnese, 40),
         alertas_saude: alerts,
         duvidas: safeText(data.duvidas, 1200),
+        arquivado_em: safeText(row.arquivado_em, 40) || null,
+        arquivado_motivo: safeText(row.arquivado_motivo, 500) || null,
         pdf: documentLinks[path] || null,
-        pdf_nome: path ? typeMeta.filename + "-" + safeText(row.codigo_verificacao, 8) + ".pdf" : null,
+        pdf_nome: path
+          ? typeMeta.filename + "-" + safeText(row.codigo_verificacao, 8) +
+            ".pdf"
+          : null,
       };
     });
+
+    const activeForms = forms.filter((item: { arquivado_em?: string | null }) =>
+      !item.arquivado_em
+    ).length;
+    const activeDocuments =
+      documents.filter((item: { arquivado_em?: string | null }) =>
+        !item.arquivado_em
+      ).length;
+    const archivedForms = forms.length - activeForms;
+    const archivedDocuments = documents.length - activeDocuments;
 
     return json(req, {
       fichas: forms,
@@ -227,13 +388,18 @@ Deno.serve(async (req: Request) => {
       pdfs: names.length,
       documentos: documents,
       totais: {
-        anamneses: forms.length,
-        tcles: documents.length,
-        geral: forms.length + documents.length,
+        anamneses: activeForms,
+        tcles: activeDocuments,
+        geral: activeForms + activeDocuments,
+        arquivados: archivedForms + archivedDocuments,
       },
     });
   } catch (error) {
     console.error("Painel loading failed", String(error));
-    return json(req, { erro: "Não foi possível carregar os documentos agora." }, 500);
+    return json(
+      req,
+      { erro: "Não foi possível carregar os documentos agora." },
+      500,
+    );
   }
 });
