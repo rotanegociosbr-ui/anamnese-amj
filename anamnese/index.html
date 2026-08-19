@@ -55,7 +55,6 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
 /* ============================================================
    CONFIGURAÇÃO — edite apenas este bloco
@@ -63,11 +62,10 @@
 </style>
 <script>
 const CONFIG = {
-  // Deixe vazio para funcionar em modo PDF (a paciente baixa e envia).
-  // Preencha para enviar direto ao banco.
   SUPABASE_URL: 'https://rjxtxoqprnumouqakxbc.supabase.co',
-  SUPABASE_ANON_KEY: 'sb_publishable_Ip14p4tUfYFjwUYaWinMlw_Gf9v0YwT',
-  SUPABASE_TABELA: 'anamneses',
+  SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_Ip14p4tUfYFjwUYaWinMlw_Gf9v0YwT',
+  FORM_VERSION: '2026-08-19-v1',
+  FORM_SHA256: '50177b1a892781a1bc321bb15759742d81ab17b03ad981fa0c0cf700edfdf3d3',
 
   // WhatsApp da clínica, só dígitos, com 55 na frente
   WHATSAPP: '5531995844803',
@@ -84,6 +82,7 @@ const CONFIG = {
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html{-webkit-text-size-adjust:100%}
+.hp-campo{position:absolute!important;left:-10000px!important;width:1px!important;height:1px!important;overflow:hidden!important}
 body{
   margin:0;background:var(--gelo);color:var(--tinta);
   font-family:'Poppins',system-ui,sans-serif;font-size:15px;line-height:1.55;
@@ -227,6 +226,11 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0 10px;b
 </div>
 
 <div class="wrap">
+
+<div class="hp-campo" aria-hidden="true">
+  <label for="website">Deixe este campo vazio</label>
+  <input type="text" id="website" name="website" tabindex="-1" autocomplete="off">
+</div>
 
 <!-- ============ 1 ============ -->
 <section class="passo ativo" data-nome="Identificação">
@@ -487,7 +491,20 @@ const ACEITES = [
 /* ============================================================
    Estado
    ============================================================ */
+function novaChaveIdempotencia() {
+  if (crypto.randomUUID) return crypto.randomUUID();
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = [...bytes].map(b => b.toString(16).padStart(2, '0')).join('');
+  return hex.slice(0, 8) + '-' + hex.slice(8, 12) + '-' + hex.slice(12, 16) + '-' +
+    hex.slice(16, 20) + '-' + hex.slice(20);
+}
+
 const estado = { saude:{}, medic:{}, laser:{}, procs:{}, escolhas:{}, multi:{}, aceites:{} };
+const formularioIniciadoEm = new Date().toISOString();
+const idempotencyKey = novaChaveIdempotencia();
+let assinaturaRegistradaEm = null;
 let passo = 0;
 const passos = [...document.querySelectorAll('.passo')];
 const ULTIMO_FORM = passos.length - 2; // antes da tela de conclusão
@@ -735,6 +752,26 @@ function valida() {
     if (vazio) { ok = false; achados.primeiro = achados.primeiro || c; }
   });
 
+  const grupoAtendimento = sec.querySelector('[data-multi="atendimento"]');
+  if (grupoAtendimento && !(estado.multi.atendimento || []).length) {
+    ok = false;
+    achados.primeiro = achados.primeiro || grupoAtendimento;
+  }
+
+  if (sec.querySelector('#laser')) {
+    const gruposLaser = [
+      [estado.escolhas.fototipo, sec.querySelector('[data-escolha="fototipo"]')],
+      [(estado.multi.areas || []).length, sec.querySelector('[data-multi="areas"]')],
+      [estado.escolhas.metodo_pelo, sec.querySelector('[data-escolha="metodo_pelo"]')]
+    ];
+    gruposLaser.forEach(([valor, elemento]) => {
+      if (!valor) {
+        ok = false;
+        achados.primeiro = achados.primeiro || elemento;
+      }
+    });
+  }
+
   if (!checaGrupo(sec, '#saude', SAUDE, 'saude', achados)) ok = false;
   if (!checaGrupo(sec, '#medic', MEDIC, 'medic', achados)) ok = false;
   if (!checaGrupo(sec, '#laser', LASER, 'laser', achados)) ok = false;
@@ -774,8 +811,8 @@ btAvancar.addEventListener('click', async () => {
   btAvancar.textContent = 'Enviando...';
   try { await finalizar(); }
   catch (e) {
-    console.error(e);
-    avisa('Não foi possível concluir. Tente novamente.');
+    console.error('Falha no envio seguro:', e && e.codigo ? e.codigo : 'falha_envio');
+    avisa(e && e.message ? e.message : 'Não foi possível concluir. Tente novamente.');
     btAvancar.textContent = 'Enviar ficha';
   }
   btAvancar.disabled = false;
@@ -790,6 +827,7 @@ document.querySelectorAll('[data-req]').forEach(c =>
 const v = id => (document.getElementById(id)?.value || '').trim();
 
 function montaDados() {
+  assinaturaRegistradaEm = assinaturaRegistradaEm || new Date().toISOString();
   const d = {
     nome: v('nome'), nascimento: v('nascimento'), cpf: v('cpf'),
     telefone: v('telefone'), email: v('email'), profissao: v('profissao'),
@@ -813,275 +851,101 @@ function montaDados() {
     rotina: v('rotina'), objetivo: v('objetivo'),
     assinatura_nome: v('assina_nome'),
     aceites: estado.aceites,
-    assinado_em: new Date().toISOString(),
-    dispositivo: navigator.userAgent,
+    assinado_em: assinaturaRegistradaEm,
     fuso: Intl.DateTimeFormat().resolvedOptions().timeZone
   };
   return d;
 }
 
-async function hash(obj) {
-  const txt = JSON.stringify(obj);
-  // crypto.subtle só existe em HTTPS ou localhost. Fora disso, usa alternativa
-  // simples e sinaliza no próprio código, para não passar por SHA-256 o que não é.
-  if (window.crypto && crypto.subtle && crypto.subtle.digest) {
-    try {
-      const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(txt));
-      return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
-    } catch (e) { /* cai no alternativo */ }
-  }
-  let h1 = 0x811c9dc5, h2 = 0x01000193;
-  for (let i = 0; i < txt.length; i++) {
-    const c = txt.charCodeAt(i);
-    h1 = Math.imul(h1 ^ c, 16777619) >>> 0;
-    h2 = Math.imul(h2 + c, 2246822519) >>> 0;
-  }
-  return 'simples-' + h1.toString(16).padStart(8, '0') + h2.toString(16).padStart(8, '0');
-}
-
 /* ============================================================
-   PDF
+   Envio seguro: validação, PDF e armazenamento são feitos no servidor
    ============================================================ */
-function gerarPDF(d, codigo) {
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
-  const M = 15, L = 180;
-  let y = 18;
 
-  const quebra = (alt = 6) => { if (y + alt > 280) { doc.addPage(); y = 20; } };
-
-  doc.setTextColor(176, 138, 62);
-  doc.setFont('times', 'bold'); doc.setFontSize(20);
-  doc.text('Ana Maria Jacob', 105, y, { align: 'center' }); y += 5;
-  doc.setFont('helvetica', 'normal'); doc.setFontSize(7);
-  doc.text('E S T É T I C A', 105, y, { align: 'center' }); y += 5;
-  doc.setDrawColor(231, 216, 190); doc.line(M, y, M + L, y); y += 8;
-
-  doc.setTextColor(27, 25, 23);
-  doc.setFont('times', 'bold'); doc.setFontSize(13);
-  doc.text('FICHA DE ANAMNESE', 105, y, { align: 'center' }); y += 8;
-
-  const titulo = (txt) => {
-    quebra(12); y += 3;
-    doc.setFillColor(253, 251, 248); doc.rect(M, y - 4, L, 6.5, 'F');
-    doc.setTextColor(176, 138, 62); doc.setFont('helvetica', 'bold'); doc.setFontSize(8);
-    doc.text(txt.toUpperCase(), M + 2, y); y += 8;
-    doc.setTextColor(27, 25, 23); doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5);
-  };
-  const linha = (rotulo, valor) => {
-    if (!valor) return;
-    const t = doc.splitTextToSize(String(valor), L - 42);
-    quebra(t.length * 4 + 2);
-    doc.setTextColor(107, 101, 96); doc.text(rotulo, M, y);
-    doc.setTextColor(27, 25, 23); doc.text(t, M + 40, y);
-    y += t.length * 4 + 1.5;
-  };
-
-  titulo('Identificação');
-  linha('Nome', d.nome); linha('Nascimento', d.nascimento); linha('CPF', d.cpf);
-  linha('Telefone', d.telefone); linha('E-mail', d.email); linha('Profissão', d.profissao);
-  linha('Como conheceu', d.conheceu); linha('Emergência', d.emergencia);
-  linha('Veio fazer', (d.atendimento || []).join(', '));
-
-  titulo('Saúde geral');
-  d.saude.forEach(i => {
-    const t = doc.splitTextToSize(i.pergunta, L - 18);
-    quebra(t.length * 4 + 2);
-    doc.setTextColor(27, 25, 23); doc.text(t, M, y);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(i.resposta === 'sim' ? 163 : 107, i.resposta === 'sim' ? 58 : 101, i.resposta === 'sim' ? 58 : 96);
-    doc.text(i.resposta === 'sim' ? 'SIM' : 'NÃO', M + L - 10, y, { align: 'right' });
-    doc.setFont('helvetica', 'normal');
-    y += t.length * 4 + 1.5;
-  });
-  if (d.saude_detalhe) { y += 2; linha('Detalhes', d.saude_detalhe); }
-
-  titulo('Medicamentos e alergias');
-  d.medicamentos.forEach(i => {
-    const t = doc.splitTextToSize(i.pergunta, L - 18);
-    quebra(t.length * 4 + 2);
-    doc.setTextColor(27, 25, 23); doc.text(t, M, y);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(i.resposta === 'sim' ? 163 : 107, i.resposta === 'sim' ? 58 : 101, i.resposta === 'sim' ? 58 : 96);
-    doc.text(i.resposta === 'sim' ? 'SIM' : 'NÃO', M + L - 10, y, { align: 'right' });
-    doc.setFont('helvetica', 'normal');
-    y += t.length * 4 + 1.5;
-  });
-  y += 2;
-  linha('Uso contínuo', d.uso_continuo); linha('Suplementos', d.suplementos);
-  linha('Alergia medic.', d.alergia_medicamentos); linha('Outras alergias', d.alergia_outras);
-
-  titulo('Procedimentos anteriores');
-  d.procedimentos.forEach(pr => {
-    if (pr.fez !== 'sim') return;
-    const det = [pr.quando, pr.regiao, pr.intercorrencia].filter(Boolean).join(' · ');
-    linha(' ', pr.procedimento + (det ? ' — ' + det : ''));
-  });
-  const nenhum = d.procedimentos.every(pr => pr.fez !== 'sim');
-  if (nenhum) { doc.setTextColor(107, 101, 96); doc.text('Nenhum procedimento anterior informado.', M, y); y += 5; }
-
-  if (d.laser) {
-    titulo('Depilação a laser');
-    linha('Fototipo', d.laser.fototipo);
-    linha('Áreas', (d.laser.areas || []).join(', '));
-    linha('Método atual', d.laser.metodo_pelo);
-    d.laser.respostas.forEach(i => {
-      const t = doc.splitTextToSize(i.pergunta, L - 18);
-      quebra(t.length * 4 + 2);
-      doc.setTextColor(27, 25, 23); doc.text(t, M, y);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(i.resposta === 'sim' ? 163 : 107, i.resposta === 'sim' ? 58 : 101, i.resposta === 'sim' ? 58 : 96);
-      doc.text(i.resposta === 'sim' ? 'SIM' : 'NÃO', M + L - 10, y, { align: 'right' });
-      doc.setFont('helvetica', 'normal');
-      y += t.length * 4 + 1.5;
-    });
-    if (d.laser.detalhe) { y += 2; linha('Detalhes', d.laser.detalhe); }
-  }
-
-  titulo('Pele e objetivo');
-  linha('Tipo de pele', d.tipo_pele); linha('Exposição ao sol', d.exposicao_sol);
-  linha('Protetor solar', d.protetor_solar); linha('Rotina atual', d.rotina);
-  linha('Objetivo', d.objetivo);
-
-  titulo('Declaração e assinatura');
-  const decl = 'A paciente declarou ter respondido com sinceridade e não ter omitido informações de saúde, medicamentos, alergias ou procedimentos anteriores; autorizou o tratamento de seus dados conforme a Lei 13.709/2018, com guarda por 20 anos; e aceitou assinar por meio eletrônico, nos termos do art. 10, §2º da MP 2.200-2/2001. Esta ficha não autoriza uso de imagem.';
-  const dt = doc.splitTextToSize(decl, L);
-  quebra(dt.length * 4 + 40);
-  doc.setTextColor(27, 25, 23); doc.text(dt, M, y); y += dt.length * 4 + 6;
-
-  try {
-    const img = canvas.toDataURL('image/png');
-    quebra(34);
-    doc.addImage(img, 'PNG', M, y, 70, 26);
-    doc.setDrawColor(231, 216, 190); doc.line(M, y + 27, M + 70, y + 27);
-    doc.setFontSize(8); doc.setTextColor(27, 25, 23);
-    doc.text(d.assinatura_nome || d.nome, M, y + 31);
-    doc.setFontSize(7); doc.setTextColor(107, 101, 96);
-    doc.text('Assinatura da paciente', M, y + 35);
-    y += 42;
-  } catch (e) { y += 6; }
-
-  quebra(20);
-  doc.setFontSize(6.5); doc.setTextColor(107, 101, 96);
-  doc.text('Assinado em: ' + new Date(d.assinado_em).toLocaleString('pt-BR') + '  ·  Fuso: ' + d.fuso, M, y); y += 3.5;
-  doc.text('Código de verificação (' + (codigo.startsWith('simples-') ? 'não criptográfico' : 'SHA-256') + '): ' + codigo, M, y); y += 3.5;
-  doc.text(doc.splitTextToSize('Dispositivo: ' + d.dispositivo, L), M, y);
-
-  const total = doc.internal.getNumberOfPages();
-  for (let i = 1; i <= total; i++) {
-    doc.setPage(i);
-    doc.setFontSize(6.5); doc.setTextColor(107, 101, 96);
-    doc.text('Ana Maria Costa Jacob · Farmacêutica · CRF/MG 40880 · Guarda por 20 anos', M, 290);
-    doc.text(i + '/' + total, M + L, 290, { align: 'right' });
-  }
-  return doc;
+function base64DaAssinatura() {
+  const dataUrl = canvas.toDataURL('image/png');
+  const partes = dataUrl.split(',');
+  if (partes.length !== 2 || !partes[1]) throw new Error('assinatura_invalida');
+  return partes[1];
 }
 
-/* ============================================================
-   Envio
-   ============================================================ */
-async function salvarPdfNoStorage(doc, dados, codigo) {
-  // Gera o PDF e deposita no cofre privado da Ana. Falha aqui não pode
-  // travar o fluxo: os dados já estão salvos no banco de qualquer forma.
-  try {
-    const blob = doc.output('blob');
-    const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-');
-    const nomeLimpo = (dados.nome || 'paciente')
-      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^a-zA-Z0-9 ]/g, '').trim().replace(/\s+/g, '-');
-    const arquivo = stamp + '_' + nomeLimpo + '_' + codigo.slice(0, 8) + '.pdf';
-    const r = await fetch(CONFIG.SUPABASE_URL + '/storage/v1/object/fichas-pdf/' + arquivo, {
-      method: 'POST',
-      headers: {
-        'apikey': CONFIG.SUPABASE_ANON_KEY,
-        'Authorization': 'Bearer ' + CONFIG.SUPABASE_ANON_KEY,
-        'Content-Type': 'application/pdf'
-      },
-      body: blob
-    });
-    return r.ok;
-  } catch (e) { console.error('pdf storage:', e); return false; }
+async function sha256Base64(base64) {
+  if (!window.crypto || !crypto.subtle) throw new Error('integridade_indisponivel');
+  const binario = atob(base64);
+  const bytes = new Uint8Array(binario.length);
+  for (let i = 0; i < binario.length; i++) bytes[i] = binario.charCodeAt(i);
+  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  return [...new Uint8Array(digest)].map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-async function enviarSupabase(dados, codigo) {
-  const r = await fetch(CONFIG.SUPABASE_URL + '/rest/v1/' + CONFIG.SUPABASE_TABELA, {
+async function enviarSupabase(dados) {
+  const assinatura = base64DaAssinatura();
+  const assinaturaHash = await sha256Base64(assinatura);
+  const r = await fetch(CONFIG.SUPABASE_URL + '/functions/v1/anamnese-submit', {
     method: 'POST',
     headers: {
-      'apikey': CONFIG.SUPABASE_ANON_KEY,
-      'Authorization': 'Bearer ' + CONFIG.SUPABASE_ANON_KEY,
+      'apikey': CONFIG.SUPABASE_PUBLISHABLE_KEY,
       'Content-Type': 'application/json',
-      'Prefer': 'return=minimal'
     },
     body: JSON.stringify({
-      nome: dados.nome, cpf: dados.cpf, telefone: dados.telefone,
-      assinado_em: dados.assinado_em, codigo_verificacao: codigo,
-      dispositivo: dados.dispositivo,
-      assinatura_png: canvas.toDataURL('image/png'),
-      dados: dados
+      idempotency_key: idempotencyKey,
+      formulario_versao: CONFIG.FORM_VERSION,
+      formulario_sha256: CONFIG.FORM_SHA256,
+      started_at: formularioIniciadoEm,
+      website: v('website'),
+      dados,
+      assinatura_png_base64: assinatura,
+      assinatura_sha256: assinaturaHash
     })
   });
-  if (!r.ok) throw new Error('HTTP ' + r.status);
+  let resposta = {};
+  try { resposta = await r.json(); } catch (_) { /* resposta inválida */ }
+  if (!r.ok || !resposta.ok) {
+    const erro = new Error(resposta.erro || 'Não foi possível enviar a ficha.');
+    erro.codigo = resposta.codigo_erro || 'falha_envio';
+    throw erro;
+  }
+  return resposta;
 }
 
 async function finalizar() {
   const dados = montaDados();
-  const codigo = await hash(dados);
-  const online = !!(CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY);
   const acoes = document.getElementById('acoes-fim');
   const primeiro = (dados.nome.split(' ')[0] || '');
-  let enviado = false;
-
-  if (online) {
-    try { await enviarSupabase(dados, codigo); enviado = true; }
-    catch (e) { console.error(e); }
-  }
-
-  const doc = gerarPDF(dados, codigo);
-  if (enviado) { await salvarPdfNoStorage(doc, dados, codigo); }
-  const arquivo = 'Anamnese-' + (dados.nome.replace(/\s+/g, '-') || 'paciente') + '.pdf';
+  const resposta = await enviarSupabase(dados);
+  const codigo = resposta.codigo || '';
 
   document.getElementById('fim-titulo').textContent =
-    enviado ? 'Recebemos sua ficha' : 'Ficha pronta';
+    'Recebemos sua ficha';
 
-  document.getElementById('fim-texto').textContent = enviado
-    ? 'Obrigada, ' + primeiro + '. A Ana já tem tudo o que precisa. Se quiser, guarde uma cópia.'
-    : 'Falta um passo, ' + primeiro + ': baixe o arquivo e envie para a Ana pelo WhatsApp.';
+  document.getElementById('fim-texto').textContent =
+    'Obrigada, ' + primeiro + '. A ficha e o PDF foram guardados no cofre privado da clínica.';
 
   acoes.innerHTML = '';
 
-  if (!enviado) {
-    const b = document.createElement('button');
-    b.textContent = 'Baixar minha ficha em PDF';
-    b.onclick = () => doc.save(arquivo);
-    acoes.appendChild(b);
-
-    const a = document.createElement('a');
-    a.className = 'alt';
-    a.href = 'https://wa.me/' + CONFIG.WHATSAPP + '?text=' +
-      encodeURIComponent('Olá! Preenchi a ficha de anamnese. Nome: ' + dados.nome +
-        '. Vou anexar o PDF aqui. Código: ' + codigo.slice(0, 12));
-    a.target = '_blank'; a.rel = 'noopener';
-    a.textContent = 'Abrir WhatsApp para enviar';
-    acoes.appendChild(a);
-  } else {
-    const aviso = document.createElement('a');
-    aviso.href = 'https://wa.me/' + CONFIG.WHATSAPP + '?text=' +
-      encodeURIComponent('Olá, Ana! Acabei de enviar minha ficha de anamnese. Nome: ' +
-        dados.nome + '. Código: ' + codigo.slice(0, 12));
-    aviso.target = '_blank'; aviso.rel = 'noopener';
-    aviso.textContent = 'Avisar a Ana no WhatsApp';
-    acoes.appendChild(aviso);
-
-    const b = document.createElement('button');
-    b.className = 'alt';
-    b.textContent = 'Guardar uma cópia em PDF';
-    b.onclick = () => doc.save(arquivo);
-    acoes.appendChild(b);
+  if (resposta.pdf_url) {
+    const pdf = document.createElement('a');
+    pdf.href = resposta.pdf_url;
+    pdf.target = '_blank';
+    pdf.rel = 'noopener noreferrer';
+    pdf.textContent = 'Guardar uma cópia em PDF';
+    acoes.appendChild(pdf);
   }
 
+  const ajuda = document.createElement('a');
+  ajuda.className = 'alt';
+  ajuda.href = 'https://wa.me/' + CONFIG.WHATSAPP + '?text=' +
+    encodeURIComponent('Olá! Preciso de ajuda com minha ficha de anamnese.');
+  ajuda.target = '_blank'; ajuda.rel = 'noopener noreferrer';
+  ajuda.textContent = 'Preciso de ajuda';
+  acoes.appendChild(ajuda);
+
   document.getElementById('recibo').textContent =
-    'Assinado em ' + new Date(dados.assinado_em).toLocaleString('pt-BR') +
+    'Recebido em ' + new Date(resposta.recebido_em || dados.assinado_em).toLocaleString('pt-BR') +
     ' · Código de verificação: ' + codigo.slice(0, 24) + '…';
+
+  document.querySelectorAll('input, textarea').forEach(campo => { campo.value = ''; });
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  assinou = false;
 
   concluido = true;
   pinta();
