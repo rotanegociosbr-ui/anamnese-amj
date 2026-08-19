@@ -1,0 +1,120 @@
+.financeiro-painel{padding-top:18px}
+.financeiro-cabecalho{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:14px}
+.financeiro-cabecalho h2{margin:0 0 4px;font-family:'Cormorant Garamond',Georgia,serif;font-size:28px;line-height:1.1}
+.financeiro-cabecalho p{margin:0;color:var(--cinza);font-size:12.5px}
+.financeiro-sobretitulo{margin:0 0 5px!important;color:var(--dourado)!important;font-size:10px!important;font-weight:500;letter-spacing:.13em;text-transform:uppercase}
+.financeiro-botao{min-height:42px;padding:9px 13px;border:1px solid var(--dourado);border-radius:9px;background:var(--dourado);color:#fff;font-family:inherit;font-size:12.5px;font-weight:500;cursor:pointer}
+.financeiro-botao.secundario{background:#fff;color:var(--dourado)}
+.financeiro-botao.perigo{border-color:#D9A6A0;background:#fff;color:var(--alerta)}
+.financeiro-botao:disabled{opacity:.48;cursor:default}
+.financeiro-status,.financeiro-form-status{min-height:19px;margin:7px 0;color:var(--dourado);font-size:12.5px}
+.financeiro-status.erro,.financeiro-form-status.erro{color:var(--alerta)}
+.financeiro-bloqueio{padding:17px;border:1px solid #E4C988;border-radius:var(--raio);background:#FFF9EE;color:var(--tinta)}
+.financeiro-bloqueio strong{font-family:'Cormorant Garamond',Georgia,serif;font-size:21px;color:var(--dourado)}
+.financeiro-bloqueio p{margin:5px 0 0;font-size:12.5px;color:var(--cinza)}
+.financeiro-kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin:13px 0}
+.financeiro-kpis article{min-height:106px;padding:13px;border:1px solid var(--linha);border-radius:11px;background:#fff}
+.financeiro-kpis article.destaque{border-color:#CDA95B;background:linear-gradient(150deg,#FFFDF9,#FFF6E5)}
+.financeiro-kpis span,.financeiro-kpis strong,.financeiro-kpis small{display:block}
+.financeiro-kpis span{font-size:10px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--cinza)}
+.financeiro-kpis strong{margin:6px 0 5px;font-family:'Cormorant Garamond',Georgia,serif;font-size:24px;line-height:1.05;color:var(--dourado);overflow-wrap:anywhere}
+.financeiro-kpis small{font-size:9.5px;line-height:1.4;color:var(--cinza)}
+.financeiro-grafico-card,.financeiro-lista-card{margin:13px 0;padding:15px;border:1px solid var(--linha);border-radius:var(--raio);background:#fff}
+.financeiro-grafico-card h3,.financeiro-lista-card h3{margin:0;font-family:'Cormorant Garamond',Georgia,serif;font-size:21px}
+.financeiro-grafico-card p,.financeiro-lista-card p{margin:3px 0;color:var(--cinza);font-size:10.5px}
+.financeiro-grafico{display:grid;grid-template-columns:repeat(6,minmax(42px,1fr));align-items:end;gap:9px;height:215px;margin:16px 0 7px;padding:13px 7px 24px;border-bottom:1px solid var(--linha);overflow-x:auto}
+.financeiro-mes{display:grid;grid-template-columns:1fr 1fr;align-items:end;gap:3px;height:100%;min-width:42px;position:relative}
+.financeiro-barra{min-height:2px;border-radius:5px 5px 0 0;background:#B18431;transition:height .25s ease}
+.financeiro-barra.despesa{background:#AA675E}
+.financeiro-mes>span{position:absolute;bottom:-21px;left:50%;transform:translateX(-50%);font-size:9px;color:var(--cinza);white-space:nowrap}
+.financeiro-grafico-vazio{grid-column:1/-1;align-self:center;text-align:center;color:var(--cinza);font-size:12px}
+.financeiro-legenda{display:flex;gap:15px;justify-content:flex-end;color:var(--cinza);font-size:9.5px}
+.financeiro-legenda span{display:flex;align-items:center;gap:5px}
+.financeiro-legenda i{width:10px;height:10px;border-radius:3px;background:#B18431}
+.financeiro-legenda i.despesa{background:#AA675E}
+.financeiro-atalhos{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:7px;margin:13px 0}
+.financeiro-atalhos button{min-height:53px;padding:8px;border:1px solid var(--linha);border-radius:9px;background:#fff;color:var(--dourado);font-family:inherit;font-size:10.5px;font-weight:500;cursor:pointer}
+.financeiro-atalhos button:hover{border-color:var(--dourado);background:#FFF9EE}
+.financeiro-editor{margin:12px 0;border:1px solid var(--linha);border-radius:var(--raio);background:#fff;overflow:hidden}
+.financeiro-editor>summary{padding:14px 16px;color:var(--dourado);font-size:13px;font-weight:500;cursor:pointer}
+.financeiro-editor[open]>summary{border-bottom:1px solid var(--linha);background:#FFFDF9}
+.financeiro-form{padding:16px}
+.financeiro-form h3{margin:0 0 10px;font-family:'Cormorant Garamond',Georgia,serif;font-size:20px}
+.financeiro-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px}
+.financeiro-grid .largo{grid-column:1/-1}
+.financeiro-form label{display:block;min-width:0}
+.financeiro-form label>span{display:block;margin:0 0 5px;color:var(--tinta);font-size:11.5px;font-weight:500}
+.financeiro-form small{color:var(--cinza);font-weight:300}
+.financeiro-form input,.financeiro-form select,.financeiro-form textarea,.financeiro-filtros select{width:100%;min-height:44px;padding:10px 11px;border:1px solid var(--linha);border-radius:8px;background:var(--gelo);color:var(--tinta);font-family:inherit;font-size:16px;text-align:left;text-transform:none;letter-spacing:normal}
+.financeiro-form textarea{resize:vertical}
+.financeiro-form input:focus,.financeiro-form select:focus,.financeiro-form textarea:focus,.financeiro-filtros select:focus{outline:3px solid rgba(133,97,29,.2);outline-offset:1px;border-color:var(--dourado)}
+.financeiro-form [aria-invalid="true"]{border-color:var(--alerta)}
+.financeiro-form-acoes{display:flex;gap:9px;justify-content:flex-end;margin-top:14px}
+.financeiro-form-acoes .financeiro-botao{min-width:180px}
+.financeiro-nota{margin:0 0 13px;padding:10px 12px;border-left:3px solid var(--dourado);border-radius:0 8px 8px 0;background:#FFF9EE;color:var(--cinza);font-size:11px}
+.financeiro-candidatos:empty{display:none}
+.financeiro-candidatos{display:grid;gap:6px;padding:8px;border:1px solid var(--linha);border-radius:8px;background:#FFFDF9}
+.financeiro-candidato{display:flex;justify-content:space-between;align-items:center;gap:9px;padding:8px;border:1px solid var(--linha);border-radius:7px;background:#fff}
+.financeiro-candidato div{min-width:0}
+.financeiro-candidato strong,.financeiro-candidato small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.financeiro-candidato small{color:var(--cinza);font-size:9.5px}
+.financeiro-candidato button{flex:0 0 auto;border:1px solid var(--dourado);border-radius:7px;background:#fff;color:var(--dourado);padding:7px 9px;font-family:inherit;font-size:10px;cursor:pointer}
+.financeiro-candidato button:disabled{border-color:var(--linha);color:var(--cinza);cursor:default}
+.financeiro-subformularios{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;padding:14px}
+.financeiro-subformularios .financeiro-form{padding:13px;border:1px solid var(--linha);border-radius:9px;background:#FFFDF9}
+.financeiro-subformularios label+label{margin-top:9px}
+.financeiro-subformularios .financeiro-botao{width:100%;margin-top:11px}
+.financeiro-itens-topo{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:15px 0 9px}
+.financeiro-itens-topo h3{margin:0}
+.financeiro-itens{display:grid;gap:8px}
+.financeiro-item{display:grid;grid-template-columns:minmax(170px,2fr) minmax(90px,.7fr) minmax(110px,1fr) auto;gap:8px;align-items:end;padding:9px;border:1px solid var(--linha);border-radius:9px;background:#FFFDF9}
+.financeiro-item .financeiro-botao{min-height:44px;padding:8px 10px}
+.financeiro-total{text-align:right;font-size:12px!important;color:var(--cinza)!important}
+.financeiro-total strong{font-family:'Cormorant Garamond',Georgia,serif;font-size:21px;color:var(--dourado)}
+.financeiro-lista-topo{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:12px}
+.financeiro-filtros{display:flex;gap:7px;flex-wrap:wrap}
+.financeiro-filtros select{width:auto;min-width:145px;min-height:39px;padding:8px 9px;font-size:11px}
+.financeiro-lista{display:grid;gap:8px}
+.financeiro-lancamento{padding:12px;border:1px solid var(--linha);border-radius:9px;background:#FFFDF9}
+.financeiro-lancamento-topo{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.financeiro-lancamento h4{margin:0;font-family:'Cormorant Garamond',Georgia,serif;font-size:19px;line-height:1.1}
+.financeiro-lancamento-valor{font-size:14px;font-weight:600;color:var(--dourado);white-space:nowrap}
+.financeiro-lancamento-meta{margin:5px 0 0!important;font-size:10.5px!important}
+.financeiro-selos{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px}
+.financeiro-selo{padding:3px 8px;border:1px solid var(--linha);border-radius:20px;background:#fff;color:var(--cinza);font-size:9.5px}
+.financeiro-selo.receita,.financeiro-selo.pago{border-color:#BFD7BF;background:#F2F8F2;color:#356B35}
+.financeiro-selo.despesa,.financeiro-selo.vencido,.financeiro-selo.cancelado{border-color:#F0D5D0;background:var(--alerta-bg);color:var(--alerta)}
+.financeiro-lancamento-acoes{display:flex;gap:7px;flex-wrap:wrap;margin-top:9px;padding-top:9px;border-top:1px solid var(--linha)}
+.financeiro-lancamento-acoes button{padding:7px 9px;border:1px solid var(--dourado);border-radius:7px;background:#fff;color:var(--dourado);font-family:inherit;font-size:10px;cursor:pointer}
+.financeiro-vazio{padding:30px 12px;text-align:center;color:var(--cinza);font-size:12px}
+.financeiro-auditoria-wrap{padding:14px}
+.financeiro-auditoria{display:grid;gap:7px}
+.financeiro-auditoria-item{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:9px;padding:10px;border:1px solid var(--linha);border-radius:8px;background:#FFFDF9}
+.financeiro-auditoria-item strong,.financeiro-auditoria-item span,.financeiro-auditoria-item small{display:block}
+.financeiro-auditoria-item strong{font-size:11.5px;color:var(--tinta)}
+.financeiro-auditoria-item span{font-size:10.5px;color:var(--cinza)}
+.financeiro-auditoria-item small{font-size:9.5px;color:var(--dourado);text-align:right}
+
+@media(max-width:720px){
+  .financeiro-atalhos{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .financeiro-subformularios{grid-template-columns:1fr}
+}
+
+@media(max-width:640px){
+  .financeiro-cabecalho,.financeiro-lista-topo{align-items:stretch;flex-direction:column}
+  .financeiro-cabecalho .financeiro-botao{width:100%}
+  .financeiro-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .financeiro-grid{grid-template-columns:1fr}
+  .financeiro-grid .largo{grid-column:auto}
+  .financeiro-item{grid-template-columns:1fr 1fr}
+  .financeiro-item label:first-child{grid-column:1/-1}
+  .financeiro-filtros select{flex:1;width:100%}
+  .financeiro-lancamento-topo{flex-direction:column}
+}
+
+@media(max-width:390px){
+  .financeiro-kpis{grid-template-columns:1fr}
+  .financeiro-atalhos{grid-template-columns:1fr}
+  .financeiro-item{grid-template-columns:1fr}
+  .financeiro-item label:first-child{grid-column:auto}
+}

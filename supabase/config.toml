@@ -64,3 +64,11 @@ enabled = true
 verify_jwt = false
 import_map = "./functions/anamnese-submit/deno.json"
 entrypoint = "./functions/anamnese-submit/index.ts"
+
+[functions.financeiro-fichas]
+enabled = true
+# JWT é validado no corpo para também exigir sessão ativa, owner e AAL2.
+# Senha compartilhada legada é recusada explicitamente neste endpoint.
+verify_jwt = false
+import_map = "./functions/financeiro-fichas/deno.json"
+entrypoint = "./functions/financeiro-fichas/index.ts"
