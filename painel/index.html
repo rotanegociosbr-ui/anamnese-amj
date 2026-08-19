@@ -661,7 +661,7 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
 <footer>Ana Maria Costa Jacob · CRF/MG 40880 · Documentos clínicos protegidos</footer>
 
 <script src="./vendor/supabase-js-2.112.3.min.js"></script>
-<script src="./auth-mfa.js"></script>
+<script src="./auth-mfa.js?v=20260819-2"></script>
 <script src="./financeiro.js"></script>
 <script>
 const SUPABASE_URL = 'https://rjxtxoqprnumouqakxbc.supabase.co';
@@ -685,6 +685,7 @@ let authController = null;
 let authSession = null;
 let authEncerrando = false;
 let authInicioConcluido = false;
+let aplicativoLiberado = false;
 let identidadeBackend = null;
 let filtroAtual = 'todos';
 let cachePainel = { fichas: [], documentos: [], totais: { anamneses: 0, tcles: 0, geral: 0 } };
@@ -1090,6 +1091,7 @@ function mensagemAuth(erro, padrao) {
 }
 
 function limparEstadoAplicativo() {
+  aplicativoLiberado = false;
   agendaPararPolling();
   agendaCache = [];
   agendaLembretes = [];
@@ -1142,6 +1144,7 @@ async function sair(msg) {
 }
 
 function sessaoAplicativoAtiva() {
+  if (!aplicativoLiberado) return false;
   return modoAcesso === 'legacy' ? Boolean(hashSenha) :
     modoAcesso === 'auth' ? Boolean(authSession && authSession.access_token) : false;
 }
@@ -1198,6 +1201,7 @@ async function abrirAplicativo(modo, session, restaurando) {
     hashSenha = null;
     sessionStorage.removeItem('amj_s');
   }
+  aplicativoLiberado = true;
   sessionStorage.setItem('amj_modo_acesso', modo);
   iniciarRelogioSessao(restaurando);
   TELAS_AUTENTICACAO.forEach(id => {
@@ -1228,6 +1232,11 @@ async function prepararCadastroMfa(session) {
       el('mfa-desafio-codigo').focus();
       return;
     }
+    if (cadastro.resumed) {
+      el('auth-mfa-cadastro-erro').textContent = 'Configuração retomada. Digite o código atual do aplicativo autenticador.';
+      el('mfa-cadastro-codigo').focus();
+      return;
+    }
     const qr = String(cadastro.qrCode || '');
     if (!qr.startsWith('data:image/')) throw new Error('O QR code recebido não é válido.');
     el('mfa-qr').src = qr;
@@ -1243,22 +1252,21 @@ async function prepararCadastroMfa(session) {
 async function processarEtapaAuth(session, restaurando) {
   authSession = session;
   modoAcesso = 'auth';
+  aplicativoLiberado = false;
   sessionStorage.setItem('amj_modo_acesso', 'auth');
+  iniciarRelogioSessao(restaurando);
   const proxima = await authController.getNextStep();
   if (proxima.step === 'password') {
-    iniciarRelogioSessao(restaurando);
     mostrarTelaAutenticacao('tela-convite');
     el('convite-identidade').textContent = session.user && session.user.email || 'Conta convidada';
     el('auth-nova-senha').focus();
     return;
   }
   if (proxima.step === 'enroll') {
-    iniciarRelogioSessao(restaurando);
     await prepararCadastroMfa(proxima.session);
     return;
   }
   if (proxima.step === 'challenge') {
-    iniciarRelogioSessao(restaurando);
     mostrarTelaAutenticacao('tela-mfa-desafio');
     el('mfa-desafio-identidade').textContent = session.user && session.user.email || 'Conta individual';
     el('mfa-desafio-codigo').focus();
@@ -1533,6 +1541,18 @@ function agendaNormalizar(item) {
   };
 }
 
+async function retomarMfaSemEncerrarSessao(mensagem) {
+  if (modoAcesso !== 'auth' || !authController) return false;
+  limparEstadoAplicativo();
+  mostrarTelaAutenticacao('tela-mfa-desafio');
+  el('auth-mfa-desafio-erro').textContent = mensagem || 'Confirme o código do autenticador para continuar.';
+  const session = await authController.getSession();
+  if (!session) return false;
+  authSession = session;
+  await processarEtapaAuth(session, false);
+  return true;
+}
+
 async function agendaRequest(acao, payload) {
   const resposta = await fetch(AGENDA_API, {
     method: 'POST',
@@ -1541,6 +1561,10 @@ async function agendaRequest(acao, payload) {
   });
   let dados = {};
   try { dados = await resposta.json(); } catch (_) {}
+  if (resposta.status === 403 && dados.codigo === 'mfa_required') {
+    const retomado = await retomarMfaSemEncerrarSessao(dados.erro);
+    if (retomado) throw new Error(dados.erro || 'Confirme o código do autenticador para continuar.');
+  }
   if (resposta.status === 401 || resposta.status === 403) {
     await acessoNegado();
     throw new Error('Sessão encerrada');

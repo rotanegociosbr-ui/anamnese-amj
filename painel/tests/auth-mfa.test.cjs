@@ -261,6 +261,48 @@ async function invitationAndChallengeTests() {
   assert.equal(tokenWindow.currentUrl(), 'https://anamariajacob.com.br/painel/');
 }
 
+async function pendingEnrollmentResumeTests() {
+  const storage = memoryStorage();
+  const windowLike = makeWindow('https://anamariajacob.com.br/painel/');
+  const AMJAuth = loadModule(windowLike);
+  const mock = makeSupabaseMock();
+  const options = {
+    supabaseGlobal: mock.global,
+    supabaseUrl: 'https://project.supabase.co',
+    publishableKey: 'sb_publishable_test',
+    storage,
+    windowLike
+  };
+
+  const firstController = AMJAuth.createController(options);
+  const firstEnrollment = await firstController.beginEnrollment();
+  assert.equal(firstEnrollment.factorId, 'factor-new');
+  assert.equal(storage.getItem(AMJAuth.PENDING_FACTOR_KEY), 'factor-new');
+  const storedText = JSON.stringify(storage.entries());
+  assert(!storedText.includes('SECRET123'), 'O segredo TOTP não pode ser persistido.');
+  assert(!storedText.includes('data:image'), 'O QR code TOTP não pode ser persistido.');
+
+  mock.state.factors = {
+    all: [{ id: 'factor-new', factor_type: 'totp', status: 'unverified' }],
+    totp: []
+  };
+  firstController.destroy();
+  const enrollCallsBeforeResume = mock.calls.filter(call => call[0] === 'enroll').length;
+  const resumedController = AMJAuth.createController(options);
+  const resumed = await resumedController.beginEnrollment();
+  assert.equal(resumed.resumed, true);
+  assert.equal(resumed.factorId, 'factor-new');
+  assert.equal(resumed.qrCode, '');
+  assert.equal(mock.calls.filter(call => call[0] === 'enroll').length, enrollCallsBeforeResume,
+    'Retomar a mesma aba não pode criar outro fator.');
+  assert.equal(mock.calls.filter(call => call[0] === 'unenroll').length, 0,
+    'Retomar a mesma aba não pode apagar o fator pendente.');
+
+  await resumedController.verifyEnrollment('123456');
+  assert.equal(storage.getItem(AMJAuth.PENDING_FACTOR_KEY), null,
+    'O fator pendente deve ser limpo após a confirmação.');
+}
+
 function staticAndAccessibilityTests() {
   new vm.Script(authSource, { filename: 'auth-mfa.js' });
   const inlineStart = html.lastIndexOf('<script>') + '<script>'.length;
@@ -295,6 +337,7 @@ function staticAndAccessibilityTests() {
   assert(referrerPolicyPosition < firstResourcePosition,
     'A Referrer-Policy deve aparecer antes de qualquer recurso carregado.');
   assert(html.includes('./vendor/supabase-js-2.112.3.min.js'));
+  assert(html.includes('./auth-mfa.js?v=20260819-2'));
   assert(html.indexOf('./vendor/supabase-js-2.112.3.min.js') < html.indexOf('./auth-mfa.js'));
   assert(!authSource.includes('localStorage'));
   assert(!html.includes('localStorage'));
@@ -304,6 +347,40 @@ function staticAndAccessibilityTests() {
   assert(html.includes("headers['x-senha'] = hashSenha"));
   assert(html.includes("if (modoAcesso === 'auth')"));
   assert(html.includes("if (modoAcesso === 'legacy' && hashSenha)"));
+
+  assert(html.includes('let aplicativoLiberado = false;'));
+  const sessionActiveStart = inlineSource.indexOf('function sessaoAplicativoAtiva');
+  const sessionActiveEnd = inlineSource.indexOf('function registrarAtividadeSessao', sessionActiveStart);
+  const sessionActiveSource = inlineSource.slice(sessionActiveStart, sessionActiveEnd);
+  assert(sessionActiveSource.includes('if (!aplicativoLiberado) return false;'),
+    'Uma sessão AAL1 em cadastro MFA não pode liberar o aplicativo.');
+
+  const authStepStart = inlineSource.indexOf('async function processarEtapaAuth');
+  const authStepEnd = inlineSource.indexOf('async function entrarTemporariamente', authStepStart);
+  const authStepSource = inlineSource.slice(authStepStart, authStepEnd);
+  const appLockPosition = authStepSource.indexOf('aplicativoLiberado = false;');
+  const clockPosition = authStepSource.indexOf('iniciarRelogioSessao(restaurando);');
+  const nextStepPosition = authStepSource.indexOf('await authController.getNextStep()');
+  assert(appLockPosition >= 0 && appLockPosition < nextStepPosition,
+    'O aplicativo deve ser bloqueado antes de consultar a etapa MFA.');
+  assert(clockPosition >= 0 && clockPosition < nextStepPosition,
+    'O relógio deve existir antes da primeira espera assíncrona do login.');
+  assert.equal((authStepSource.match(/iniciarRelogioSessao\(restaurando\);/g) || []).length, 1,
+    'A etapa Auth deve iniciar somente um relógio de sessão.');
+
+  const openAppStart = inlineSource.indexOf('async function abrirAplicativo');
+  const openAppEnd = inlineSource.indexOf('async function prepararCadastroMfa', openAppStart);
+  const openAppSource = inlineSource.slice(openAppStart, openAppEnd);
+  assert(openAppSource.indexOf('aplicativoLiberado = true;') >= 0);
+  assert(openAppSource.indexOf('aplicativoLiberado = true;') < openAppSource.indexOf('await carregar();'));
+
+  const agendaRequestStart = inlineSource.indexOf('async function agendaRequest');
+  const agendaRequestEnd = inlineSource.indexOf('function agendaNormalizarLembrete', agendaRequestStart);
+  const agendaRequestSource = inlineSource.slice(agendaRequestStart, agendaRequestEnd);
+  assert(agendaRequestSource.includes("dados.codigo === 'mfa_required'"));
+  assert(agendaRequestSource.indexOf("dados.codigo === 'mfa_required'") <
+    agendaRequestSource.indexOf('await acessoNegado()'),
+  'MFA pendente deve ser retomado antes do tratamento que encerra a sessão.');
 
   const carregarAgendaStart = inlineSource.indexOf('async function carregarAgenda');
   const carregarAgendaEnd = inlineSource.indexOf('function agendaPararPolling', carregarAgendaStart);
@@ -330,6 +407,7 @@ function staticAndAccessibilityTests() {
 (async () => {
   await controllerTests();
   await invitationAndChallengeTests();
+  await pendingEnrollmentResumeTests();
   staticAndAccessibilityTests();
   console.log('OK: Auth individual, convite, senha, TOTP, AAL2, sessão e DOM.');
 })().catch(error => {

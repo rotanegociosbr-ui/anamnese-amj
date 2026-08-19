@@ -4,6 +4,7 @@
   const CLIENT_VERSION = '2.112.3';
   const AUTH_STORAGE_KEY = 'amj-auth-v1';
   const PASSWORD_REQUIRED_KEY = 'amj_auth_requires_password';
+  const PENDING_FACTOR_KEY = 'amj_auth_pending_factor';
   const SUPPORTED_LINK_TYPES = new Set(['invite', 'recovery']);
 
   function authError(code, message, cause) {
@@ -144,6 +145,19 @@
       sessionStorageAdapter.removeItem(PASSWORD_REQUIRED_KEY);
     }
 
+    function pendingFactorId() {
+      return String(sessionStorageAdapter.getItem(PENDING_FACTOR_KEY) || '').trim();
+    }
+
+    function rememberPendingFactor(factorId) {
+      const normalized = String(factorId || '').trim();
+      if (normalized) sessionStorageAdapter.setItem(PENDING_FACTOR_KEY, normalized);
+    }
+
+    function clearPendingFactor() {
+      sessionStorageAdapter.removeItem(PENDING_FACTOR_KEY);
+    }
+
     async function initialize() {
       if (initialLink.linkError) {
         clearPasswordRequirement();
@@ -241,12 +255,34 @@
       });
       if (verifiedTotp) {
         enrollment = null;
+        clearPendingFactor();
         return { alreadyEnrolled: true, factorId: verifiedTotp.id };
       }
 
       const unverified = (factorData.all || []).filter(function (factor) {
         return factor.factor_type === 'totp' && factor.status === 'unverified';
       });
+      const pendingId = pendingFactorId();
+      const resumable = unverified.find(function (factor) {
+        return pendingId && factor.id === pendingId;
+      });
+      if (resumable) {
+        enrollment = {
+          factorId: resumable.id,
+          qrCode: '',
+          secret: '',
+          resumed: true
+        };
+        return {
+          alreadyEnrolled: false,
+          resumed: true,
+          factorId: enrollment.factorId,
+          qrCode: '',
+          secret: ''
+        };
+      }
+
+      clearPendingFactor();
       for (const factor of unverified) {
         const removed = await client.auth.mfa.unenroll({ factorId: factor.id });
         if (removed.error) {
@@ -270,8 +306,10 @@
         qrCode: enrolled.data.totp.qr_code,
         secret: enrolled.data.totp.secret
       };
+      rememberPendingFactor(enrollment.factorId);
       return {
         alreadyEnrolled: false,
+        resumed: false,
         factorId: enrollment.factorId,
         qrCode: enrollment.qrCode,
         secret: enrollment.secret
@@ -313,6 +351,7 @@
       }
       const session = await verifyFactor(enrollment.factorId, code);
       enrollment = null;
+      clearPendingFactor();
       return session;
     }
 
@@ -332,6 +371,7 @@
 
     async function signOut() {
       enrollment = null;
+      clearPendingFactor();
       clearPasswordRequirement();
       const result = await client.auth.signOut({ scope: 'local' });
       if (result && result.error) {
@@ -366,6 +406,7 @@
     CLIENT_VERSION,
     AUTH_STORAGE_KEY,
     PASSWORD_REQUIRED_KEY,
+    PENDING_FACTOR_KEY,
     createController,
     normalizeOtp,
     readAuthLink
