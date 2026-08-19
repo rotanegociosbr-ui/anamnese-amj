@@ -358,6 +358,8 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
 const API = 'https://rjxtxoqprnumouqakxbc.supabase.co/functions/v1/painel-fichas';
 const AGENDA_API = 'https://rjxtxoqprnumouqakxbc.supabase.co/functions/v1/agenda-fichas';
 const AGENDA_POLL_MS = 90000;
+const SESSAO_INATIVA_MS = 20 * 60_000;
+const SESSAO_MAXIMA_MS = 8 * 60 * 60_000;
 const TIPOS_TCLE = {
   tcle_toxina_botulinica: { label: 'TCLE · Toxina botulínica', arquivo: 'TCLE-Toxina.pdf' },
   tcle_preenchimento_facial: { label: 'TCLE · Preenchimento facial', arquivo: 'TCLE-Preenchimento-Facial.pdf' },
@@ -381,6 +383,8 @@ let agendaReagendando = false;
 let agendaUltimaAssinaturaAlerta = '';
 let agendaAgoraServidor = Date.now();
 let agendaAgoraRecebidoEm = performance.now();
+let sessaoMonitor = null;
+let sessaoUltimoRegistro = 0;
 
 const el = id => document.getElementById(id);
 
@@ -669,10 +673,47 @@ function sair(msg) {
   agendaCarregada = false;
   agendaAtivarAba('fichas', false);
   sessionStorage.removeItem('amj_s');
+  sessionStorage.removeItem('amj_login_em');
+  sessionStorage.removeItem('amj_atividade_em');
+  if (sessaoMonitor) clearInterval(sessaoMonitor);
+  sessaoMonitor = null;
   el('tela-lista').classList.add('oculto');
   el('tela-login').classList.remove('oculto');
   el('erro').textContent = msg || '';
   el('senha').value = '';
+}
+
+function registrarAtividadeSessao(forcar) {
+  if (!hashSenha) return;
+  if (!forcar && !sessaoAindaValida()) {
+    verificarSessao();
+    return;
+  }
+  const agora = Date.now();
+  if (!forcar && agora - sessaoUltimoRegistro < 30_000) return;
+  sessaoUltimoRegistro = agora;
+  sessionStorage.setItem('amj_atividade_em', String(agora));
+}
+
+function sessaoAindaValida() {
+  const inicio = Number(sessionStorage.getItem('amj_login_em') || 0);
+  const atividade = Number(sessionStorage.getItem('amj_atividade_em') || 0);
+  const agora = Date.now();
+  return Number.isFinite(inicio) && Number.isFinite(atividade) && inicio > 0 && atividade > 0 &&
+    agora - inicio <= SESSAO_MAXIMA_MS && agora - atividade <= SESSAO_INATIVA_MS;
+}
+
+function verificarSessao() {
+  if (hashSenha && !sessaoAindaValida()) {
+    sair('Sua sessão expirou por segurança. Entre novamente.');
+    return false;
+  }
+  return Boolean(hashSenha);
+}
+
+function iniciarMonitorSessao() {
+  if (sessaoMonitor) clearInterval(sessaoMonitor);
+  sessaoMonitor = setInterval(verificarSessao, 30_000);
 }
 
 async function entrar(valor) {
@@ -686,6 +727,9 @@ async function entrar(valor) {
     if (!r.ok) { el('erro').textContent = 'Erro ao conectar. Tente de novo.'; return; }
     hashSenha = h;
     sessionStorage.setItem('amj_s', h);
+    sessionStorage.setItem('amj_login_em', String(Date.now()));
+    registrarAtividadeSessao(true);
+    iniciarMonitorSessao();
     el('tela-login').classList.add('oculto');
     el('tela-lista').classList.remove('oculto');
     await carregar();
@@ -1503,10 +1547,13 @@ el('agenda-lista').addEventListener('click', evento => {
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) {
     agendaPararPolling();
-  } else if (hashSenha) {
+  } else if (verificarSessao()) {
     carregarAgenda({ silencioso: true });
     agendaIniciarPolling();
   }
+});
+['pointerdown', 'keydown', 'touchstart'].forEach(tipo => {
+  document.addEventListener(tipo, () => registrarAtividadeSessao(false), { passive: true, capture: true });
 });
 
 agendaLimparFormulario();
@@ -1638,16 +1685,21 @@ el('cv-qr').addEventListener('click', () => {
   if (abrindo) box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 });
 
-// mantém a sessão só enquanto a aba estiver aberta
+// Sessão legada temporária: permanece somente nesta aba, com expiração por
+// inatividade e limite absoluto. Supabase Auth + MFA substituirá este acesso.
 (async () => {
   const g = sessionStorage.getItem('amj_s');
-  if (g) {
+  if (g && sessaoAindaValida()) {
     hashSenha = g;
+    registrarAtividadeSessao(true);
+    iniciarMonitorSessao();
     el('tela-login').classList.add('oculto');
     el('tela-lista').classList.remove('oculto');
     await carregar();
     await carregarAgenda({ silencioso: true });
     agendaIniciarPolling();
+  } else if (g) {
+    sair('Sua sessão expirou por segurança. Entre novamente.');
   }
 })();
 </script>
