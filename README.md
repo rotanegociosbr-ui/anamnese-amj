@@ -25,7 +25,8 @@ Maria Jacob Estética.
 - `/termos/` — central pública para escolher o documento do procedimento,
   mantendo a ficha de anamnese separada
 - `/painel/` — acesso restrito da equipe, com filtros para anamneses e TCLEs,
-  links de convite, QR codes e acesso aos PDFs armazenados
+  links de convite, QR codes, acesso aos PDFs armazenados e o módulo interno
+  **Agenda e retornos**
 
 Domínio: `anamariajacob.com.br`
 
@@ -43,6 +44,51 @@ A rota `/painel/` corresponde à área interna **Fichas** da clínica. Todas as
 anamneses e todos os termos liberados aparecem nela, com acesso restrito por
 senha à equipe. Os documentos usam armazenamento privado e o painel recebe
 apenas os resumos necessários e links temporários para os PDFs.
+
+## Agenda e retornos
+
+O módulo fica na aba **Agenda e retornos** da própria rota protegida `/painel/`.
+Depois de entrar com a senha já usada pelo Fichas, a equipe pode cadastrar e
+editar horários, controlar estados do atendimento e organizar lembretes de
+confirmação, 24 horas, 2 horas e retorno. A página pública `/agendar/` continua
+apenas iniciando uma conversa no WhatsApp e não confirma nem grava um horário.
+
+O botão **Ativar alertas do navegador** solicita permissão somente após um
+clique da equipe e a autorização vale para aquele navegador e aparelho. Os
+alertas do sistema operacional usam texto genérico, sem nome, telefone,
+procedimento ou horário. Os avisos internos continuam funcionando quando a
+permissão é negada ou o recurso não está disponível.
+
+Nesta versão, as pendências são consultadas quando o Fichas abre, volta a ficar
+visível e periodicamente enquanto permanece aberto. Sem Web Push e sem um
+serviço de envio, não é possível garantir alertas com o Fichas ou o navegador
+fechado; as pendências reaparecem na próxima abertura.
+
+O WhatsApp permanece **manual**: o sistema apenas prepara e abre o link depois
+de uma ação consciente da equipe. Abrir a conversa não registra envio; a equipe
+precisa usar **Marcar como enviado** depois de realmente enviar a mensagem.
+Nenhuma API externa está ativa, e os textos não incluem procedimento nem dado
+de saúde.
+
+Arquivos principais do módulo:
+
+- `painel/index.html` — interface da agenda, retornos, filtros, estados, alertas
+  e ações manuais de WhatsApp;
+- `supabase/migrations/20260819031402_agenda_retornos_fichas.sql` — cria as
+  tabelas privadas `agendamentos_clinica` e `agendamento_lembretes`, constraints,
+  índices, RLS e permissões;
+- `supabase/functions/agenda-fichas/index.ts` — API server-side de consulta e
+  mutação da agenda, protegida pelo acesso do Fichas;
+- `supabase/functions/agenda-fichas/deno.json` e `deno.lock` — dependências
+  fixadas da função;
+- `supabase/config.toml` — registra a Edge Function `agenda-fichas`.
+
+O navegador não acessa as tabelas da agenda diretamente. A Edge Function valida
+origem, senha, conteúdo, transições de estado e idempotência; somente ela usa a
+`service_role`, mantida no servidor. As tabelas têm RLS habilitada, não possuem
+acesso para `public`, `anon` ou `authenticated` e não armazenam a senha. Dados da
+agenda e credenciais também não devem ser gravados em `localStorage`, exibidos
+em notificações ou registrados em logs.
 
 ## Fluxo do TCLE
 
@@ -69,6 +115,19 @@ dúvidas, registrar produto/lote/validade e concluir sua parte antes da aplicaç
 A anamnese atual continua no fluxo original. O TCLE usa tabela e bucket
 separados para que a evolução dos próximos termos não altere os registros já
 existentes.
+
+## Arquivamento das fichas
+
+O app Fichas permite retirar uma anamnese ou um documento clínico da lista
+principal por meio de **Arquivar ficha**. A operação exige confirmação digitada
+e motivo, é reversível pela área **Arquivadas** e gera registro em
+`fichas_acoes_auditoria`. O PDF, a assinatura e o registro clínico não são
+apagados.
+
+Não existe exclusão definitiva no painel: a Lei 13.787/2018 estabelece guarda
+mínima de 20 anos a partir do último registro. A autenticação atual ainda usa
+senha compartilhada; auditoria nominal e eventual fluxo futuro de eliminação
+dependem de usuários individuais com autenticação reforçada.
 
 ## Arquivos do TCLE
 
@@ -117,6 +176,15 @@ individual, à rastreabilidade e à confirmação antes da execução.
   acrescenta o tipo do peeling químico ao armazenamento protegido
 - `supabase/migrations/20260818115450_documentos_clinicos_tcle_fios_pdo.sql` —
   acrescenta o tipo dos fios de PDO ao armazenamento protegido
+- `supabase/migrations/20260819031402_agenda_retornos_fichas.sql` — cria a
+  agenda operacional privada e sua fila de lembretes, com RLS e acesso exclusivo
+  pela Edge Function
+- `supabase/migrations/20260819031744_arquivamento_fichas_painel.sql` —
+  acrescenta arquivamento reversível, motivo, auditoria imutável e fecha a
+  leitura pública herdada da view de anamneses
+- `supabase/migrations/20260819031852_minimizar_privilegios_fichas.sql` —
+  reduz os privilégios internos ao mínimo necessário e mantém operações
+  destrutivas fora das Edge Functions
 - `supabase/functions/tcle-submit/index.ts` — endpoint server-side de recepção,
   validação, geração canônica do PDF, integridade e armazenamento do TCLE
 - `supabase/functions/tcle-preenchimento-submit/index.ts` — endpoint isolado do
@@ -129,6 +197,8 @@ individual, à rastreabilidade e à confirmação antes da execução.
   da pré-avaliação do peeling químico
 - `supabase/functions/tcle-fios-pdo-submit/index.ts` — endpoint isolado da
   pré-avaliação dos fios de PDO
+- `supabase/functions/agenda-fichas/index.ts` — endpoint isolado da agenda e dos
+  retornos, autenticado pelo acesso restrito do Fichas
 - `supabase/functions/painel-fichas/index.ts` — endpoint server-side do painel,
   unificando resumos das anamneses e dos TCLEs e emitindo links assinados
 
