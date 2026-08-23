@@ -56,6 +56,10 @@ const CALCULATED_STATUSES = new Set([
   "cancelado",
 ]);
 const PRODUCT_TYPES = new Set([
+  "bioestimulador",
+  "toxina_botulinica",
+  "preenchedor",
+  "skinbooster",
   "injetavel",
   "medicamento",
   "dermocosmetico",
@@ -67,6 +71,21 @@ const PRODUCT_TYPES = new Set([
 ]);
 const PRODUCT_UNITS = new Set(["un", "cx", "frasco", "seringa", "ml", "mg", "g", "kit"]);
 const SOURCE_KINDS = new Set(["anamnese", "documento_clinico", "agendamento"]);
+const PAYMENT_SITUATIONS = new Set(["recebido", "parcial", "pendente"]);
+const PROCEDURE_LABELS: Record<string, string> = {
+  toxina_terco_superior: "Toxina botulínica · terço superior",
+  toxina_full_face: "Toxina botulínica · full face",
+  preenchimento_facial: "Preenchimento facial",
+  bioestimulador_colageno: "Bioestimulador de colágeno",
+  fios_pdo: "Fios de PDO",
+  peeling_quimico: "Peeling químico",
+  intradermoterapia: "Intradermoterapia",
+  skinbooster: "Skinbooster",
+  microagulhamento: "Microagulhamento",
+  avaliacao_facial: "Avaliação facial",
+  outro: "Outro procedimento",
+};
+const PROCEDURE_CODES = new Set(Object.keys(PROCEDURE_LABELS));
 const FORBIDDEN_PAYMENT_KEYS = new Set([
   "cardnumber",
   "card_number",
@@ -1143,6 +1162,116 @@ async function handleCreateEntry(
   }, 201);
 }
 
+async function handleRegisterService(
+  req: Request,
+  context: DualAuthContext,
+  payload: JsonRecord,
+): Promise<Response> {
+  const { clinicId, userId } = tenant(context);
+  const entryKey = requiredUuid(payload.idempotency_key, "idempotency_key");
+  const patientId = requiredUuid(payload.cliente_id ?? payload.patient_id, "cliente_id");
+  await assertParty(clinicId, "patients", patientId, "invalid_client");
+  const procedureCode = enumValue(payload.procedimento, "procedimento", PROCEDURE_CODES);
+  const procedureLabel = procedureCode === "outro"
+    ? requiredText(payload.procedimento_outro, "procedimento_outro", 2, 100)
+    : PROCEDURE_LABELS[procedureCode];
+  const serviceDate = dateValue(payload.data_atendimento, "data_atendimento");
+  const dueDate = dateValue(payload.vencimento ?? serviceDate, "vencimento");
+  if (dueDate < serviceDate) {
+    throw new ApiError(422, "invalid_due_date", "O vencimento não pode ser anterior ao atendimento.");
+  }
+  const total = decimalValue(payload.valor_total, "valor_total", 2);
+  const totalNumber = numberFrom(total);
+  const situation = enumValue(
+    payload.situacao_pagamento,
+    "situacao_pagamento",
+    PAYMENT_SITUATIONS,
+  );
+  const installments = integerValue(payload.parcelas, "parcelas", 1, 1, 120);
+  const notes = optionalText(payload.observacoes, "observacoes", 1000);
+  let paidAmount = 0;
+  if (situation === "recebido") paidAmount = totalNumber;
+  if (situation === "parcial") {
+    paidAmount = numberFrom(decimalValue(payload.valor_recebido, "valor_recebido", 2));
+    if (paidAmount >= totalNumber) {
+      throw new ApiError(
+        422,
+        "invalid_partial_payment",
+        "No pagamento parcial, o valor recebido deve ser menor que o total.",
+      );
+    }
+  }
+  let paymentMethod: string | null = null;
+  let paymentKey: string | null = null;
+  const paidAt = payload.recebido_em === undefined || payload.recebido_em === null ||
+      payload.recebido_em === ""
+    ? `${serviceDate}T12:00:00-03:00`
+    : dateTimeValue(payload.recebido_em, "recebido_em");
+  if (paidAmount > 0) {
+    paymentMethod = enumValue(payload.forma_pagamento, "forma_pagamento", PAYMENT_METHODS);
+    await assertPaymentMethodActive(paymentMethod);
+    paymentKey = requiredUuid(
+      payload.pagamento_idempotency_key,
+      "pagamento_idempotency_key",
+    );
+  }
+  const condition = situation === "parcial"
+    ? "entrada_saldo"
+    : installments > 1
+    ? "parcelado"
+    : "avista";
+  const description = `Atendimento · ${procedureLabel}`;
+  const entryId = requiredUuid(
+    await rpc("financeiro_criar_lancamento", {
+      p_clinic_id: clinicId,
+      p_user_id: userId,
+      p_patient_id: patientId,
+      p_supplier_id: null,
+      p_entry_type: "receita",
+      p_origin: "atendimento",
+      p_description: description,
+      p_category: procedureLabel,
+      p_competence_date: serviceDate,
+      p_due_date: dueDate,
+      p_total_amount: total,
+      p_payment_condition: condition,
+      p_installments: installments,
+      p_notes: notes,
+      p_idempotency_key: entryKey,
+      p_request_id: context.requestId,
+    }),
+    "lancamento_id",
+  );
+  let paymentId: string | null = null;
+  if (paidAmount > 0 && paymentMethod && paymentKey) {
+    paymentId = requiredUuid(
+      await rpc("financeiro_registrar_pagamento", {
+        p_clinic_id: clinicId,
+        p_user_id: userId,
+        p_entry_id: entryId,
+        p_movement_type: "pagamento",
+        p_payment_method: paymentMethod,
+        p_amount: paidAmount.toFixed(2),
+        p_paid_at: paidAt,
+        p_installments: installments,
+        p_reference: null,
+        p_reversed_payment_id: null,
+        p_idempotency_key: paymentKey,
+        p_request_id: context.requestId,
+      }),
+      "pagamento_id",
+    );
+  }
+  const row = await getEntryById(clinicId, entryId);
+  if (!row) {
+    throw new ApiError(502, "service_read_failed", "Atendimento salvo, mas não foi possível recarregá-lo.");
+  }
+  return success(req, context, {
+    lancamento: (await presentEntries(clinicId, [row]))[0] || null,
+    pagamento_id: paymentId,
+  }, 201);
+}
+
 async function getPaymentById(clinicId: string, id: string): Promise<JsonRecord | null> {
   const result = await admin(
     `/rest/v1/financeiro_pagamentos?select=${PAYMENT_SELECT},idempotency_key` +
@@ -2035,6 +2164,9 @@ export async function handleRequest(req: Request): Promise<Response> {
         break;
       case "criar_lancamento":
         response = await handleCreateEntry(req, context, payload);
+        break;
+      case "registrar_atendimento":
+        response = await handleRegisterService(req, context, payload);
         break;
       case "registrar_pagamento":
         response = await handlePayment(req, context, payload, false);

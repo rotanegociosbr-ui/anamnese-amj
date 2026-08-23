@@ -56,6 +56,23 @@
     return Number.isFinite(result) ? result : NaN;
   }
   function digits(value) { return String(value || '').replace(/\D/g, ''); }
+  function normalizeSearch(value) {
+    return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase().trim();
+  }
+  function maskedDocument(value) {
+    const raw = digits(value);
+    if (raw.length === 11) return '***.***.***-' + raw.slice(-2);
+    if (raw.length === 14) return '**.***.***/****-' + raw.slice(-2);
+    return raw ? 'Final ' + raw.slice(-4) : '';
+  }
+  function productTypeLabel(value) {
+    return ({ bioestimulador: 'Bioestimulador', toxina_botulinica: 'Toxina botulínica',
+      preenchedor: 'Preenchedor', skinbooster: 'Skinbooster', injetavel: 'Outro injetável',
+      medicamento: 'Medicamento', dermocosmetico: 'Dermocosmético', descartavel: 'Descartável',
+      epi: 'EPI', limpeza: 'Limpeza', revenda: 'Revenda', outro: 'Outro' })[String(value || '')] ||
+      String(value || '');
+  }
   function uuid() {
     return window.crypto && typeof window.crypto.randomUUID === 'function'
       ? window.crypto.randomUUID()
@@ -235,10 +252,16 @@
       return item.nome || item.label;
     });
     byId('financeiro-lancamento-cliente').innerHTML = clientOptions;
+    byId('financeiro-atendimento-cliente').innerHTML = options(
+      state.clients, 'Selecione um cliente cadastrado', function (item) {
+        return item.nome || item.name || item.full_name || 'Cliente';
+      }
+    );
     byId('financeiro-lancamento-fornecedor').innerHTML = supplierOptions;
     byId('financeiro-compra-fornecedor').innerHTML = requiredSupplier;
     byId('financeiro-produto-marca').innerHTML = brandOptions;
     byId('financeiro-pagamento-forma').innerHTML = methodOptions;
+    byId('financeiro-atendimento-forma').innerHTML = methodOptions;
     populateOpenEntries();
     document.querySelectorAll('.financeiro-item-produto').forEach(function (select) {
       const current = select.value;
@@ -256,6 +279,49 @@
         (brandRow && (brandRow.nome || brandRow.name)) || '';
       return [item.nome || item.name, brand].filter(Boolean).join(' · ');
     });
+  }
+
+  function renderRegistries() {
+    const clientQuery = normalizeSearch(byId('financeiro-clientes-busca').value);
+    const supplierQuery = normalizeSearch(byId('financeiro-fornecedores-busca').value);
+    const productQuery = normalizeSearch(byId('financeiro-produtos-busca').value);
+    const clients = state.clients.filter(function (item) {
+      return normalizeSearch([item.nome, item.telefone, item.email, item.cpf_mascarado].join(' '))
+        .includes(clientQuery);
+    });
+    const suppliers = state.catalogs.fornecedores.filter(function (item) {
+      return normalizeSearch([item.nome, item.telefone, item.email, item.documento].join(' '))
+        .includes(supplierQuery);
+    });
+    const products = state.catalogs.produtos.filter(function (item) {
+      const brand = state.catalogs.marcas.find(function (row) { return row.id === item.marca_id; });
+      return normalizeSearch([item.nome, item.tipo, brand && brand.nome].join(' ')).includes(productQuery);
+    });
+    byId('financeiro-clientes-contagem').textContent = String(state.clients.length);
+    byId('financeiro-fornecedores-contagem').textContent = String(state.catalogs.fornecedores.length);
+    byId('financeiro-produtos-contagem').textContent = String(state.catalogs.produtos.length);
+    byId('financeiro-clientes-lista').innerHTML = clients.length ? clients.map(function (item) {
+      const contact = [item.telefone, item.email].filter(Boolean).join(' · ');
+      const details = [contact, item.cpf_mascarado, item.data_nascimento ? 'Nasc. ' + safeDate(item.data_nascimento) : '']
+        .filter(Boolean).join(' · ');
+      return '<article class="financeiro-cadastro-item"><div><strong>' + escapeHtml(item.nome) +
+        '</strong><small>' + escapeHtml(details || 'Sem contato informado') + '</small></div>' +
+        '<button type="button" data-financeiro-atender="' + escapeHtml(item.id) + '">Registrar atendimento</button></article>';
+    }).join('') : '<p class="financeiro-vazio">Nenhum cliente encontrado.</p>';
+    byId('financeiro-fornecedores-lista').innerHTML = suppliers.length ? suppliers.map(function (item) {
+      const details = [maskedDocument(item.documento), item.telefone, item.email].filter(Boolean).join(' · ');
+      return '<article class="financeiro-cadastro-item"><div><strong>' + escapeHtml(item.nome) +
+        '</strong><small>' + escapeHtml(details || 'Sem contato informado') + '</small></div>' +
+        '<button type="button" data-financeiro-comprar="' + escapeHtml(item.id) + '">Registrar compra</button></article>';
+    }).join('') : '<p class="financeiro-vazio">Nenhum fornecedor encontrado.</p>';
+    byId('financeiro-produtos-lista').innerHTML = products.length ? products.map(function (item) {
+      const brand = state.catalogs.marcas.find(function (row) { return row.id === item.marca_id; });
+      const values = [brand && brand.nome, productTypeLabel(item.tipo),
+        item.custo_referencia != null ? 'Custo ' + money(item.custo_referencia) : '',
+        item.preco_venda != null ? 'Venda ' + money(item.preco_venda) : ''].filter(Boolean).join(' · ');
+      return '<article class="financeiro-cadastro-item somente-info"><div><strong>' + escapeHtml(item.nome) +
+        '</strong><small>' + escapeHtml(values) + '</small></div></article>';
+    }).join('') : '<p class="financeiro-vazio">Nenhum produto encontrado.</p>';
   }
 
   function populateOpenEntries() {
@@ -349,6 +415,8 @@
       const type = entryType(entry) === 'receita' ? 'receita' : 'despesa';
       const received = num(entryPaid(entry));
       const balance = num(entryBalance(entry));
+      const party = entry.cliente && entry.cliente.nome ? 'Cliente: ' + entry.cliente.nome :
+        (entry.fornecedor && entry.fornecedor.nome ? 'Fornecedor: ' + entry.fornecedor.nome : '');
       const payments = Array.isArray(entry.pagamentos) ? entry.pagamentos : [];
       const actions = [];
       if (entryState(entry) !== 'cancelado' && balance > 0) {
@@ -379,6 +447,7 @@
         '<p class="financeiro-lancamento-meta">Competência ' + escapeHtml(safeDate(entry.competence_date || entry.competencia)) +
         ' · vencimento ' + escapeHtml(safeDate(entry.due_date || entry.vencimento)) + '</p></div>' +
         '<span class="financeiro-lancamento-valor">' + escapeHtml(money(entryTotal(entry))) + '</span></div>' +
+        (party ? '<p class="financeiro-lancamento-parte">' + escapeHtml(party) + '</p>' : '') +
         '<div class="financeiro-selos"><span class="financeiro-selo ' + type + '">' +
         (type === 'receita' ? 'Receita' : 'Despesa') + '</span><span class="financeiro-selo ' +
         escapeHtml(calculated) + '">' + escapeHtml(statusLabel(calculated)) + '</span>' +
@@ -424,6 +493,7 @@
       state.entries = Array.isArray(results[3].lancamentos) ? results[3].lancamentos : state.entries;
       state.audit = Array.isArray(results[4].auditoria) ? results[4].auditoria : [];
       populateCatalogs();
+      renderRegistries();
       renderEntries();
       renderAudit();
       state.loaded = true;
@@ -475,14 +545,16 @@
         node.textContent = '';
         node.classList.remove('erro');
       });
-      ['financeiro-lancamento-cliente', 'financeiro-lancamento-fornecedor',
+      ['financeiro-atendimento-cliente', 'financeiro-atendimento-forma',
+        'financeiro-lancamento-cliente', 'financeiro-lancamento-fornecedor',
         'financeiro-compra-fornecedor', 'financeiro-produto-marca', 'financeiro-pagamento-forma',
         'financeiro-pagamento-lancamento'].forEach(function (id) {
         const select = byId(id);
         if (select) select.innerHTML = '<option value="">Selecione</option>';
       });
       ['financeiro-lista', 'financeiro-auditoria', 'financeiro-cliente-candidatos',
-        'financeiro-compra-itens'].forEach(function (id) {
+        'financeiro-compra-itens', 'financeiro-clientes-lista', 'financeiro-fornecedores-lista',
+        'financeiro-produtos-lista'].forEach(function (id) {
         const node = byId(id);
         if (node) node.innerHTML = '';
       });
@@ -494,13 +566,83 @@
       byId('financeiro-grafico').innerHTML = '';
       byId('financeiro-grafico').setAttribute('aria-label', 'Sem dados financeiros para exibir');
       byId('financeiro-contagem').textContent = '0 lançamentos';
+      byId('financeiro-clientes-contagem').textContent = '0';
+      byId('financeiro-fornecedores-contagem').textContent = '0';
+      byId('financeiro-produtos-contagem').textContent = '0';
+      byId('financeiro-clientes-busca').value = '';
+      byId('financeiro-fornecedores-busca').value = '';
+      byId('financeiro-produtos-busca').value = '';
       byId('financeiro-status').textContent = '';
       byId('financeiro-lista').setAttribute('aria-busy', 'false');
       setInitialDates();
+      syncServiceForm();
       syncEntryForm();
       addPurchaseItem();
     }
     updateAccess();
+  }
+
+  function syncServiceForm() {
+    const procedureOther = byId('financeiro-atendimento-procedimento').value === 'outro';
+    const situation = byId('financeiro-atendimento-situacao').value;
+    const partial = situation === 'parcial';
+    const paid = situation !== 'pendente';
+    byId('financeiro-atendimento-outro-campo').classList.toggle('oculto', !procedureOther);
+    byId('financeiro-atendimento-outro').required = procedureOther;
+    byId('financeiro-atendimento-valor-recebido-campo').classList.toggle('oculto', !partial);
+    byId('financeiro-atendimento-valor-recebido').required = partial;
+    byId('financeiro-atendimento-forma-campo').classList.toggle('oculto', !paid);
+    byId('financeiro-atendimento-forma').required = paid;
+    if (!partial) byId('financeiro-atendimento-valor-recebido').value = '';
+  }
+
+  async function submitService(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    syncServiceForm();
+    if (!requireValid(form)) return;
+    const total = parseMoney(byId('financeiro-atendimento-valor').value);
+    if (!(total > 0)) {
+      status('financeiro-atendimento-status', 'Informe um valor total maior que zero.', true);
+      byId('financeiro-atendimento-valor').focus();
+      return;
+    }
+    const situation = byId('financeiro-atendimento-situacao').value;
+    let received = 0;
+    if (situation === 'recebido') received = total;
+    if (situation === 'parcial') received = parseMoney(byId('financeiro-atendimento-valor-recebido').value);
+    if (situation === 'parcial' && (!(received > 0) || received >= total)) {
+      status('financeiro-atendimento-status', 'No pagamento parcial, informe um valor maior que zero e menor que o total.', true);
+      byId('financeiro-atendimento-valor-recebido').focus();
+      return;
+    }
+    setBusy(form, true);
+    try {
+      await call('registrar_atendimento', {
+        idempotency_key: intentKey('atendimento'),
+        pagamento_idempotency_key: received > 0 ? intentKey('atendimento_pagamento') : null,
+        cliente_id: byId('financeiro-atendimento-cliente').value,
+        procedimento: byId('financeiro-atendimento-procedimento').value,
+        procedimento_outro: byId('financeiro-atendimento-outro').value.trim() || null,
+        data_atendimento: byId('financeiro-atendimento-data').value,
+        valor_total: total,
+        situacao_pagamento: situation,
+        valor_recebido: received,
+        forma_pagamento: received > 0 ? byId('financeiro-atendimento-forma').value : null,
+        parcelas: Number(byId('financeiro-atendimento-parcelas').value),
+        vencimento: byId('financeiro-atendimento-vencimento').value,
+        observacoes: byId('financeiro-atendimento-observacoes').value.trim() || null
+      });
+      clearIntent('atendimento');
+      clearIntent('atendimento_pagamento');
+      form.reset();
+      setInitialDates();
+      syncServiceForm();
+      status('financeiro-atendimento-status', 'Atendimento, valor e pagamento foram salvos e auditados.', false);
+      await load({ silent: true });
+    } catch (error) {
+      if (!isStaleSession(error)) status('financeiro-atendimento-status', error.message, true);
+    } finally { setBusy(form, false); }
   }
 
   function syncEntryForm() {
@@ -671,9 +813,11 @@
       await call('criar_cliente', {
         idempotency_key: intentKey('cliente'),
         nome: byId('financeiro-cliente-nome').value.trim(),
+        data_nascimento: byId('financeiro-cliente-nascimento').value || null,
         telefone: byId('financeiro-cliente-telefone').value.trim() || null,
         email: byId('financeiro-cliente-email').value.trim() || null,
         cpf: digits(byId('financeiro-cliente-cpf').value) || null,
+        telefone_emergencia: byId('financeiro-cliente-emergencia').value.trim() || null,
         origem: candidate ? (candidate.origem || candidate.source_kind) : null,
         origem_id: candidate ? (candidate.origem_id || candidate.source_id) : null,
         match_method: candidate ? (candidate.match_method || 'manual') : null
@@ -816,6 +960,8 @@
 
   function setInitialDates() {
     const date = today();
+    byId('financeiro-atendimento-data').value = date;
+    byId('financeiro-atendimento-vencimento').value = date;
     byId('financeiro-lancamento-competencia').value = date;
     byId('financeiro-lancamento-vencimento').value = date;
     byId('financeiro-compra-data').value = date;
@@ -824,6 +970,7 @@
 
   function bind() {
     setInitialDates();
+    syncServiceForm();
     syncEntryForm();
     addPurchaseItem();
     byId('financeiro-atualizar').addEventListener('click', function () { load(); });
@@ -838,9 +985,14 @@
     });
     byId('financeiro-lancamento-tipo').addEventListener('change', syncEntryForm);
     byId('financeiro-lancamento-origem').addEventListener('change', syncEntryForm);
+    byId('financeiro-atendimento-procedimento').addEventListener('change', syncServiceForm);
+    byId('financeiro-atendimento-situacao').addEventListener('change', syncServiceForm);
+    byId('financeiro-form-atendimento').addEventListener('submit', submitService);
     byId('financeiro-form-lancamento').addEventListener('submit', submitEntry);
     byId('financeiro-form-pagamento').addEventListener('submit', submitPayment);
     byId('financeiro-form-cliente').addEventListener('submit', submitClient);
+    resetIntentOnEdit(byId('financeiro-form-atendimento'), 'atendimento');
+    resetIntentOnEdit(byId('financeiro-form-atendimento'), 'atendimento_pagamento');
     resetIntentOnEdit(byId('financeiro-form-lancamento'), 'lancamento');
     resetIntentOnEdit(byId('financeiro-form-pagamento'), 'pagamento');
     resetIntentOnEdit(byId('financeiro-form-cliente'), 'cliente');
@@ -853,17 +1005,36 @@
       clearTimeout(state.searchTimer);
       state.searchTimer = setTimeout(searchCandidates, 450);
     });
-    ['financeiro-cliente-nome', 'financeiro-cliente-telefone', 'financeiro-cliente-email',
-      'financeiro-cliente-cpf'].forEach(function (id) {
+    ['financeiro-cliente-nome', 'financeiro-cliente-nascimento', 'financeiro-cliente-telefone',
+      'financeiro-cliente-email', 'financeiro-cliente-cpf', 'financeiro-cliente-emergencia'].forEach(function (id) {
       byId(id).addEventListener('input', function () {
         markCandidateForReconfirmation();
       });
+    });
+    ['financeiro-clientes-busca', 'financeiro-fornecedores-busca', 'financeiro-produtos-busca']
+      .forEach(function (id) { byId(id).addEventListener('input', renderRegistries); });
+    byId('financeiro-clientes-lista').addEventListener('click', function (event) {
+      const button = event.target.closest('[data-financeiro-atender]');
+      if (!button) return;
+      byId('financeiro-atendimento-cliente').value = button.dataset.financeiroAtender;
+      byId('financeiro-editor-atendimento').open = true;
+      byId('financeiro-editor-atendimento').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      byId('financeiro-atendimento-procedimento').focus({ preventScroll: true });
+    });
+    byId('financeiro-fornecedores-lista').addEventListener('click', function (event) {
+      const button = event.target.closest('[data-financeiro-comprar]');
+      if (!button) return;
+      byId('financeiro-compra-fornecedor').value = button.dataset.financeiroComprar;
+      byId('financeiro-editor-compra').open = true;
+      byId('financeiro-editor-compra').scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
     byId('financeiro-form-fornecedor').addEventListener('submit', function (event) {
       event.preventDefault();
       simpleCreate(event.currentTarget, 'criar_fornecedor', {
         nome: byId('financeiro-fornecedor-nome').value.trim(),
-        documento: digits(byId('financeiro-fornecedor-documento').value) || null
+        documento: digits(byId('financeiro-fornecedor-documento').value) || null,
+        telefone: byId('financeiro-fornecedor-telefone').value.trim() || null,
+        email: byId('financeiro-fornecedor-email').value.trim() || null
       }, 'financeiro-fornecedor-status', 'Fornecedor salvo.');
     });
     byId('financeiro-form-marca').addEventListener('submit', function (event) {
@@ -875,11 +1046,19 @@
     byId('financeiro-form-produto').addEventListener('submit', function (event) {
       event.preventDefault();
       const costField = byId('financeiro-produto-custo');
+      const saleField = byId('financeiro-produto-venda');
       const rawCost = costField.value.trim();
+      const rawSale = saleField.value.trim();
       const cost = parseMoney(rawCost);
+      const sale = parseMoney(rawSale);
       if (rawCost && !Number.isFinite(cost)) {
         status('financeiro-produto-status', 'Informe o custo com no máximo duas casas decimais.', true);
         costField.focus();
+        return;
+      }
+      if (rawSale && !Number.isFinite(sale)) {
+        status('financeiro-produto-status', 'Informe o preço de venda com no máximo duas casas decimais.', true);
+        saleField.focus();
         return;
       }
       simpleCreate(event.currentTarget, 'criar_produto', {
@@ -888,7 +1067,9 @@
         tipo: byId('financeiro-produto-tipo').value,
         unidade: byId('financeiro-produto-unidade').value,
         custo_referencia: Number.isFinite(cost) ? cost : null,
-        registro_anvisa: byId('financeiro-produto-anvisa').value.trim() || null
+        preco_venda: Number.isFinite(sale) ? sale : null,
+        registro_anvisa: byId('financeiro-produto-anvisa').value.trim() || null,
+        controla_estoque: byId('financeiro-produto-estoque').checked
       }, 'financeiro-produto-status', 'Produto salvo.');
     });
     byId('financeiro-adicionar-item').addEventListener('click', addPurchaseItem);

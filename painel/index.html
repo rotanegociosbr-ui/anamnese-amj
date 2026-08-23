@@ -14,7 +14,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
-<link href="./financeiro.css" rel="stylesheet">
+<link href="./financeiro.css?v=20260823-1" rel="stylesheet">
 <style>
 :root{
   --gelo:#FDFBF8;--dourado:#85611D;--linha:#E7D8BE;--tinta:#1B1917;
@@ -522,15 +522,64 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
         </section>
 
         <div class="financeiro-atalhos" role="group" aria-label="Ações financeiras">
-          <button type="button" data-financeiro-abrir="financeiro-editor-lancamento">Nova receita ou despesa</button>
+          <button type="button" data-financeiro-abrir="financeiro-editor-atendimento">Registrar atendimento</button>
+          <button type="button" data-financeiro-abrir="financeiro-editor-lancamento">Outras receitas ou despesas</button>
           <button type="button" data-financeiro-abrir="financeiro-editor-pagamento">Registrar pagamento</button>
           <button type="button" data-financeiro-abrir="financeiro-editor-cliente">Cadastrar cliente</button>
           <button type="button" data-financeiro-abrir="financeiro-editor-catalogo">Marcas e produtos</button>
           <button type="button" data-financeiro-abrir="financeiro-editor-compra">Registrar compra</button>
         </div>
 
+        <section class="financeiro-cadastros-card" aria-labelledby="financeiro-cadastros-titulo">
+          <div class="financeiro-cadastros-topo">
+            <div>
+              <h3 id="financeiro-cadastros-titulo">Cadastros salvos</h3>
+              <p>Clientes, fornecedores e produtos cadastrados ficam disponíveis aqui e nos próximos lançamentos.</p>
+            </div>
+          </div>
+          <div class="financeiro-cadastros-grid">
+            <article class="financeiro-cadastro-coluna">
+              <div class="financeiro-cadastro-cabecalho"><h4>Clientes</h4><strong id="financeiro-clientes-contagem">0</strong></div>
+              <label class="financeiro-busca"><span class="sr-only">Buscar cliente cadastrado</span><input id="financeiro-clientes-busca" type="search" maxlength="80" placeholder="Buscar cliente"></label>
+              <div class="financeiro-cadastro-lista" id="financeiro-clientes-lista" aria-live="polite"></div>
+            </article>
+            <article class="financeiro-cadastro-coluna">
+              <div class="financeiro-cadastro-cabecalho"><h4>Fornecedores</h4><strong id="financeiro-fornecedores-contagem">0</strong></div>
+              <label class="financeiro-busca"><span class="sr-only">Buscar fornecedor cadastrado</span><input id="financeiro-fornecedores-busca" type="search" maxlength="80" placeholder="Buscar fornecedor"></label>
+              <div class="financeiro-cadastro-lista" id="financeiro-fornecedores-lista" aria-live="polite"></div>
+            </article>
+            <article class="financeiro-cadastro-coluna">
+              <div class="financeiro-cadastro-cabecalho"><h4>Produtos e marcas</h4><strong id="financeiro-produtos-contagem">0</strong></div>
+              <label class="financeiro-busca"><span class="sr-only">Buscar produto ou marca</span><input id="financeiro-produtos-busca" type="search" maxlength="80" placeholder="Buscar produto ou marca"></label>
+              <div class="financeiro-cadastro-lista" id="financeiro-produtos-lista" aria-live="polite"></div>
+            </article>
+          </div>
+        </section>
+
+        <details class="financeiro-editor" id="financeiro-editor-atendimento">
+          <summary>Registrar atendimento de cliente</summary>
+          <form class="financeiro-form" id="financeiro-form-atendimento" novalidate>
+            <p class="financeiro-nota">Registre aqui o procedimento e o valor. Informações clínicas, produtos aplicados e intercorrências continuam nas fichas clínicas.</p>
+            <div class="financeiro-grid">
+              <label class="largo"><span>Cliente</span><select id="financeiro-atendimento-cliente" required><option value="">Selecione um cliente cadastrado</option></select></label>
+              <label><span>Procedimento realizado</span><select id="financeiro-atendimento-procedimento" required><option value="">Selecione</option><option value="toxina_terco_superior">Toxina botulínica · terço superior</option><option value="toxina_full_face">Toxina botulínica · full face</option><option value="preenchimento_facial">Preenchimento facial</option><option value="bioestimulador_colageno">Bioestimulador de colágeno</option><option value="fios_pdo">Fios de PDO</option><option value="peeling_quimico">Peeling químico</option><option value="intradermoterapia">Intradermoterapia</option><option value="skinbooster">Skinbooster</option><option value="microagulhamento">Microagulhamento</option><option value="avaliacao_facial">Avaliação facial</option><option value="outro">Outro procedimento</option></select></label>
+              <label class="oculto" id="financeiro-atendimento-outro-campo"><span>Qual procedimento?</span><input id="financeiro-atendimento-outro" type="text" minlength="2" maxlength="100"></label>
+              <label><span>Data do atendimento</span><input id="financeiro-atendimento-data" type="date" required></label>
+              <label><span>Valor total</span><input id="financeiro-atendimento-valor" type="text" inputmode="decimal" placeholder="0,00" required></label>
+              <label><span>Situação do pagamento</span><select id="financeiro-atendimento-situacao" required><option value="recebido">Recebido integralmente</option><option value="parcial">Recebido parcialmente</option><option value="pendente">Ainda não recebido</option></select></label>
+              <label class="oculto" id="financeiro-atendimento-valor-recebido-campo"><span>Valor recebido agora</span><input id="financeiro-atendimento-valor-recebido" type="text" inputmode="decimal" placeholder="0,00"></label>
+              <label id="financeiro-atendimento-forma-campo"><span>Forma de pagamento</span><select id="financeiro-atendimento-forma" required><option value="">Selecione</option></select></label>
+              <label><span>Parcelas</span><input id="financeiro-atendimento-parcelas" type="number" min="1" max="120" value="1" required></label>
+              <label><span>Vencimento do saldo</span><input id="financeiro-atendimento-vencimento" type="date" required></label>
+              <label class="largo"><span>Observações administrativas <small>sem informações clínicas</small></span><textarea id="financeiro-atendimento-observacoes" maxlength="1000" rows="3"></textarea></label>
+            </div>
+            <div class="financeiro-form-acoes"><button class="financeiro-botao" type="submit">Salvar atendimento</button></div>
+            <p class="financeiro-form-status" id="financeiro-atendimento-status" role="status" aria-live="polite"></p>
+          </form>
+        </details>
+
         <details class="financeiro-editor" id="financeiro-editor-lancamento">
-          <summary>Nova receita ou despesa</summary>
+          <summary>Outras receitas ou despesas</summary>
           <form class="financeiro-form" id="financeiro-form-lancamento" novalidate>
             <div class="financeiro-grid">
               <label><span>Tipo</span><select id="financeiro-lancamento-tipo" required><option value="receita">Receita</option><option value="despesa">Despesa</option></select></label>
@@ -575,9 +624,11 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
               <label class="largo"><span>Pesquisar cadastros existentes</span><input id="financeiro-cliente-pesquisa" type="search" maxlength="120" placeholder="Nome, telefone ou CPF"></label>
               <div class="financeiro-candidatos largo" id="financeiro-cliente-candidatos" aria-live="polite"></div>
               <label class="largo"><span>Nome completo</span><input id="financeiro-cliente-nome" type="text" minlength="2" maxlength="160" autocomplete="name" required></label>
+              <label><span>Data de nascimento <small>opcional</small></span><input id="financeiro-cliente-nascimento" type="date" autocomplete="bday"></label>
               <label><span>Telefone</span><input id="financeiro-cliente-telefone" type="tel" maxlength="18" autocomplete="tel"></label>
               <label><span>E-mail</span><input id="financeiro-cliente-email" type="email" maxlength="254" autocomplete="email"></label>
               <label><span>CPF <small>somente números</small></span><input id="financeiro-cliente-cpf" type="text" inputmode="numeric" minlength="11" maxlength="14"></label>
+              <label><span>Telefone de emergência <small>opcional</small></span><input id="financeiro-cliente-emergencia" type="tel" maxlength="18"></label>
             </div>
             <div class="financeiro-form-acoes"><button class="financeiro-botao" type="submit">Salvar cliente</button></div>
             <p class="financeiro-form-status" id="financeiro-cliente-status" role="status" aria-live="polite"></p>
@@ -591,6 +642,8 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
               <h3>Novo fornecedor</h3>
               <label><span>Nome</span><input id="financeiro-fornecedor-nome" type="text" minlength="2" maxlength="160" required></label>
               <label><span>CNPJ ou CPF <small>opcional</small></span><input id="financeiro-fornecedor-documento" type="text" inputmode="numeric" maxlength="18"></label>
+              <label><span>Telefone <small>opcional</small></span><input id="financeiro-fornecedor-telefone" type="tel" maxlength="18"></label>
+              <label><span>E-mail <small>opcional</small></span><input id="financeiro-fornecedor-email" type="email" maxlength="254"></label>
               <button class="financeiro-botao" type="submit">Salvar fornecedor</button>
               <p class="financeiro-form-status" id="financeiro-fornecedor-status" role="status"></p>
             </form>
@@ -604,10 +657,12 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
               <h3>Novo produto</h3>
               <label><span>Nome</span><input id="financeiro-produto-nome" type="text" minlength="2" maxlength="160" required></label>
               <label><span>Marca</span><select id="financeiro-produto-marca"><option value="">Sem marca</option></select></label>
-              <label><span>Tipo</span><select id="financeiro-produto-tipo" required><option value="injetavel">Injetável</option><option value="medicamento">Medicamento</option><option value="dermocosmetico">Dermocosmético</option><option value="descartavel">Descartável</option><option value="epi">EPI</option><option value="limpeza">Limpeza</option><option value="revenda">Revenda</option><option value="outro">Outro</option></select></label>
+              <label><span>Tipo</span><select id="financeiro-produto-tipo" required><option value="bioestimulador">Bioestimulador</option><option value="toxina_botulinica">Toxina botulínica</option><option value="preenchedor">Preenchedor</option><option value="skinbooster">Skinbooster</option><option value="injetavel">Outro injetável</option><option value="medicamento">Medicamento</option><option value="dermocosmetico">Dermocosmético</option><option value="descartavel">Descartável</option><option value="epi">EPI</option><option value="limpeza">Limpeza</option><option value="revenda">Revenda</option><option value="outro">Outro</option></select></label>
               <label><span>Unidade</span><select id="financeiro-produto-unidade" required><option value="un">Unidade</option><option value="cx">Caixa</option><option value="frasco">Frasco</option><option value="seringa">Seringa</option><option value="ml">ml</option><option value="mg">mg</option><option value="g">g</option><option value="kit">Kit</option></select></label>
               <label><span>Custo de referência</span><input id="financeiro-produto-custo" type="text" inputmode="decimal" placeholder="0,00"></label>
+              <label><span>Preço de venda <small>opcional</small></span><input id="financeiro-produto-venda" type="text" inputmode="decimal" placeholder="0,00"></label>
               <label><span>Registro Anvisa <small>quando aplicável</small></span><input id="financeiro-produto-anvisa" type="text" maxlength="80"></label>
+              <label class="financeiro-check"><input id="financeiro-produto-estoque" type="checkbox"><span>Controlar estoque deste produto</span></label>
               <button class="financeiro-botao" type="submit">Salvar produto</button>
               <p class="financeiro-form-status" id="financeiro-produto-status" role="status"></p>
             </form>
@@ -662,7 +717,7 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
 
 <script src="./vendor/supabase-js-2.112.3.min.js"></script>
 <script src="./auth-mfa.js?v=20260819-3"></script>
-<script src="./financeiro.js"></script>
+<script src="./financeiro.js?v=20260823-1"></script>
 <script>
 const SUPABASE_URL = 'https://rjxtxoqprnumouqakxbc.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_Ip14p4tUfYFjwUYaWinMlw_Gf9v0YwT';

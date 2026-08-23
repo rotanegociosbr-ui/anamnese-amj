@@ -1,4 +1,5 @@
 .financeiro-painel{padding-top:18px}
+.financeiro-painel .sr-only{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 .financeiro-cabecalho{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:14px}
 .financeiro-cabecalho h2{margin:0 0 4px;font-family:'Cormorant Garamond',Georgia,serif;font-size:28px;line-height:1.1}
 .financeiro-cabecalho p{margin:0;color:var(--cinza);font-size:12.5px}
@@ -32,9 +33,28 @@
 .financeiro-legenda span{display:flex;align-items:center;gap:5px}
 .financeiro-legenda i{width:10px;height:10px;border-radius:3px;background:#B18431}
 .financeiro-legenda i.despesa{background:#AA675E}
-.financeiro-atalhos{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:7px;margin:13px 0}
+.financeiro-atalhos{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin:13px 0}
 .financeiro-atalhos button{min-height:53px;padding:8px;border:1px solid var(--linha);border-radius:9px;background:#fff;color:var(--dourado);font-family:inherit;font-size:10.5px;font-weight:500;cursor:pointer}
 .financeiro-atalhos button:hover{border-color:var(--dourado);background:#FFF9EE}
+.financeiro-cadastros-card{margin:13px 0;padding:15px;border:1px solid var(--linha);border-radius:var(--raio);background:#fff}
+.financeiro-cadastros-topo h3{margin:0;font-family:'Cormorant Garamond',Georgia,serif;font-size:22px}
+.financeiro-cadastros-topo p{margin:3px 0 12px;color:var(--cinza);font-size:10.5px}
+.financeiro-cadastros-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}
+.financeiro-cadastro-coluna{min-width:0;padding:11px;border:1px solid var(--linha);border-radius:10px;background:#FFFDF9}
+.financeiro-cadastro-cabecalho{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+.financeiro-cadastro-cabecalho h4{margin:0;font-family:'Cormorant Garamond',Georgia,serif;font-size:18px}
+.financeiro-cadastro-cabecalho strong{display:grid;place-items:center;min-width:27px;height:27px;padding:0 7px;border-radius:20px;background:#F4E9CF;color:var(--dourado);font-size:11px}
+.financeiro-busca input{width:100%;min-height:40px;padding:8px 10px;border:1px solid var(--linha);border-radius:8px;background:#fff;color:var(--tinta);font:inherit;font-size:12px}
+.financeiro-busca input:focus{outline:3px solid rgba(133,97,29,.2);border-color:var(--dourado)}
+.financeiro-cadastro-lista{display:grid;gap:6px;max-height:310px;margin-top:8px;overflow:auto}
+.financeiro-cadastro-lista .financeiro-vazio{padding:18px 8px}
+.financeiro-cadastro-item{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px;border:1px solid var(--linha);border-radius:8px;background:#fff}
+.financeiro-cadastro-item div{min-width:0}
+.financeiro-cadastro-item strong,.financeiro-cadastro-item small{display:block;overflow:hidden;text-overflow:ellipsis}
+.financeiro-cadastro-item strong{font-size:11px;color:var(--tinta)}
+.financeiro-cadastro-item small{margin-top:2px;color:var(--cinza);font-size:9px;line-height:1.35}
+.financeiro-cadastro-item button{flex:0 0 auto;padding:6px 8px;border:1px solid var(--dourado);border-radius:7px;background:#fff;color:var(--dourado);font:inherit;font-size:9px;cursor:pointer}
+.financeiro-cadastro-item.somente-info{display:block}
 .financeiro-editor{margin:12px 0;border:1px solid var(--linha);border-radius:var(--raio);background:#fff;overflow:hidden}
 .financeiro-editor>summary{padding:14px 16px;color:var(--dourado);font-size:13px;font-weight:500;cursor:pointer}
 .financeiro-editor[open]>summary{border-bottom:1px solid var(--linha);background:#FFFDF9}
@@ -49,6 +69,9 @@
 .financeiro-form textarea{resize:vertical}
 .financeiro-form input:focus,.financeiro-form select:focus,.financeiro-form textarea:focus,.financeiro-filtros select:focus{outline:3px solid rgba(133,97,29,.2);outline-offset:1px;border-color:var(--dourado)}
 .financeiro-form [aria-invalid="true"]{border-color:var(--alerta)}
+.financeiro-check{display:flex!important;align-items:center;gap:8px;margin-top:10px}
+.financeiro-check input{width:18px!important;min-height:18px!important;accent-color:var(--dourado)}
+.financeiro-check span{margin:0!important}
 .financeiro-form-acoes{display:flex;gap:9px;justify-content:flex-end;margin-top:14px}
 .financeiro-form-acoes .financeiro-botao{min-width:180px}
 .financeiro-nota{margin:0 0 13px;padding:10px 12px;border-left:3px solid var(--dourado);border-radius:0 8px 8px 0;background:#FFF9EE;color:var(--cinza);font-size:11px}
@@ -80,6 +103,7 @@
 .financeiro-lancamento h4{margin:0;font-family:'Cormorant Garamond',Georgia,serif;font-size:19px;line-height:1.1}
 .financeiro-lancamento-valor{font-size:14px;font-weight:600;color:var(--dourado);white-space:nowrap}
 .financeiro-lancamento-meta{margin:5px 0 0!important;font-size:10.5px!important}
+.financeiro-lancamento-parte{margin:7px 0 0!important;color:var(--tinta)!important;font-size:11px!important;font-weight:500}
 .financeiro-selos{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px}
 .financeiro-selo{padding:3px 8px;border:1px solid var(--linha);border-radius:20px;background:#fff;color:var(--cinza);font-size:9.5px}
 .financeiro-selo.receita,.financeiro-selo.pago{border-color:#BFD7BF;background:#F2F8F2;color:#356B35}
@@ -97,6 +121,7 @@
 
 @media(max-width:720px){
   .financeiro-atalhos{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .financeiro-cadastros-grid{grid-template-columns:1fr}
   .financeiro-subformularios{grid-template-columns:1fr}
 }
 
