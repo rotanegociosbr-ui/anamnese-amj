@@ -3,8 +3,8 @@ import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import type { PDFFont, PDFPage } from "pdf-lib";
 
 const TYPE = "tcle_intradermoterapia_estetica";
-const TERM_VERSION = "2026-08-11-v1";
-const TERM_SHA256 = "fefcf01a609b21369af4b576b031df4cf0fd12dca933d6d0755f220e21283337";
+const TERM_VERSION = "2026-08-18-v1";
+const TERM_SHA256 = "65c38aa1611a53d5602db4307d8353f508dffc6cd6ab7ada320d2db2db925de4";
 const BUCKET = "documentos-clinicos";
 const MAX_BODY_BYTES = 1_500_000;
 const MAX_PDF_BYTES = 4_000_000;

@@ -42,6 +42,8 @@ entrypoint = "./functions/tcle-fios-pdo-submit/index.ts"
 
 [functions.painel-fichas]
 enabled = true
+# verify_jwt=false somente porque a Edge valida internamente o Bearer no Auth,
+# a sessão ativa, o vínculo owner e AAL2. Não habilita acesso anônimo/legado.
 verify_jwt = false
 import_map = "./functions/painel-fichas/deno.json"
 # Uncomment to specify a custom file path to the entrypoint.
@@ -53,6 +55,7 @@ entrypoint = "./functions/painel-fichas/index.ts"
 
 [functions.agenda-fichas]
 enabled = true
+# Validação interna obrigatória: Bearer, sessão ativa, owner e AAL2.
 verify_jwt = false
 import_map = "./functions/agenda-fichas/deno.json"
 entrypoint = "./functions/agenda-fichas/index.ts"
@@ -72,3 +75,31 @@ enabled = true
 verify_jwt = false
 import_map = "./functions/financeiro-fichas/deno.json"
 entrypoint = "./functions/financeiro-fichas/index.ts"
+
+[functions.prontuario-fichas]
+enabled = true
+# Validação interna obrigatória: Bearer, sessão ativa, owner e AAL2.
+verify_jwt = false
+import_map = "./functions/prontuario-fichas/deno.json"
+entrypoint = "./functions/prontuario-fichas/index.ts"
+
+[functions.operacao-clinica-fichas]
+enabled = true
+# Validação interna obrigatória: Bearer, sessão ativa, owner e AAL2.
+verify_jwt = false
+import_map = "./functions/operacao-clinica-fichas/deno.json"
+entrypoint = "./functions/operacao-clinica-fichas/index.ts"
+
+[functions.gestao-administrativa-fichas]
+enabled = true
+# Validação interna obrigatória: Bearer, sessão ativa, owner e AAL2.
+verify_jwt = false
+import_map = "./functions/gestao-administrativa-fichas/deno.json"
+entrypoint = "./functions/gestao-administrativa-fichas/index.ts"
+
+[functions.cotacoes-fichas]
+enabled = true
+# Validação interna obrigatória: Bearer, sessão ativa, owner e AAL2.
+verify_jwt = false
+import_map = "./functions/cotacoes-fichas/deno.json"
+entrypoint = "./functions/cotacoes-fichas/index.ts"

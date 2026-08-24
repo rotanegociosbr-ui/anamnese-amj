@@ -95,7 +95,7 @@ vm.runInNewContext(source, sandbox, { filename: 'financeiro.js' });
 
   const loading = sandbox.AMJFinanceiro.carregar();
   await new Promise(resolve => setImmediate(resolve));
-  assert.equal(pending.length, 5, 'O carregamento deve iniciar cinco consultas protegidas');
+  assert.equal(pending.length, 8, 'O carregamento deve iniciar oito consultas protegidas');
 
   sandbox.modoAcesso = null;
   sandbox.identidadeBackend = null;
@@ -112,6 +112,9 @@ vm.runInNewContext(source, sandbox, { filename: 'financeiro.js' });
       action === 'listar_catalogos' ? { formas_pagamento: [], fornecedores: [], marcas: [], produtos: [] } :
       action === 'listar_clientes' ? { clientes: [{ nome: 'Paciente Tardio' }] } :
       action === 'listar_lancamentos' ? { lancamentos: [{ descricao: 'Resposta tardia' }] } :
+      action === 'listar_estoque' ? { estoque: [{ lote: 'RESPOSTA-TARDIA' }] } :
+      action === 'listar_pendencias_estoque' ? { pendencias: [{ produto: 'Resposta tardia' }] } :
+      action === 'listar_revisoes_duplicidade' ? { revisoes: [{ status: 'pendente' }] } :
       { auditoria: [{ ator: { nome: 'Resposta tardia' } }] };
     request.resolve({ ok: true, status: 200, json: async () => payload });
   }

@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="referrer" content="no-referrer">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Fichas, Agenda e Financeiro — Ana Maria Jacob Estética</title>
+<title>Fichas, Agenda, Prontuários e Financeiro — Ana Maria Jacob Estética</title>
 <meta name="theme-color" content="#B08A3E">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Documentos">
@@ -14,7 +14,12 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
-<link href="./financeiro.css?v=20260823-2" rel="stylesheet">
+<link href="./financeiro.css?v=20260824-1" rel="stylesheet">
+<link href="./prontuario.css?v=20260824-1" rel="stylesheet">
+<link href="./operacao.css?v=20260824-1" rel="stylesheet">
+<link href="./gestao.css?v=20260824-1" rel="stylesheet">
+<link href="./cotacoes.css?v=20260824-1" rel="stylesheet">
+<link href="./app-shell.css?v=20260824-2" rel="stylesheet">
 <style>
 :root{
   --gelo:#FDFBF8;--dourado:#85611D;--linha:#E7D8BE;--tinta:#1B1917;
@@ -106,8 +111,8 @@ button.principal:disabled{opacity:.5}
 .filtro.ativo{border-color:var(--dourado);background:var(--dourado);color:#fff}
 
 /* ---- fichas, agenda e retornos ---- */
-.abas{display:flex;gap:8px;margin-top:18px;padding:5px;background:#F5EFE6;border:1px solid var(--linha);border-radius:12px}
-.aba{flex:1;min-height:44px;border:1px solid transparent;border-radius:9px;background:transparent;color:var(--cinza);
+.abas{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px;padding:5px;background:#F5EFE6;border:1px solid var(--linha);border-radius:12px}
+.aba{flex:1 1 128px;min-height:44px;border:1px solid transparent;border-radius:9px;background:transparent;color:var(--cinza);
   font-family:inherit;font-size:13px;font-weight:500;cursor:pointer}
 .aba[aria-selected="true"]{background:#fff;border-color:var(--linha);color:var(--dourado);box-shadow:0 2px 8px rgba(70,50,22,.08)}
 .painel-aba{min-width:0}
@@ -232,9 +237,31 @@ button.principal:disabled{opacity:.5}
   background:var(--dourado);color:#fff;border:none;display:block}
 .acoes .alt{background:#fff;color:var(--dourado);border:1px solid var(--dourado)}
 .acoes .perigo{background:#fff;color:var(--alerta);border:1px solid #D9A6A0}
+.acoes .perigo-definitivo{background:#7F2727;color:#fff;border:1px solid #7F2727}
 .acoes .off{background:#fff;color:#B5AFA8;border:1px solid var(--linha);cursor:default}
-.fichas-status{min-height:18px;margin:0 0 8px;color:var(--dourado);font-size:12.5px}
+.fichas-status{min-height:18px;margin:0 0 8px;color:var(--dourado);font-size:12.5px;white-space:pre-line}
 .fichas-status.erro{color:var(--alerta)}
+
+/* ---- confirmação de operação protegida ---- */
+.reauth-dialog{width:min(520px,calc(100vw - 28px));max-height:calc(100vh - 28px);padding:0;border:1px solid var(--linha);
+  border-radius:14px;background:#fff;color:var(--tinta);box-shadow:0 24px 80px rgba(27,25,23,.28)}
+.reauth-dialog::backdrop{background:rgba(27,25,23,.58);backdrop-filter:blur(2px)}
+.reauth-form{display:grid;gap:13px;padding:22px}
+.reauth-form h2{margin:0;font-family:'Cormorant Garamond',Georgia,serif;font-size:25px;line-height:1.1}
+.reauth-form>p{margin:0;color:var(--cinza);font-size:12.5px}
+.reauth-form label{display:grid;gap:5px;color:var(--tinta);font-size:11.5px;font-weight:500}
+.reauth-form input,.reauth-form textarea,.reauth-form select{width:100%;min-height:45px;padding:11px 12px;border:1px solid var(--linha);border-radius:9px;
+  background:var(--gelo);color:var(--tinta);font-family:inherit;font-size:16px;text-align:left;letter-spacing:normal;text-transform:none}
+.reauth-form textarea{min-height:76px;resize:vertical}
+.reauth-form input:focus,.reauth-form textarea:focus,.reauth-form select:focus{outline:3px solid rgba(133,97,29,.2);outline-offset:1px;border-color:var(--dourado)}
+.exclusao-aviso{padding:11px 12px;border:1px solid #D9A6A0;border-radius:9px;background:#FFF4F2;color:#7F2727!important;line-height:1.45}
+.exclusao-digitar{font-weight:600;color:#7F2727}
+.reauth-acoes{display:flex;gap:9px;flex-wrap:wrap;margin-top:2px}
+.reauth-acoes button{flex:1;min-width:145px;min-height:44px;border:1px solid var(--dourado);border-radius:9px;background:#fff;
+  color:var(--dourado);font-family:inherit;font-size:13px;font-weight:500;cursor:pointer}
+.reauth-acoes .confirmar{background:var(--dourado);color:#fff}
+.reauth-acoes button:disabled{opacity:.5;cursor:default}
+.reauth-status{min-height:18px;margin:0!important;color:var(--alerta)!important;font-size:12px!important}
 
 .vazio{text-align:center;padding:50px 20px;color:var(--cinza);font-size:14px}
 .carregando{text-align:center;padding:40px;color:var(--cinza);font-size:14px}
@@ -260,14 +287,7 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
     <h2 id="login-titulo">Acesso restrito</h2>
     <p>Estes documentos contêm dados pessoais e de saúde.</p>
 
-    <div class="login-metodos" role="tablist" aria-label="Escolha o modo de acesso">
-      <button class="login-metodo" id="login-metodo-individual" type="button" role="tab"
-              aria-selected="true" aria-controls="login-painel-individual" tabindex="0">Login individual</button>
-      <button class="login-metodo" id="login-metodo-temporario" type="button" role="tab"
-              aria-selected="false" aria-controls="login-painel-temporario" tabindex="-1">Acesso temporário</button>
-    </div>
-
-    <div class="auth-panel" id="login-painel-individual" role="tabpanel" aria-labelledby="login-metodo-individual">
+    <div class="auth-panel" id="login-painel-individual" aria-labelledby="login-titulo">
       <form class="auth-form" id="form-login-individual" novalidate>
         <label for="auth-email">E-mail individual
           <input id="auth-email" name="email" type="email" inputmode="email" autocomplete="username"
@@ -283,16 +303,6 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
       <p class="auth-nota">Somente contas convidadas pela clínica podem entrar. Não existe cadastro público neste aplicativo.</p>
     </div>
 
-    <div class="auth-panel oculto" id="login-painel-temporario" role="tabpanel"
-         aria-labelledby="login-metodo-temporario" hidden>
-      <label class="auth-form" for="senha">Senha temporária
-        <input type="password" id="senha" inputmode="text" autocomplete="off"
-               aria-label="Senha de acesso temporário" placeholder="senha" maxlength="20">
-      </label>
-      <button class="principal" id="entrar" type="button">Entrar temporariamente</button>
-      <p class="erro" id="erro" role="alert" aria-live="assertive"></p>
-      <p class="auth-nota">Acesso de transição. Ele permanecerá disponível até Ana e Rodney concluírem e testarem o MFA.</p>
-    </div>
   </section>
 
   <section class="login oculto" id="tela-convite" aria-labelledby="convite-titulo" hidden>
@@ -361,12 +371,73 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
       <button id="encerrar-sessao" type="button">Encerrar sessão</button>
     </div>
     <div class="abas" role="tablist" aria-label="Áreas do aplicativo Fichas">
-      <button class="aba" id="aba-bt-fichas" type="button" role="tab" aria-selected="true" aria-controls="aba-fichas" tabindex="0">Fichas</button>
+      <button class="aba" id="aba-bt-inicio" type="button" role="tab" aria-selected="true" aria-controls="aba-inicio" tabindex="0">Início</button>
+      <button class="aba" id="aba-bt-fichas" type="button" role="tab" aria-selected="false" aria-controls="aba-fichas" tabindex="-1">Fichas</button>
       <button class="aba" id="aba-bt-agenda" type="button" role="tab" aria-selected="false" aria-controls="aba-agenda" tabindex="-1">Agenda e retornos</button>
+      <button class="aba" id="aba-bt-prontuarios" type="button" role="tab" aria-selected="false" aria-controls="aba-prontuarios" tabindex="-1" hidden>Prontuários</button>
       <button class="aba" id="aba-bt-financeiro" type="button" role="tab" aria-selected="false" aria-controls="aba-financeiro" tabindex="-1" hidden>Financeiro</button>
+      <button class="aba" id="aba-bt-operacao" type="button" role="tab" aria-selected="false" aria-controls="aba-operacao" tabindex="-1" hidden>Procedimentos</button>
+      <button class="aba" id="aba-bt-gestao" type="button" role="tab" aria-selected="false" aria-controls="aba-gestao" tabindex="-1" hidden>Gestão e auditoria</button>
+      <button class="aba" id="aba-bt-cotacoes" type="button" role="tab" aria-selected="false" aria-controls="aba-cotacoes" tabindex="-1" hidden>Cotações e preços</button>
     </div>
 
-    <section class="painel-aba" id="aba-fichas" role="tabpanel" aria-labelledby="aba-bt-fichas">
+    <section class="painel-aba app-inicio" id="aba-inicio" role="tabpanel" aria-labelledby="aba-bt-inicio">
+      <header class="app-inicio-cabecalho">
+        <p class="app-inicio-sobretitulo">Visão de trabalho</p>
+        <h2>O que precisa de atenção hoje</h2>
+        <p>Abra somente a área de que precisa. Os dados reais são carregados pela própria área e nenhuma contagem é estimada.</p>
+      </header>
+
+      <div class="app-prioridades" aria-label="Atalhos das atividades de hoje">
+        <button class="app-prioridade" type="button" data-shell-route="agenda" data-shell-agenda-filter="hoje">
+          <span class="app-prioridade-icone" aria-hidden="true">01</span>
+          <span><strong>Agenda de hoje</strong><small data-shell-metric="agenda-hoje">Atualizando agenda…</small></span>
+          <span class="app-prioridade-seta" aria-hidden="true">→</span>
+        </button>
+        <button class="app-prioridade" type="button" data-shell-route="agenda" data-shell-agenda-filter="retornos">
+          <span class="app-prioridade-icone" aria-hidden="true">02</span>
+          <span><strong>Retornos e acompanhamentos</strong><small data-shell-metric="retornos">Atualizando retornos…</small></span>
+          <span class="app-prioridade-seta" aria-hidden="true">→</span>
+        </button>
+        <button class="app-prioridade" type="button" data-shell-route="receitas">
+          <span class="app-prioridade-icone" aria-hidden="true">03</span>
+          <span><strong>Parcelas e recebimentos</strong><small data-shell-metric="parcelas">Carrega ao abrir Receitas avulsas</small></span>
+          <span class="app-prioridade-seta" aria-hidden="true">→</span>
+        </button>
+        <button class="app-prioridade" type="button" data-shell-route="estoque">
+          <span class="app-prioridade-icone" aria-hidden="true">04</span>
+          <span><strong>Estoque baixo, lotes e validades</strong><small data-shell-metric="estoque">Carrega ao abrir Estoque</small></span>
+          <span class="app-prioridade-seta" aria-hidden="true">→</span>
+        </button>
+        <button class="app-prioridade" type="button" data-shell-route="fichas">
+          <span class="app-prioridade-icone" aria-hidden="true">05</span>
+          <span><strong>Fichas da clínica</strong><small data-shell-metric="fichas">Atualizando documentos…</small></span>
+          <span class="app-prioridade-seta" aria-hidden="true">→</span>
+        </button>
+      </div>
+
+      <section class="app-acoes-rapidas" aria-labelledby="app-acoes-rapidas-titulo">
+        <div class="app-secao-titulo">
+          <div><p>Atalhos</p><h3 id="app-acoes-rapidas-titulo">Comece uma tarefa</h3></div>
+          <span>Uma tela por vez, sem perder o contexto</span>
+        </div>
+        <div class="app-atalhos-grid">
+          <button type="button" data-shell-route="procedimentos" data-shell-action="novo-procedimento"><strong>Novo procedimento</strong><span>Paciente, itens, produtos, fotos e retorno</span></button>
+          <button type="button" data-shell-route="clientes" data-shell-action="novo-cliente"><strong>Cadastrar cliente</strong><span>Pesquise antes e abra um cadastro existente</span></button>
+          <button type="button" data-shell-route="agenda" data-shell-action="novo-agendamento"><strong>Novo agendamento</strong><span>Horário, confirmação e retorno</span></button>
+          <button type="button" data-shell-route="estoque" data-shell-action="nova-compra"><strong>Registrar compra</strong><span>Fornecedor, vários produtos, lotes e frete</span></button>
+          <button type="button" data-shell-route="fichas"><strong>Enviar ficha</strong><span>Link ou QR code para a paciente</span></button>
+          <button type="button" data-shell-route="despesas" data-shell-action="nova-despesa"><strong>Nova despesa</strong><span>Valor, forma, vencimento e pagamento</span></button>
+        </div>
+      </section>
+
+      <aside class="app-fluxo-seguro" aria-label="Fluxo de trabalho recomendado">
+        <strong>Um cadastro, todo o histórico conectado</strong>
+        <p>Localize a pessoa antes de criar, registre o atendimento dentro do cadastro e vincule pagamentos, produtos, fotos e retorno. Correspondências devem ser confirmadas; o sistema nunca deve unir duas pessoas apenas pelo nome.</p>
+      </aside>
+    </section>
+
+    <section class="painel-aba oculto" id="aba-fichas" role="tabpanel" aria-labelledby="aba-bt-fichas" hidden>
     <div class="convite">
       <p class="rot">Enviar um documento para a paciente</p>
       <div class="linha-envio">
@@ -485,6 +556,78 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
       <p class="agenda-status" id="agenda-status" role="status" aria-live="polite"></p>
     </section>
 
+    <section class="painel-aba prontuario-painel oculto" id="aba-prontuarios" role="tabpanel" aria-labelledby="aba-bt-prontuarios" hidden>
+      <div class="prontuario-cabecalho">
+        <div>
+          <p class="prontuario-sobretitulo">Registro clínico privado</p>
+          <h2>Prontuários e procedimentos</h2>
+          <p>Registre o procedimento, os produtos e lotes utilizados e as fotos clínicas autorizadas.</p>
+        </div>
+        <button class="prontuario-botao secundario" id="prontuario-atualizar" type="button">Atualizar</button>
+      </div>
+      <div class="prontuario-bloqueio oculto" id="prontuario-bloqueio" role="alert">
+        <strong>Acesso clínico protegido</strong>
+        <p>Entre com uma conta proprietária individual e confirme o MFA.</p>
+      </div>
+      <div id="prontuario-conteudo">
+        <details class="prontuario-editor" id="prontuario-editor" open>
+          <summary id="prontuario-form-titulo">Novo registro de procedimento</summary>
+          <form class="prontuario-form" id="prontuario-form" novalidate>
+            <input id="prontuario-id" type="hidden">
+            <input id="prontuario-versao" type="hidden">
+            <div class="prontuario-grid">
+              <label class="largo"><span>Paciente cadastrada</span><select id="prontuario-paciente" required><option value="">Selecione</option></select></label>
+              <label><span>Procedimento</span><select id="prontuario-tipo" required><option value="">Selecione</option><option value="toxina_terco_superior">Toxina botulínica · terço superior</option><option value="toxina_full_face">Toxina botulínica · full face</option><option value="preenchimento_facial">Preenchimento facial</option><option value="bioestimulador_colageno">Bioestimulador de colágeno</option><option value="fios_pdo">Fios de PDO</option><option value="peeling_quimico">Peeling químico</option><option value="skinbooster">Skinbooster</option><option value="microagulhamento">Microagulhamento</option><option value="intradermoterapia">Intradermoterapia</option><option value="outro">Outro</option></select></label>
+              <label><span>Data do procedimento</span><input id="prontuario-data" type="date" required></label>
+              <label><span>Retorno recomendado <small>opcional</small></span><input id="prontuario-retorno" type="date"></label>
+              <label class="largo"><span>Queixa e objetivo relatados</span><textarea id="prontuario-queixa" maxlength="2000" rows="3"></textarea></label>
+              <label class="largo"><span>Registro técnico do atendimento</span><textarea id="prontuario-notas" maxlength="5000" rows="4"></textarea></label>
+              <label class="largo"><span>Orientações e cuidados</span><textarea id="prontuario-orientacoes" maxlength="3000" rows="3"></textarea></label>
+            </div>
+
+            <fieldset class="prontuario-consentimentos">
+              <legend>Consentimentos deste registro</legend>
+              <label><input id="prontuario-consentimento-dados" type="checkbox" disabled><span>Tratamento de dados: deve vir da ficha/TCLE assinado pela paciente, não de um clique administrativo.</span></label>
+              <label><input id="prontuario-consentimento-fotos" type="checkbox"><span>A gestão confirma que a paciente autorizou fotografias exclusivamente para o registro clínico privado.</span></label>
+              <label><input id="prontuario-consentimento-marketing" type="checkbox" disabled><span>Uso em divulgação/marketing: somente após vincular termo de imagem separado e assinado.</span></label>
+              <p>O aceite interno acima fica auditado, mas não substitui um termo assinado. As fotos deste módulo nunca são liberadas automaticamente para marketing.</p>
+            </fieldset>
+
+            <section class="prontuario-produtos" aria-labelledby="prontuario-produtos-titulo">
+              <div class="prontuario-produtos-topo"><div><h3 id="prontuario-produtos-titulo">Produtos usados</h3><p>Informe produto, lote, validade e quantidade aplicada.</p></div><button class="prontuario-botao secundario" id="prontuario-adicionar-produto" type="button">Adicionar produto</button></div>
+              <div id="prontuario-produtos-lista"></div>
+            </section>
+
+            <div class="prontuario-form-acoes">
+              <button class="prontuario-botao" id="prontuario-salvar" type="submit">Salvar prontuário</button>
+              <button class="prontuario-botao secundario oculto" id="prontuario-cancelar-edicao" type="button">Cancelar edição</button>
+            </div>
+            <p class="prontuario-status" id="prontuario-form-status" role="status" aria-live="polite"></p>
+          </form>
+        </details>
+
+        <section class="prontuario-fotos-editor oculto" id="prontuario-fotos-editor" aria-labelledby="prontuario-fotos-titulo">
+          <div><h3 id="prontuario-fotos-titulo">Adicionar foto clínica</h3><p>A foto será gravada em armazenamento privado. Limite de 5 MB; JPEG, PNG ou WebP.</p></div>
+          <form id="prontuario-foto-form" novalidate>
+            <label><span>Momento</span><select id="prontuario-foto-fase" required><option value="before">Antes</option><option value="during">Durante</option><option value="after">Depois</option></select></label>
+            <label><span>Data e hora</span><input id="prontuario-foto-data" type="datetime-local"></label>
+            <label class="largo"><span>Arquivo da foto</span><input id="prontuario-foto-arquivo" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" required></label>
+            <button class="prontuario-botao" type="submit">Enviar foto privada</button>
+          </form>
+          <p class="prontuario-status" id="prontuario-foto-status" role="status" aria-live="polite"></p>
+        </section>
+
+        <section class="prontuario-lista-card" aria-labelledby="prontuario-lista-titulo">
+          <div class="prontuario-lista-topo">
+            <div><h3 id="prontuario-lista-titulo">Registros salvos</h3><p id="prontuario-contagem"></p></div>
+            <div class="prontuario-filtros"><input id="prontuario-busca" type="search" maxlength="80" placeholder="Buscar paciente ou procedimento"><label><input id="prontuario-mostrar-arquivados" type="checkbox"><span>Mostrar arquivados</span></label></div>
+          </div>
+          <div id="prontuario-lista" aria-live="polite" aria-busy="false"></div>
+          <p class="prontuario-status" id="prontuario-status" role="status" aria-live="polite"></p>
+        </section>
+      </div>
+    </section>
+
     <section class="painel-aba financeiro-painel oculto" id="aba-financeiro" role="tabpanel" aria-labelledby="aba-bt-financeiro" hidden>
       <div class="financeiro-cabecalho">
         <div>
@@ -522,21 +665,23 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
         </section>
 
         <div class="financeiro-atalhos" role="group" aria-label="Ações financeiras">
+          <button type="button" data-financeiro-ver-clientes>Ver clientes cadastrados</button>
           <button type="button" data-financeiro-abrir="financeiro-editor-atendimento">Registrar atendimento</button>
           <button type="button" data-financeiro-abrir="financeiro-editor-lancamento">Outras receitas ou despesas</button>
           <button type="button" data-financeiro-abrir="financeiro-editor-pagamento">Registrar pagamento</button>
           <button type="button" data-financeiro-abrir="financeiro-editor-parcelas">Programar parcelas</button>
           <button type="button" data-financeiro-abrir="financeiro-editor-cliente">Cadastrar cliente</button>
           <button type="button" data-financeiro-abrir="financeiro-editor-catalogo">Marcas e produtos</button>
-          <button type="button" data-financeiro-abrir="financeiro-editor-compra">Registrar compra</button>
+          <button type="button" data-financeiro-abrir="financeiro-editor-compra">Compra: vários produtos</button>
         </div>
 
         <section class="financeiro-cadastros-card" aria-labelledby="financeiro-cadastros-titulo">
           <div class="financeiro-cadastros-topo">
             <div>
-              <h3 id="financeiro-cadastros-titulo">Cadastros salvos</h3>
-              <p>Clientes, fornecedores e produtos cadastrados ficam disponíveis aqui e nos próximos lançamentos.</p>
+              <h3 id="financeiro-cadastros-titulo">Clientes, fornecedores e produtos cadastrados</h3>
+              <p>Veja todos os cadastros salvos, pesquise, edite ou use Apagar/Arquivar com senha.</p>
             </div>
+            <label class="financeiro-check"><input id="financeiro-mostrar-arquivados" type="checkbox"><span>Mostrar arquivados</span></label>
           </div>
           <div class="financeiro-cadastros-grid">
             <article class="financeiro-cadastro-coluna">
@@ -584,6 +729,7 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
         <details class="financeiro-editor" id="financeiro-editor-lancamento">
           <summary>Outras receitas ou despesas</summary>
           <form class="financeiro-form" id="financeiro-form-lancamento" novalidate>
+            <p class="financeiro-nota">Para compra de produtos ou insumos, use “Registrar compra”: ela liga fornecedor, vários produtos, custo e contas a pagar. Use este formulário para aluguel, taxas e outras despesas sem itens.</p>
             <div class="financeiro-grid">
               <label><span>Tipo</span><select id="financeiro-lancamento-tipo" required><option value="receita">Receita</option><option value="despesa">Despesa</option></select></label>
               <label><span>Origem</span><select id="financeiro-lancamento-origem" required><option value="atendimento">Atendimento</option><option value="produto">Venda de produto</option><option value="operacional">Despesa operacional</option><option value="ajuste">Ajuste justificado</option></select></label>
@@ -639,6 +785,8 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
         <details class="financeiro-editor" id="financeiro-editor-cliente">
           <summary>Cadastro reaproveitável de cliente</summary>
           <form class="financeiro-form" id="financeiro-form-cliente" novalidate>
+            <input id="financeiro-cliente-id" type="hidden">
+            <input id="financeiro-cliente-versao" type="hidden">
             <p class="financeiro-nota">Antes de cadastrar, pesquise as fichas e agendamentos existentes. O sistema nunca une pessoas apenas pelo nome.</p>
             <div class="financeiro-grid">
               <label class="largo"><span>Pesquisar cadastros existentes</span><input id="financeiro-cliente-pesquisa" type="search" maxlength="120" placeholder="Nome, telefone ou CPF"></label>
@@ -650,7 +798,10 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
               <label><span>CPF <small>somente números</small></span><input id="financeiro-cliente-cpf" type="text" inputmode="numeric" minlength="11" maxlength="14"></label>
               <label><span>Telefone de emergência <small>opcional</small></span><input id="financeiro-cliente-emergencia" type="tel" maxlength="18"></label>
             </div>
-            <div class="financeiro-form-acoes"><button class="financeiro-botao" type="submit">Salvar cliente</button></div>
+            <div class="financeiro-form-acoes">
+              <button class="financeiro-botao secundario oculto" id="financeiro-cliente-cancelar-edicao" type="button">Cancelar edição</button>
+              <button class="financeiro-botao" id="financeiro-cliente-salvar" type="submit">Salvar cliente</button>
+            </div>
             <p class="financeiro-form-status" id="financeiro-cliente-status" role="status" aria-live="polite"></p>
           </form>
         </details>
@@ -659,32 +810,60 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
           <summary>Fornecedores, marcas e produtos</summary>
           <div class="financeiro-subformularios">
             <form class="financeiro-form" id="financeiro-form-fornecedor" novalidate>
-              <h3>Novo fornecedor</h3>
+              <input id="financeiro-fornecedor-id" type="hidden">
+              <input id="financeiro-fornecedor-versao" type="hidden">
+              <h3 id="financeiro-fornecedor-titulo">Novo fornecedor</h3>
               <label><span>Nome</span><input id="financeiro-fornecedor-nome" type="text" minlength="2" maxlength="160" required></label>
               <label><span>CNPJ ou CPF <small>opcional</small></span><input id="financeiro-fornecedor-documento" type="text" inputmode="numeric" maxlength="18"></label>
               <label><span>Telefone <small>opcional</small></span><input id="financeiro-fornecedor-telefone" type="tel" maxlength="18"></label>
               <label><span>E-mail <small>opcional</small></span><input id="financeiro-fornecedor-email" type="email" maxlength="254"></label>
-              <button class="financeiro-botao" type="submit">Salvar fornecedor</button>
+              <button class="financeiro-botao" id="financeiro-fornecedor-salvar" type="submit">Salvar fornecedor</button>
+              <button class="financeiro-botao secundario oculto" id="financeiro-fornecedor-cancelar-edicao" type="button">Cancelar edição</button>
               <p class="financeiro-form-status" id="financeiro-fornecedor-status" role="status"></p>
             </form>
             <form class="financeiro-form" id="financeiro-form-marca" novalidate>
-              <h3>Nova marca</h3>
+              <input id="financeiro-marca-id" type="hidden">
+              <input id="financeiro-marca-versao" type="hidden">
+              <h3 id="financeiro-marca-titulo">Nova marca</h3>
               <label><span>Nome da marca</span><input id="financeiro-marca-nome" type="text" minlength="2" maxlength="120" required></label>
-              <button class="financeiro-botao" type="submit">Salvar marca</button>
+              <button class="financeiro-botao" id="financeiro-marca-salvar" type="submit">Salvar marca</button>
+              <button class="financeiro-botao secundario oculto" id="financeiro-marca-cancelar-edicao" type="button">Cancelar edição</button>
               <p class="financeiro-form-status" id="financeiro-marca-status" role="status"></p>
             </form>
             <form class="financeiro-form" id="financeiro-form-produto" novalidate>
-              <h3>Novo produto</h3>
+              <input id="financeiro-produto-id" type="hidden">
+              <input id="financeiro-produto-versao" type="hidden">
+              <h3 id="financeiro-produto-titulo">Novo produto</h3>
               <label><span>Nome</span><input id="financeiro-produto-nome" type="text" minlength="2" maxlength="160" required></label>
               <label><span>Marca</span><select id="financeiro-produto-marca"><option value="">Sem marca</option></select></label>
               <label><span>Tipo</span><select id="financeiro-produto-tipo" required><option value="bioestimulador">Bioestimulador</option><option value="toxina_botulinica">Toxina botulínica</option><option value="preenchedor">Preenchedor</option><option value="skinbooster">Skinbooster</option><option value="injetavel">Outro injetável</option><option value="medicamento">Medicamento</option><option value="dermocosmetico">Dermocosmético</option><option value="descartavel">Descartável</option><option value="epi">EPI</option><option value="limpeza">Limpeza</option><option value="revenda">Revenda</option><option value="outro">Outro</option></select></label>
-              <label><span>Unidade</span><select id="financeiro-produto-unidade" required><option value="un">Unidade</option><option value="cx">Caixa</option><option value="frasco">Frasco</option><option value="seringa">Seringa</option><option value="ml">ml</option><option value="mg">mg</option><option value="g">g</option><option value="kit">Kit</option></select></label>
+              <label><span>Unidade de custo/consumo</span><select id="financeiro-produto-unidade" required><option value="un">Unidade</option><option value="u">Unidade de toxina (U)</option><option value="cx">Caixa</option><option value="frasco">Frasco</option><option value="seringa">Seringa</option><option value="ampola">Ampola</option><option value="aplicacao">Aplicação/paciente</option><option value="canula">Cânula</option><option value="dose">Dose</option><option value="ml">ml</option><option value="mg">mg</option><option value="g">g</option><option value="kit">Kit</option></select></label>
               <label><span>Custo de referência</span><input id="financeiro-produto-custo" type="text" inputmode="decimal" placeholder="0,00"></label>
               <label><span>Preço de venda <small>opcional</small></span><input id="financeiro-produto-venda" type="text" inputmode="decimal" placeholder="0,00"></label>
               <label><span>Registro Anvisa <small>quando aplicável</small></span><input id="financeiro-produto-anvisa" type="text" maxlength="80"></label>
               <label class="financeiro-check"><input id="financeiro-produto-estoque" type="checkbox"><span>Controlar estoque deste produto</span></label>
-              <button class="financeiro-botao" type="submit">Salvar produto</button>
+              <button class="financeiro-botao" id="financeiro-produto-salvar" type="submit">Salvar produto</button>
+              <button class="financeiro-botao secundario oculto" id="financeiro-produto-cancelar-edicao" type="button">Cancelar edição</button>
               <p class="financeiro-form-status" id="financeiro-produto-status" role="status"></p>
+            </form>
+            <form class="financeiro-form financeiro-custo-form" id="financeiro-form-custo-produto" novalidate>
+              <h3>Histórico de custo e cotação</h3>
+              <p class="financeiro-nota">Guarde cada preço com fornecedor e data. Marcar como custo atual atualiza a referência sem apagar o histórico.</p>
+              <label><span>Produto</span><select id="financeiro-custo-produto" required><option value="">Selecione</option></select></label>
+              <label><span>Fornecedor <small>opcional</small></span><select id="financeiro-custo-fornecedor"><option value="">Sem fornecedor</option></select></label>
+              <label><span>Data do preço</span><input id="financeiro-custo-data" type="date" required></label>
+              <label><span>Condição de pagamento <small>opcional</small></span><input id="financeiro-custo-condicao" type="text" maxlength="80" placeholder="Ex.: Pix, cartão ou boleto"></label>
+              <label><span>Quantidade na embalagem</span><input id="financeiro-custo-quantidade" type="number" min="0.0001" max="999999999" step="0.0001" value="1" required></label>
+              <label><span>Unidade usada no cálculo</span><select id="financeiro-custo-unidade" required><option value="un">Unidade</option><option value="u">Unidade de toxina (U)</option><option value="cx">Caixa</option><option value="frasco">Frasco</option><option value="seringa">Seringa</option><option value="ml">ml</option><option value="mg">mg</option><option value="g">g</option><option value="kit">Kit</option><option value="ampola">Ampola</option><option value="aplicacao">Aplicação/paciente</option><option value="canula">Cânula</option><option value="dose">Dose</option></select></label>
+              <label><span>Valor total pago ou cotado</span><input id="financeiro-custo-total" type="text" inputmode="decimal" placeholder="0,00" required></label>
+              <label><span>Fonte <small>opcional</small></span><input id="financeiro-custo-fonte" type="text" maxlength="160" placeholder="Ex.: compra real, tabela do fornecedor"></label>
+              <label><span>Observações <small>opcional</small></span><textarea id="financeiro-custo-observacoes" maxlength="500" rows="2"></textarea></label>
+              <label class="financeiro-check"><input id="financeiro-custo-atual" type="checkbox" checked><span>Usar este como custo atual do produto</span></label>
+              <button class="financeiro-botao" type="submit">Salvar custo</button>
+              <p class="financeiro-form-status" id="financeiro-custo-status" role="status"></p>
+              <div class="financeiro-custos-historico" id="financeiro-custos-historico" aria-live="polite">
+                <p class="financeiro-vazio">Selecione um produto para consultar o histórico.</p>
+              </div>
             </form>
           </div>
         </details>
@@ -692,6 +871,7 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
         <details class="financeiro-editor" id="financeiro-editor-compra">
           <summary>Registrar compra de produtos</summary>
           <form class="financeiro-form" id="financeiro-form-compra" novalidate>
+            <p class="financeiro-nota">Uma compra corresponde a um fornecedor e pode conter quantos produtos forem necessários. Se a compra veio de dois fornecedores, salve uma compra para cada fornecedor.</p>
             <div class="financeiro-grid">
               <label><span>Fornecedor</span><select id="financeiro-compra-fornecedor" required><option value="">Selecione</option></select></label>
               <label><span>Data da compra</span><input id="financeiro-compra-data" type="date" required></label>
@@ -699,15 +879,28 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
               <label><span>Categoria</span><input id="financeiro-compra-categoria" type="text" value="Produtos e insumos" minlength="2" maxlength="100" required></label>
               <label><span>Condição</span><select id="financeiro-compra-condicao" required><option value="avista">À vista</option><option value="parcelado">Parcelado</option><option value="entrada_saldo">Entrada + saldo</option></select></label>
               <label><span>Parcelas</span><input id="financeiro-compra-parcelas" type="number" min="1" max="120" value="1" required></label>
+              <label><span>Valor do frete <small>opcional; vinculado a esta compra</small></span><input id="financeiro-compra-frete" type="text" inputmode="decimal" placeholder="0,00"></label>
             </div>
             <div class="financeiro-itens-topo"><h3>Itens da compra</h3><button class="financeiro-botao secundario" id="financeiro-adicionar-item" type="button">Adicionar item</button></div>
             <div class="financeiro-itens" id="financeiro-compra-itens"></div>
-            <p class="financeiro-total">Total calculado: <strong id="financeiro-compra-total">R$ 0,00</strong></p>
+            <p class="financeiro-total">Itens: <strong id="financeiro-compra-subtotal">R$ 0,00</strong> · Frete: <strong id="financeiro-compra-frete-resumo">R$ 0,00</strong> · Total: <strong id="financeiro-compra-total">R$ 0,00</strong></p>
             <label><span>Observações <small>opcional</small></span><textarea id="financeiro-compra-observacoes" maxlength="1000" rows="3"></textarea></label>
             <div class="financeiro-form-acoes"><button class="financeiro-botao" type="submit">Salvar compra e despesa</button></div>
             <p class="financeiro-form-status" id="financeiro-compra-status" role="status" aria-live="polite"></p>
           </form>
         </details>
+
+        <section class="financeiro-lista-card" aria-labelledby="financeiro-pendencias-titulo">
+          <div class="financeiro-lista-topo"><div><h3 id="financeiro-pendencias-titulo">Compras antigas aguardando lote</h3><p>Informe lote e validade somente com base na embalagem ou no documento real. O sistema não inventa esses dados.</p></div><strong id="financeiro-pendencias-contagem">Carregando…</strong></div>
+          <p class="financeiro-nota">A regularização cria uma entrada auditável e preserva o custo original como histórico. Atualizar o custo atual é uma escolha explícita e vem desmarcada.</p>
+          <p class="financeiro-form-status" id="financeiro-pendencias-status" role="status" aria-live="polite"></p>
+          <div class="financeiro-pendencias-estoque" id="financeiro-pendencias-estoque"><p class="financeiro-vazio">Carregando pendências…</p></div>
+        </section>
+
+        <section class="financeiro-lista-card" aria-labelledby="financeiro-estoque-titulo">
+          <div class="financeiro-lista-topo"><div><h3 id="financeiro-estoque-titulo">Estoque por produto e lote</h3><p>Saldos derivados das compras, procedimentos e estornos.</p></div></div>
+          <div class="financeiro-estoque-resumo" id="financeiro-estoque-resumo"><p class="financeiro-vazio">Carregando estoque…</p></div>
+        </section>
 
         <section class="financeiro-lista-card" aria-labelledby="financeiro-lista-titulo">
           <div class="financeiro-lista-topo">
@@ -729,15 +922,78 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
         </details>
       </div>
     </section>
+
+    <section class="painel-aba oculto" id="aba-operacao" role="tabpanel" aria-labelledby="aba-bt-operacao" hidden>
+      <div id="operacao-clinica-root"></div>
+    </section>
+
+    <section class="painel-aba oculto" id="aba-gestao" role="tabpanel" aria-labelledby="aba-bt-gestao" hidden>
+      <div id="gestao-administrativa-root"></div>
+    </section>
+
+    <section class="painel-aba oculto" id="aba-cotacoes" role="tabpanel" aria-labelledby="aba-bt-cotacoes" hidden>
+      <div id="cotacoes-root"></div>
+    </section>
   </section>
 
 </main>
+
+<dialog class="reauth-dialog" id="reauth-dialog" aria-labelledby="reauth-titulo">
+  <form class="reauth-form" id="reauth-form" method="dialog" novalidate>
+    <h2 id="reauth-titulo">Confirme com sua senha</h2>
+    <p id="reauth-explicacao">Esta alteração será registrada na auditoria e exige a senha da sua conta individual.</p>
+    <label>Motivo da alteração
+      <textarea id="reauth-motivo" minlength="3" maxlength="300" rows="2" required
+        placeholder="Ex.: corrigir informação cadastrada incorretamente"></textarea>
+    </label>
+    <label>Senha atual da sua conta
+      <input id="reauth-senha" type="password" autocomplete="current-password" minlength="6" maxlength="256" required>
+    </label>
+    <p class="reauth-status" id="reauth-status" role="alert" aria-live="assertive"></p>
+    <div class="reauth-acoes">
+      <button id="reauth-cancelar" type="button">Cancelar</button>
+      <button class="confirmar" id="reauth-confirmar" type="submit">Confirmar alteração</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog class="reauth-dialog" id="fichas-exclusao-dialog" aria-labelledby="fichas-exclusao-titulo">
+  <form class="reauth-form" id="fichas-exclusao-form" method="dialog" novalidate>
+    <h2 id="fichas-exclusao-titulo">Excluir definitivamente</h2>
+    <p class="exclusao-aviso">Esta ação apaga a ficha e seus arquivos privados sem possibilidade de restauração. O sistema recusará a exclusão se encontrar paciente, agenda, atendimento, prontuário, financeiro, pagamento, termo, consentimento ou outra relação que precise ser preservada.</p>
+    <p>Use somente para teste, duplicata, erro cadastral sem vínculo ou solicitação já validada pela gestão. O sistema não decide sozinho obrigações de retenção.</p>
+    <label>Categoria da exclusão
+      <select id="fichas-exclusao-categoria" required>
+        <option value="">Selecione</option>
+        <option value="teste">Registro de teste</option>
+        <option value="duplicada">Ficha duplicada</option>
+        <option value="erro_cadastral">Erro cadastral sem vínculo</option>
+        <option value="solicitacao_validada">Solicitação validada conforme política</option>
+      </select>
+    </label>
+    <label>Motivo detalhado
+      <textarea id="fichas-exclusao-motivo" minlength="10" maxlength="300" rows="3" required
+        placeholder="Explique por que este registro pode ser apagado definitivamente"></textarea>
+    </label>
+    <label class="exclusao-digitar">Para confirmar, digite EXCLUIR
+      <input id="fichas-exclusao-confirmacao" type="text" autocomplete="off" autocapitalize="characters"
+        spellcheck="false" maxlength="20" required>
+    </label>
+    <p class="reauth-status" id="fichas-exclusao-status" role="alert" aria-live="assertive"></p>
+    <div class="reauth-acoes">
+      <button id="fichas-exclusao-cancelar" type="button">Cancelar</button>
+      <button class="confirmar" id="fichas-exclusao-continuar" type="submit">Continuar para a senha</button>
+    </div>
+  </form>
+</dialog>
 
 <footer>Ana Maria Costa Jacob · CRF/MG 40880 · Documentos clínicos protegidos</footer>
 
 <script src="./vendor/supabase-js-2.112.3.min.js"></script>
 <script src="./auth-mfa.js?v=20260819-3"></script>
-<script src="./financeiro.js?v=20260823-2"></script>
+<script src="./financeiro.js?v=20260824-1"></script>
+<script src="./prontuario.js?v=20260824-1"></script>
+<script src="./app-shell.js?v=20260824-2"></script>
 <script>
 const SUPABASE_URL = 'https://rjxtxoqprnumouqakxbc.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_Ip14p4tUfYFjwUYaWinMlw_Gf9v0YwT';
@@ -754,7 +1010,6 @@ const TIPOS_TCLE = {
   tcle_peeling_quimico: { label: 'Pré-avaliação · Peeling químico superficial', arquivo: 'Pre-Avaliacao-Peeling-Quimico-Superficial.pdf' },
   tcle_fios_pdo: { label: 'Pré-avaliação · Fios absorvíveis de PDO', arquivo: 'Pre-Avaliacao-Fios-PDO.pdf' }
 };
-let hashSenha = null;
 let modoAcesso = null;
 let authController = null;
 let authSession = null;
@@ -781,11 +1036,6 @@ let sessaoMonitor = null;
 let sessaoUltimoRegistro = 0;
 
 const el = id => document.getElementById(id);
-
-async function sha256(txt) {
-  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(txt));
-  return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
-}
 
 function quando(iso) {
   const d = new Date(iso);
@@ -860,7 +1110,12 @@ function cartao(f) {
   html += '<button class="' + (arquivada ? 'alt' : 'perigo') + '" type="button" data-ficha-acao="' +
     (arquivada ? 'restaurar' : 'arquivar') + '" data-ficha-origem="anamnese" data-ficha-id="' +
     esc(f.id) + '" data-ficha-nome="' + esc(f.nome) + '">' +
-    (arquivada ? 'Restaurar ficha' : 'Arquivar ficha') + '</button>';
+    (arquivada ? 'Restaurar ficha' : 'Apagar/Arquivar (reversível)') + '</button>';
+  if (arquivada) {
+    html += '<button class="perigo-definitivo" type="button" data-ficha-acao="excluir_definitivamente" ' +
+      'data-ficha-origem="anamnese" data-ficha-id="' + esc(f.id) + '" data-ficha-nome="' +
+      esc(f.nome) + '">Excluir definitivamente</button>';
+  }
   html += '</div>';
 
   div.innerHTML = html;
@@ -922,7 +1177,12 @@ function cartaoDocumento(d) {
   html += '<button class="' + (arquivada ? 'alt' : 'perigo') + '" type="button" data-ficha-acao="' +
     (arquivada ? 'restaurar' : 'arquivar') + '" data-ficha-origem="documento_clinico" data-ficha-id="' +
     esc(d.id) + '" data-ficha-nome="' + esc(d.nome) + '">' +
-    (arquivada ? 'Restaurar ficha' : 'Arquivar ficha') + '</button>';
+    (arquivada ? 'Restaurar ficha' : 'Apagar/Arquivar (reversível)') + '</button>';
+  if (arquivada) {
+    html += '<button class="perigo-definitivo" type="button" data-ficha-acao="excluir_definitivamente" ' +
+      'data-ficha-origem="documento_clinico" data-ficha-id="' + esc(d.id) + '" data-ficha-nome="' +
+      esc(d.nome) + '">Excluir definitivamente</button>';
+  }
   html += '</div>';
   div.innerHTML = html;
   return div;
@@ -975,7 +1235,6 @@ function rotuloPapel(role) {
     owner: 'Proprietário(a)',
     professional: 'Profissional',
     assistant: 'Assistente',
-    legacy: 'Acesso temporário'
   };
   return papeis[String(role || '').toLowerCase()] || 'Acesso individual';
 }
@@ -993,43 +1252,192 @@ function atualizarIdentidade(dados) {
     const papel = identidadeBackend && identidadeBackend.role || dados && dados.role || '';
     el('usuario-nome').textContent = nome;
     el('usuario-detalhes').textContent = [email, rotuloPapel(papel), 'MFA confirmado'].filter(Boolean).join(' · ');
-  } else {
-    el('usuario-nome').textContent = 'Acesso temporário';
-    el('usuario-detalhes').textContent = 'Senha compartilhada de transição · sessão protegida nesta aba';
   }
   if (window.AMJFinanceiro) window.AMJFinanceiro.atualizarAcesso();
+  if (window.AMJProntuario) window.AMJProntuario.atualizarAcesso();
+  if (window.AMJOperacaoClinica) window.AMJOperacaoClinica.atualizarAcesso();
+  if (window.AMJGestaoAdministrativa) window.AMJGestaoAdministrativa.atualizarAcesso();
 }
 
-async function cabecalhosAcesso(comJson) {
+async function cabecalhosAcesso(comJson, provaSenha) {
   const headers = {};
   if (comJson) headers['Content-Type'] = 'application/json';
 
-  if (modoAcesso === 'auth') {
-    if (!authController) throw new Error('Login individual indisponível.');
-    const session = await authController.getSession();
-    if (!session || !session.access_token) {
-      await sair('Sua sessão individual expirou. Entre novamente.');
-      throw new Error('Sessão individual encerrada.');
-    }
-    authSession = session;
-    headers.apikey = SUPABASE_PUBLISHABLE_KEY;
-    headers.Authorization = 'Bearer ' + session.access_token;
-    return headers;
+  if (modoAcesso !== 'auth' || !authController) {
+    throw new Error('Entre com sua conta individual e confirme o MFA.');
   }
-
-  if (modoAcesso === 'legacy' && hashSenha) {
-    headers['x-senha'] = hashSenha;
-    return headers;
+  const session = await authController.getSession();
+  if (!session || !session.access_token) {
+    await sair('Sua sessão individual expirou. Entre novamente.');
+    throw new Error('Sessão individual encerrada.');
   }
-  throw new Error('Entre novamente para continuar.');
+  authSession = session;
+  headers.apikey = SUPABASE_PUBLISHABLE_KEY;
+  headers.Authorization = 'Bearer ' + session.access_token;
+  if (provaSenha && provaSenha.token) {
+    headers['X-AMJ-Reauthentication'] = 'Bearer ' + provaSenha.token;
+  }
+  return headers;
 }
 
-async function acessoNegado() {
-  if (modoAcesso === 'auth') {
-    await sair('Seu acesso individual não pôde ser validado. Entre novamente ou fale com o administrador.');
-  } else {
-    await sair('Senha temporária incorreta.');
+function operacaoId() {
+  if (window.crypto && typeof window.crypto.randomUUID === 'function') return window.crypto.randomUUID();
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, char => {
+    const random = Math.random() * 16 | 0;
+    return (char === 'x' ? random : (random & 3 | 8)).toString(16);
+  });
+}
+
+async function solicitarSenhaRecente(opcoes) {
+  const config = opcoes && typeof opcoes === 'object' ? opcoes : {};
+  if (modoAcesso !== 'auth' || !authController) {
+    throw new Error('Esta alteração exige uma conta individual com MFA. O acesso temporário não é permitido.');
   }
+  const role = String(identidadeBackend && identidadeBackend.role || '').toLowerCase();
+  if (role !== 'owner') throw new Error('Somente os proprietários podem realizar esta alteração.');
+
+  const userResult = await authController.client.auth.getUser();
+  const user = userResult && userResult.data && userResult.data.user;
+  const email = String(user && user.email || '').trim().toLowerCase();
+  if (userResult.error || !user || !email) throw new Error('Não foi possível confirmar a identidade da conta.');
+
+  const dialog = el('reauth-dialog');
+  const form = el('reauth-form');
+  const title = el('reauth-titulo');
+  const explanation = el('reauth-explicacao');
+  const reasonField = el('reauth-motivo');
+  const passwordField = el('reauth-senha');
+  const statusField = el('reauth-status');
+  const confirmButton = el('reauth-confirmar');
+  const cancelButton = el('reauth-cancelar');
+  if (!dialog || typeof dialog.showModal !== 'function') {
+    throw new Error('Seu navegador não oferece a confirmação segura necessária. Atualize o navegador e tente novamente.');
+  }
+
+  title.textContent = config.titulo || 'Confirme com sua senha';
+  explanation.textContent = config.explicacao ||
+    'Esta alteração será registrada na auditoria e exige a senha da sua conta individual.';
+  reasonField.value = String(config.motivo || '').slice(0, 300);
+  passwordField.value = '';
+  statusField.textContent = '';
+  confirmButton.disabled = false;
+  cancelButton.disabled = false;
+
+  return await new Promise((resolve, reject) => {
+    let encerrado = false;
+
+    function limpar() {
+      form.removeEventListener('submit', confirmar);
+      cancelButton.removeEventListener('click', cancelar);
+      dialog.removeEventListener('cancel', cancelarDialogo);
+      passwordField.value = '';
+    }
+
+    function finalizarErro(error) {
+      if (encerrado) return;
+      encerrado = true;
+      limpar();
+      if (dialog.open) dialog.close();
+      reject(error);
+    }
+
+    function cancelar() {
+      const error = new Error('Operação cancelada.');
+      error.code = 'operation_cancelled';
+      finalizarErro(error);
+    }
+
+    function cancelarDialogo(event) {
+      event.preventDefault();
+      cancelar();
+    }
+
+    async function confirmar(event) {
+      event.preventDefault();
+      const motivo = reasonField.value.trim();
+      const password = passwordField.value;
+      if (motivo.length < 3 || motivo.length > 300) {
+        statusField.textContent = 'Informe um motivo entre 3 e 300 caracteres.';
+        reasonField.focus();
+        return;
+      }
+      if (password.length < 6) {
+        statusField.textContent = 'Digite a senha atual da sua conta.';
+        passwordField.focus();
+        return;
+      }
+
+      confirmButton.disabled = true;
+      cancelButton.disabled = true;
+      statusField.textContent = 'Confirmando sua identidade…';
+      try {
+        const response = await fetch(SUPABASE_URL + '/auth/v1/token?grant_type=password', {
+          method: 'POST',
+          cache: 'no-store',
+          headers: {
+            apikey: SUPABASE_PUBLISHABLE_KEY,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ email, password })
+        });
+        passwordField.value = '';
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || !data.access_token) {
+          statusField.textContent = response.status === 429
+            ? 'Muitas tentativas. Aguarde alguns minutos e tente novamente.'
+            : 'A senha não confere. Verifique e tente novamente.';
+          confirmButton.disabled = false;
+          cancelButton.disabled = false;
+          passwordField.focus();
+          return;
+        }
+
+        const secondaryToken = String(data.access_token);
+        const proof = {
+          token: secondaryToken,
+          operation_id: operacaoId(),
+          motivo,
+          encerrar: async function () {
+            try {
+              await fetch(SUPABASE_URL + '/auth/v1/logout?scope=local', {
+                method: 'POST',
+                cache: 'no-store',
+                headers: {
+                  apikey: SUPABASE_PUBLISHABLE_KEY,
+                  Authorization: 'Bearer ' + secondaryToken
+                }
+              });
+            } catch (_) {
+              // A prova também é de uso único e expira rapidamente no backend.
+            }
+          }
+        };
+        encerrado = true;
+        limpar();
+        if (dialog.open) dialog.close();
+        resolve(proof);
+      } catch (_) {
+        passwordField.value = '';
+        statusField.textContent = 'Não foi possível confirmar agora. Verifique a conexão e tente novamente.';
+        confirmButton.disabled = false;
+        cancelButton.disabled = false;
+      }
+    }
+
+    form.addEventListener('submit', confirmar);
+    cancelButton.addEventListener('click', cancelar);
+    dialog.addEventListener('cancel', cancelarDialogo);
+    dialog.showModal();
+    setTimeout(() => reasonField.focus(), 0);
+  });
+}
+
+window.AMJProtecao = Object.freeze({
+  solicitarSenhaRecente
+});
+
+async function acessoNegado() {
+  await sair('Seu acesso individual não pôde ser validado. Entre novamente ou fale com o administrador.');
 }
 
 async function carregar() {
@@ -1069,46 +1477,32 @@ async function alterarArquivamentoFicha(botao) {
   const origem = botao.dataset.fichaOrigem;
   const documentoId = botao.dataset.fichaId;
   const nome = botao.dataset.fichaNome || 'esta paciente';
-  const palavra = acao === 'arquivar' ? 'ARQUIVAR' : 'RESTAURAR';
   const explicacao = acao === 'arquivar'
-    ? 'A ficha sairá da lista principal, mas continuará guardada conforme a legislação.'
+    ? 'A ficha sairá da lista principal, mas continuará integralmente guardada e poderá ser restaurada.'
     : 'A ficha voltará para a lista principal.';
-
-  const confirmacao = window.prompt(
-    explicacao + '\n\nPara confirmar ' + nome + ', digite ' + palavra + '.'
-  );
-  if (confirmacao === null) return;
-  if (confirmacao.trim().toUpperCase() !== palavra) {
-    el('fichas-status').className = 'fichas-status erro';
-    el('fichas-status').textContent = 'Confirmação cancelada: a palavra digitada não confere.';
-    return;
-  }
-
-  const motivo = window.prompt(
-    'Informe um motivo administrativo breve (obrigatório). Não inclua CPF, diagnóstico ou outros dados de saúde.'
-  );
-  if (motivo === null) return;
-  const motivoLimpo = motivo.trim();
-  if (motivoLimpo.length < 3 || motivoLimpo.length > 500) {
-    el('fichas-status').className = 'fichas-status erro';
-    el('fichas-status').textContent = 'Informe um motivo entre 3 e 500 caracteres.';
-    return;
-  }
 
   const textoOriginal = botao.textContent;
   botao.disabled = true;
   botao.textContent = acao === 'arquivar' ? 'Arquivando…' : 'Restaurando…';
   el('fichas-status').className = 'fichas-status';
-  el('fichas-status').textContent = 'Atualizando a ficha…';
+  el('fichas-status').textContent = 'Aguardando confirmação segura…';
+  let prova = null;
   try {
+    prova = await solicitarSenhaRecente({
+      titulo: acao === 'arquivar' ? 'Apagar/Arquivar (reversível)' : 'Restaurar ficha',
+      explicacao: explicacao + ' Confirme a alteração de ' + nome + ' com sua senha.',
+      motivo: acao === 'arquivar' ? 'Arquivamento solicitado pela gestão' : 'Restauração solicitada pela gestão'
+    });
+    el('fichas-status').textContent = 'Atualizando a ficha…';
     const resposta = await fetch(API, {
       method: 'POST',
-      headers: await cabecalhosAcesso(true),
+      headers: await cabecalhosAcesso(true, prova),
       body: JSON.stringify({
         acao,
         origem,
         documento_id: documentoId,
-        motivo: motivoLimpo
+        motivo: prova.motivo,
+        operation_id: prova.operation_id
       })
     });
     if (resposta.status === 401 || resposta.status === 403) { await acessoNegado(); return; }
@@ -1120,9 +1514,173 @@ async function alterarArquivamentoFicha(botao) {
       ? 'Ficha arquivada. O prontuário e o PDF continuam preservados.'
       : 'Ficha restaurada para a lista principal.';
   } catch (erro) {
+    if (erro && erro.code === 'operation_cancelled') {
+      el('fichas-status').className = 'fichas-status';
+      el('fichas-status').textContent = 'Operação cancelada. Nenhum dado foi alterado.';
+      return;
+    }
     el('fichas-status').className = 'fichas-status erro';
     el('fichas-status').textContent = erro.message || 'Não foi possível atualizar a ficha agora.';
   } finally {
+    if (prova && typeof prova.encerrar === 'function') await prova.encerrar();
+    if (botao.isConnected) {
+      botao.disabled = false;
+      botao.textContent = textoOriginal;
+    }
+  }
+}
+
+async function solicitarDetalhesExclusaoDefinitiva(nome) {
+  if (modoAcesso !== 'auth' || !authController) {
+    throw new Error('A exclusão definitiva exige uma conta individual com MFA.');
+  }
+  const role = String(identidadeBackend && identidadeBackend.role || '').toLowerCase();
+  if (role !== 'owner') throw new Error('Somente os proprietários podem excluir definitivamente.');
+
+  const dialog = el('fichas-exclusao-dialog');
+  const form = el('fichas-exclusao-form');
+  const categoryField = el('fichas-exclusao-categoria');
+  const reasonField = el('fichas-exclusao-motivo');
+  const confirmationField = el('fichas-exclusao-confirmacao');
+  const statusField = el('fichas-exclusao-status');
+  const continueButton = el('fichas-exclusao-continuar');
+  const cancelButton = el('fichas-exclusao-cancelar');
+  if (!dialog || typeof dialog.showModal !== 'function') {
+    throw new Error('Seu navegador não oferece a confirmação segura necessária.');
+  }
+
+  el('fichas-exclusao-titulo').textContent = 'Excluir definitivamente · ' + String(nome || 'ficha').slice(0, 80);
+  categoryField.value = '';
+  reasonField.value = '';
+  confirmationField.value = '';
+  statusField.textContent = '';
+  continueButton.disabled = false;
+  cancelButton.disabled = false;
+
+  return await new Promise((resolve, reject) => {
+    let encerrado = false;
+
+    function limpar() {
+      form.removeEventListener('submit', continuar);
+      cancelButton.removeEventListener('click', cancelar);
+      dialog.removeEventListener('cancel', cancelarDialogo);
+      confirmationField.value = '';
+    }
+
+    function finalizarErro(error) {
+      if (encerrado) return;
+      encerrado = true;
+      limpar();
+      if (dialog.open) dialog.close();
+      reject(error);
+    }
+
+    function cancelar() {
+      const error = new Error('Operação cancelada.');
+      error.code = 'operation_cancelled';
+      finalizarErro(error);
+    }
+
+    function cancelarDialogo(event) {
+      event.preventDefault();
+      cancelar();
+    }
+
+    function continuar(event) {
+      event.preventDefault();
+      const categoria = categoryField.value;
+      const motivo = reasonField.value.trim();
+      const confirmacao = confirmationField.value.trim();
+      if (!['teste', 'duplicada', 'erro_cadastral', 'solicitacao_validada'].includes(categoria)) {
+        statusField.textContent = 'Escolha a categoria da exclusão.';
+        categoryField.focus();
+        return;
+      }
+      if (motivo.length < 10 || motivo.length > 300) {
+        statusField.textContent = 'Informe um motivo detalhado entre 10 e 300 caracteres.';
+        reasonField.focus();
+        return;
+      }
+      if (confirmacao !== 'EXCLUIR') {
+        statusField.textContent = 'Digite exatamente EXCLUIR para continuar.';
+        confirmationField.focus();
+        return;
+      }
+      encerrado = true;
+      limpar();
+      if (dialog.open) dialog.close();
+      resolve({ categoria, motivo, confirmacao });
+    }
+
+    form.addEventListener('submit', continuar);
+    cancelButton.addEventListener('click', cancelar);
+    dialog.addEventListener('cancel', cancelarDialogo);
+    dialog.showModal();
+    setTimeout(() => categoryField.focus(), 0);
+  });
+}
+
+async function excluirDefinitivamenteFicha(botao) {
+  const origem = botao.dataset.fichaOrigem;
+  const documentoId = botao.dataset.fichaId;
+  const nome = botao.dataset.fichaNome || 'esta ficha';
+  const textoOriginal = botao.textContent;
+  botao.disabled = true;
+  el('fichas-status').className = 'fichas-status';
+  el('fichas-status').textContent = 'Aguardando a confirmação da exclusão definitiva…';
+  let prova = null;
+  try {
+    const detalhes = await solicitarDetalhesExclusaoDefinitiva(nome);
+    prova = await solicitarSenhaRecente({
+      titulo: 'Senha para excluir definitivamente',
+      explicacao: 'Última etapa: confirme sua senha individual. A prova será usada uma única vez e a operação será auditada.',
+      motivo: detalhes.motivo
+    });
+    el('fichas-status').textContent = 'Verificando vínculos e removendo somente os alvos elegíveis…';
+    botao.textContent = 'Excluindo…';
+    const resposta = await fetch(API, {
+      method: 'POST',
+      headers: await cabecalhosAcesso(true, prova),
+      body: JSON.stringify({
+        acao: 'excluir_definitivamente',
+        origem,
+        documento_id: documentoId,
+        categoria: detalhes.categoria,
+        motivo: prova.motivo,
+        confirmacao: detalhes.confirmacao,
+        operation_id: prova.operation_id
+      })
+    });
+    if (resposta.status === 401 || resposta.status === 403) { await acessoNegado(); return; }
+    const dados = await resposta.json().catch(() => ({}));
+    if (!resposta.ok || dados.erro) {
+      const erro = new Error(dados.erro || 'Não foi possível excluir a ficha.');
+      erro.codigo = dados.codigo || '';
+      erro.vinculos = Array.isArray(dados.vinculos_impeditivos) ? dados.vinculos_impeditivos : [];
+      throw erro;
+    }
+    await carregar();
+    el('fichas-status').className = 'fichas-status';
+    el('fichas-status').textContent = dados.idempotente
+      ? 'A exclusão definitiva já havia sido concluída. A lista foi atualizada.'
+      : 'Ficha e arquivos privados excluídos definitivamente. Permaneceu somente a auditoria técnica sem dados da paciente.';
+  } catch (erro) {
+    if (erro && erro.code === 'operation_cancelled') {
+      el('fichas-status').className = 'fichas-status';
+      el('fichas-status').textContent = 'Operação cancelada. Nenhum dado foi excluído.';
+      return;
+    }
+    el('fichas-status').className = 'fichas-status erro';
+    const vinculos = erro && Array.isArray(erro.vinculos) ? erro.vinculos : [];
+    if (vinculos.length) {
+      el('fichas-status').textContent = 'Exclusão definitiva bloqueada. A ficha continua preservada:\n' +
+        vinculos.map(item => '• ' + String(item.descricao || 'Existe um vínculo impeditivo.') +
+          (Number(item.quantidade) > 1 ? ' (' + Number(item.quantidade) + ')' : '')).join('\n');
+    } else {
+      el('fichas-status').textContent = erro.message || 'Não foi possível excluir a ficha agora.';
+    }
+  } finally {
+    if (prova && typeof prova.encerrar === 'function') await prova.encerrar();
     if (botao.isConnected) {
       botao.disabled = false;
       botao.textContent = textoOriginal;
@@ -1143,21 +1701,11 @@ function mostrarTelaAutenticacao(id) {
   el('tela-lista').hidden = true;
 }
 
-function selecionarMetodoLogin(metodo, focar) {
-  const individual = metodo !== 'legacy';
-  const configuracao = [
-    ['login-metodo-individual', 'login-painel-individual', individual],
-    ['login-metodo-temporario', 'login-painel-temporario', !individual]
-  ];
-  configuracao.forEach(([botaoId, painelId, ativo]) => {
-    const botao = el(botaoId);
-    const painel = el(painelId);
-    botao.setAttribute('aria-selected', String(ativo));
-    botao.tabIndex = ativo ? 0 : -1;
-    painel.classList.toggle('oculto', !ativo);
-    painel.hidden = !ativo;
-  });
-  if (focar) el(individual ? 'auth-email' : 'senha').focus();
+function selecionarMetodoLogin(_metodo, focar) {
+  const painel = el('login-painel-individual');
+  painel.classList.remove('oculto');
+  painel.hidden = false;
+  if (focar) el('auth-email').focus();
 }
 
 function mensagemAuth(erro, padrao) {
@@ -1173,21 +1721,21 @@ function limparEstadoAplicativo() {
   agendaCarregada = false;
   identidadeBackend = null;
   if (window.AMJFinanceiro) window.AMJFinanceiro.reset();
-  agendaAtivarAba('fichas', false);
+  if (window.AMJProntuario) window.AMJProntuario.reset();
+  if (window.AMJOperacaoClinica) window.AMJOperacaoClinica.reset();
+  if (window.AMJGestaoAdministrativa) window.AMJGestaoAdministrativa.reset();
+  agendaAtivarAba('inicio', false);
   if (sessaoMonitor) clearInterval(sessaoMonitor);
   sessaoMonitor = null;
 }
 
-function finalizarSaidaInterface(msg, metodoPreferido) {
+function finalizarSaidaInterface(msg) {
   limparEstadoAplicativo();
-  hashSenha = null;
   authSession = null;
   modoAcesso = null;
-  sessionStorage.removeItem('amj_s');
   sessionStorage.removeItem('amj_modo_acesso');
   sessionStorage.removeItem('amj_login_em');
   sessionStorage.removeItem('amj_atividade_em');
-  el('senha').value = '';
   el('auth-senha').value = '';
   el('auth-nova-senha').value = '';
   el('auth-confirma-senha').value = '';
@@ -1197,15 +1745,13 @@ function finalizarSaidaInterface(msg, metodoPreferido) {
   el('mfa-qr').hidden = true;
   el('mfa-segredo').textContent = '';
   mostrarTelaAutenticacao('tela-login');
-  selecionarMetodoLogin(metodoPreferido === 'legacy' ? 'legacy' : 'auth', false);
-  el(metodoPreferido === 'legacy' ? 'erro' : 'auth-login-erro').textContent = msg || '';
+  selecionarMetodoLogin('auth', false);
+  el('auth-login-erro').textContent = msg || '';
 }
 
 async function sair(msg) {
-  const modoAnterior = modoAcesso;
   modoAcesso = null;
-  const preferencia = modoAnterior === 'legacy' ? 'legacy' : 'auth';
-  if (modoAnterior === 'auth' && authController && !authEncerrando) {
+  if (authController && !authEncerrando) {
     authEncerrando = true;
     try {
       await authController.signOut();
@@ -1215,13 +1761,12 @@ async function sair(msg) {
       authEncerrando = false;
     }
   }
-  finalizarSaidaInterface(msg, preferencia);
+  finalizarSaidaInterface(msg);
 }
 
 function sessaoAplicativoAtiva() {
   if (!aplicativoLiberado) return false;
-  return modoAcesso === 'legacy' ? Boolean(hashSenha) :
-    modoAcesso === 'auth' ? Boolean(authSession && authSession.access_token) : false;
+  return modoAcesso === 'auth' && Boolean(authSession && authSession.access_token);
 }
 
 function registrarAtividadeSessao(forcar) {
@@ -1270,12 +1815,11 @@ function iniciarRelogioSessao(restaurando) {
 }
 
 async function abrirAplicativo(modo, session, restaurando) {
-  modoAcesso = modo;
-  if (modo === 'auth') {
-    authSession = session;
-    hashSenha = null;
-    sessionStorage.removeItem('amj_s');
+  if (modo !== 'auth' || !session || !session.access_token) {
+    throw new Error('Acesso individual com MFA obrigatório.');
   }
+  modoAcesso = 'auth';
+  authSession = session;
   aplicativoLiberado = true;
   sessionStorage.setItem('amj_modo_acesso', modo);
   iniciarRelogioSessao(restaurando);
@@ -1354,47 +1898,6 @@ async function processarEtapaAuth(session, restaurando) {
   finalizarSaidaInterface('', 'auth');
 }
 
-async function entrarTemporariamente(valor) {
-  const bt = el('entrar');
-  bt.disabled = true; bt.textContent = 'Verificando…';
-  el('erro').textContent = '';
-  try {
-    const h = await sha256(valor.trim().toUpperCase());
-    const r = await fetch(API, { method: 'POST', headers: { 'x-senha': h } });
-    if (r.status === 401 || r.status === 403) { el('erro').textContent = 'Senha temporária incorreta.'; return; }
-    if (!r.ok) { el('erro').textContent = 'Erro ao conectar. Tente de novo.'; return; }
-    if (authSession && authController) {
-      try { await authController.signOut(); } catch (_) {}
-    }
-    authSession = null;
-    hashSenha = h;
-    modoAcesso = 'legacy';
-    sessionStorage.setItem('amj_s', h);
-    await abrirAplicativo('legacy', null, false);
-  } catch (e) {
-    el('erro').textContent = 'Erro ao conectar. Tente de novo.';
-  } finally {
-    bt.disabled = false; bt.textContent = 'Entrar temporariamente';
-  }
-}
-
-el('login-metodo-individual').addEventListener('click', () => selecionarMetodoLogin('auth', true));
-el('login-metodo-temporario').addEventListener('click', () => selecionarMetodoLogin('legacy', true));
-el('login-metodo-individual').parentElement.addEventListener('keydown', evento => {
-  if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(evento.key)) return;
-  evento.preventDefault();
-  const irIndividual = evento.key === 'ArrowLeft' || evento.key === 'Home';
-  selecionarMetodoLogin(irIndividual ? 'auth' : 'legacy', true);
-  el(irIndividual ? 'login-metodo-individual' : 'login-metodo-temporario').focus();
-});
-
-el('entrar').addEventListener('click', () => {
-  const v = el('senha').value.trim();
-  if (!v) { el('erro').textContent = 'Digite a senha temporária.'; return; }
-  void entrarTemporariamente(v);
-});
-el('senha').addEventListener('keydown', e => { if (e.key === 'Enter') el('entrar').click(); });
-
 el('form-login-individual').addEventListener('submit', async evento => {
   evento.preventDefault();
   const form = evento.currentTarget;
@@ -1405,8 +1908,6 @@ el('form-login-individual').addEventListener('submit', async evento => {
   try {
     if (!authController) throw new Error('O login individual ainda não está disponível neste aparelho.');
     const session = await authController.signIn(el('auth-email').value, el('auth-senha').value);
-    hashSenha = null;
-    sessionStorage.removeItem('amj_s');
     sessionStorage.removeItem('amj_login_em');
     sessionStorage.removeItem('amj_atividade_em');
     el('auth-senha').value = '';
@@ -1492,7 +1993,12 @@ el('encerrar-sessao').addEventListener('click', () => { void sair('Sessão encer
 el('recarregar').addEventListener('click', carregar);
 el('lista').addEventListener('click', evento => {
   const botao = evento.target.closest('button[data-ficha-acao]');
-  if (botao) alterarArquivamentoFicha(botao);
+  if (!botao) return;
+  if (botao.dataset.fichaAcao === 'excluir_definitivamente') {
+    excluirDefinitivamenteFicha(botao);
+  } else {
+    alterarArquivamentoFicha(botao);
+  }
 });
 document.querySelectorAll('.filtro').forEach(bt => bt.addEventListener('click', () => {
   filtroAtual = bt.dataset.filtro;
@@ -1990,9 +2496,12 @@ function agendaIniciarPolling() {
 }
 
 function agendaAtivarAba(nome, moverFoco) {
-  const abas = ['fichas', 'agenda', 'financeiro'];
-  let ativa = abas.includes(nome) ? nome : 'fichas';
-  if (ativa === 'financeiro' && (el('aba-bt-financeiro').hidden || el('aba-bt-financeiro').disabled)) ativa = 'fichas';
+  const abas = ['inicio', 'fichas', 'agenda', 'prontuarios', 'financeiro', 'operacao', 'gestao', 'cotacoes'];
+  let ativa = abas.includes(nome) ? nome : 'inicio';
+  if (!['inicio', 'fichas'].includes(ativa)) {
+    const botaoSolicitado = el('aba-bt-' + ativa);
+    if (!botaoSolicitado || botaoSolicitado.hidden || botaoSolicitado.disabled) ativa = 'fichas';
+  }
   abas.forEach(chave => {
     const botao = el('aba-bt-' + chave);
     const painel = el('aba-' + chave);
@@ -2004,7 +2513,13 @@ function agendaAtivarAba(nome, moverFoco) {
   });
   if (moverFoco) el('aba-bt-' + ativa).focus();
   if (ativa === 'agenda' && !agendaCarregada) carregarAgenda();
+  if (ativa === 'prontuarios' && window.AMJProntuario) window.AMJProntuario.ativar();
   if (ativa === 'financeiro' && window.AMJFinanceiro) window.AMJFinanceiro.ativar();
+  if (ativa === 'operacao' && window.AMJOperacaoClinica && typeof window.AMJOperacaoClinica.ativar === 'function') {
+    window.AMJOperacaoClinica.ativar();
+  }
+  if (ativa === 'gestao' && window.AMJGestaoAdministrativa) window.AMJGestaoAdministrativa.ativar();
+  if (ativa === 'cotacoes' && window.AMJCotacoes) window.AMJCotacoes.ativar();
 }
 
 function agendaAtualizarEstadoCentral() {
@@ -2236,13 +2751,18 @@ async function agendaMarcarLembrete(agendamento, lembrete, botao) {
   }
 }
 
+el('aba-bt-inicio').addEventListener('click', () => agendaAtivarAba('inicio', false));
 el('aba-bt-fichas').addEventListener('click', () => agendaAtivarAba('fichas', false));
 el('aba-bt-agenda').addEventListener('click', () => agendaAtivarAba('agenda', false));
+el('aba-bt-prontuarios').addEventListener('click', () => agendaAtivarAba('prontuarios', false));
 el('aba-bt-financeiro').addEventListener('click', () => agendaAtivarAba('financeiro', false));
+el('aba-bt-operacao').addEventListener('click', () => agendaAtivarAba('operacao', false));
+el('aba-bt-gestao').addEventListener('click', () => agendaAtivarAba('gestao', false));
+el('aba-bt-cotacoes').addEventListener('click', () => agendaAtivarAba('cotacoes', false));
 document.querySelector('.abas').addEventListener('keydown', evento => {
   if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(evento.key)) return;
   evento.preventDefault();
-  const disponiveis = ['fichas', 'agenda', 'financeiro'].filter(chave => {
+  const disponiveis = ['inicio', 'fichas', 'agenda', 'prontuarios', 'financeiro', 'operacao', 'gestao', 'cotacoes'].filter(chave => {
     const botao = el('aba-bt-' + chave);
     return !botao.hidden && !botao.disabled;
   });
@@ -2595,7 +3115,7 @@ el('cv-qr').addEventListener('click', () => {
       onAuthEvent(evento, session) {
         if (session) authSession = session;
         if (evento === 'SIGNED_OUT' && authInicioConcluido && modoAcesso === 'auth' && !authEncerrando) {
-          setTimeout(() => finalizarSaidaInterface('Sua sessão individual foi encerrada. Entre novamente.', 'auth'), 0);
+      setTimeout(() => finalizarSaidaInterface('Sua sessão individual foi encerrada. Entre novamente.'), 0);
         }
       }
     });
@@ -2618,19 +3138,8 @@ el('cv-qr').addEventListener('click', () => {
     authInicioConcluido = true;
     el('auth-login-erro').textContent = mensagemAuth(erro, 'O login individual não pôde ser iniciado.');
     if (erro && (erro.code === 'client_unavailable' || erro.code === 'session_storage_unavailable')) {
-      el('login-metodo-individual').disabled = true;
-      selecionarMetodoLogin('legacy', false);
-      el('erro').textContent = 'Use temporariamente este acesso neste aparelho.';
+      el('auth-login-erro').textContent = 'O login seguro não está disponível neste aparelho. Atualize o navegador e tente novamente.';
     }
-  }
-
-  const g = sessionStorage.getItem('amj_s');
-  if (g && sessaoAindaValida()) {
-    hashSenha = g;
-    modoAcesso = 'legacy';
-    await abrirAplicativo('legacy', null, true);
-  } else if (g) {
-    finalizarSaidaInterface('Sua sessão temporária expirou por segurança. Entre novamente.', 'legacy');
   }
 })();
 </script>

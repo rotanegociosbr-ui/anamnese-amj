@@ -37,6 +37,7 @@
 .financeiro-atalhos button{min-height:53px;padding:8px;border:1px solid var(--linha);border-radius:9px;background:#fff;color:var(--dourado);font-family:inherit;font-size:10.5px;font-weight:500;cursor:pointer}
 .financeiro-atalhos button:hover{border-color:var(--dourado);background:#FFF9EE}
 .financeiro-cadastros-card{margin:13px 0;padding:15px;border:1px solid var(--linha);border-radius:var(--raio);background:#fff}
+.financeiro-cadastros-topo{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap}
 .financeiro-cadastros-topo h3{margin:0;font-family:'Cormorant Garamond',Georgia,serif;font-size:22px}
 .financeiro-cadastros-topo p{margin:3px 0 12px;color:var(--cinza);font-size:10.5px}
 .financeiro-cadastros-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}
@@ -54,7 +55,10 @@
 .financeiro-cadastro-item strong{font-size:11px;color:var(--tinta)}
 .financeiro-cadastro-item small{margin-top:2px;color:var(--cinza);font-size:9px;line-height:1.35}
 .financeiro-cadastro-item button{flex:0 0 auto;padding:6px 8px;border:1px solid var(--dourado);border-radius:7px;background:#fff;color:var(--dourado);font:inherit;font-size:9px;cursor:pointer}
-.financeiro-cadastro-item.somente-info{display:block}
+.financeiro-cadastro-item.arquivado{border-style:dashed;background:#F7F4EF;opacity:.78}
+.financeiro-cadastro-acoes{display:flex;align-items:center;justify-content:flex-end;gap:4px;flex-wrap:wrap}
+.financeiro-cadastro-item .financeiro-cadastro-acoes .perigo{border-color:#D9A6A0;color:var(--alerta)}
+.financeiro-cadastro-tipo{margin:6px 0 2px;color:var(--dourado);font-size:9px;font-weight:600;letter-spacing:.07em;text-transform:uppercase}
 .financeiro-editor{margin:12px 0;border:1px solid var(--linha);border-radius:var(--raio);background:#fff;overflow:hidden}
 .financeiro-editor>summary{padding:14px 16px;color:var(--dourado);font-size:13px;font-weight:500;cursor:pointer}
 .financeiro-editor[open]>summary{border-bottom:1px solid var(--linha);background:#FFFDF9}
@@ -97,17 +101,44 @@
 .financeiro-subformularios .financeiro-form{padding:13px;border:1px solid var(--linha);border-radius:9px;background:#FFFDF9}
 .financeiro-subformularios label+label{margin-top:9px}
 .financeiro-subformularios .financeiro-botao{width:100%;margin-top:11px}
+.financeiro-custo-form{grid-column:1/-1;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}
+.financeiro-custo-form h3,.financeiro-custo-form .financeiro-nota,.financeiro-custo-form .financeiro-form-status{grid-column:1/-1}
+.financeiro-custo-form label+label{margin-top:0}
+.financeiro-custos-historico{grid-column:1/-1;display:grid;gap:6px;margin-top:4px}
+.financeiro-custo-item{display:flex;justify-content:space-between;gap:10px;padding:8px;border:1px solid var(--linha);border-radius:8px;background:#fff}
+.financeiro-custo-item div{display:grid;gap:2px}
+.financeiro-custo-item small{color:var(--cinza);font-size:10px;line-height:1.35}
+.financeiro-custo-item strong{font-size:11px;color:var(--tinta)}
+.financeiro-custo-item em{align-self:flex-start;padding:3px 6px;border-radius:999px;background:#F4E9DA;color:var(--dourado);font-size:9px;font-style:normal;white-space:nowrap}
+.financeiro-custo-item button{padding:6px 8px;border:1px solid var(--dourado);border-radius:7px;background:#fff;color:var(--dourado);font:inherit;font-size:9px;cursor:pointer}
+.financeiro-custo-item button.perigo{border-color:#D9A6A0;color:var(--alerta)}
 .financeiro-itens-topo{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:15px 0 9px}
 .financeiro-itens-topo h3{margin:0}
 .financeiro-itens{display:grid;gap:8px}
-.financeiro-item{display:grid;grid-template-columns:minmax(170px,2fr) minmax(90px,.7fr) minmax(110px,1fr) auto;gap:8px;align-items:end;padding:9px;border:1px solid var(--linha);border-radius:9px;background:#FFFDF9}
+.financeiro-item{display:grid;grid-template-columns:minmax(170px,1.6fr) minmax(82px,.6fr) minmax(105px,.8fr) minmax(110px,.8fr) minmax(125px,.9fr) auto;gap:8px;align-items:end;padding:9px;border:1px solid var(--linha);border-radius:9px;background:#FFFDF9}
 .financeiro-item .financeiro-botao{min-height:44px;padding:8px 10px}
+.financeiro-item-estoque{grid-column:1/-2;margin:0!important;padding:6px 8px;border-radius:7px;background:#F8F2E8;color:var(--cinza)!important;font-size:9.5px!important}
 .financeiro-total{text-align:right;font-size:12px!important;color:var(--cinza)!important}
 .financeiro-total strong{font-family:'Cormorant Garamond',Georgia,serif;font-size:21px;color:var(--dourado)}
 .financeiro-lista-topo{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:12px}
 .financeiro-filtros{display:flex;gap:7px;flex-wrap:wrap}
 .financeiro-filtros select{width:auto;min-width:145px;min-height:39px;padding:8px 9px;font-size:11px}
 .financeiro-lista{display:grid;gap:8px}
+.financeiro-visoes-lancamentos{display:flex;gap:7px;flex-wrap:wrap;margin:0 0 12px}
+.financeiro-visoes-lancamentos button{padding:8px 11px;border:1px solid var(--linha);border-radius:999px;background:#fff;color:var(--cinza);font:inherit;font-size:10.5px;cursor:pointer}
+.financeiro-visoes-lancamentos button.ativo{border-color:var(--dourado);background:#F8F2E8;color:var(--dourado);font-weight:600}
+.financeiro-estoque-resumo{display:grid;gap:8px}
+.financeiro-estoque-produto{padding:10px;border:1px solid var(--linha);border-radius:9px;background:#FFFDF9}
+.financeiro-estoque-produto>div{display:flex;justify-content:space-between;gap:10px;align-items:center}
+.financeiro-estoque-produto>div span{font-size:10.5px;color:var(--dourado);font-weight:600}
+.financeiro-estoque-produto ul{display:grid;gap:4px;margin:7px 0 0;padding:0;list-style:none}
+.financeiro-estoque-produto li{display:flex;justify-content:space-between;gap:8px;padding-top:4px;border-top:1px solid var(--linha);font-size:9.5px;color:var(--cinza)}
+.financeiro-pendencias-estoque{display:grid;gap:8px}
+.financeiro-pendencia-estoque{display:grid;grid-template-columns:minmax(220px,1.6fr) minmax(120px,.7fr) minmax(135px,.8fr) minmax(180px,1fr) auto;gap:8px;align-items:end;padding:11px;border:1px solid #E4C988;border-radius:9px;background:#FFF9EE}
+.financeiro-pendencia-descricao{display:grid;gap:3px;align-self:center}
+.financeiro-pendencia-descricao strong{font-size:12px;color:var(--tinta)}
+.financeiro-pendencia-descricao span,.financeiro-pendencia-descricao small{font-size:9.5px;line-height:1.35;color:var(--cinza)}
+.financeiro-pendencia-estoque .financeiro-form-status{grid-column:1/-1;margin:0!important}
 .financeiro-lancamento{padding:12px;border:1px solid var(--linha);border-radius:9px;background:#FFFDF9}
 .financeiro-lancamento-topo{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
 .financeiro-lancamento h4{margin:0;font-family:'Cormorant Garamond',Georgia,serif;font-size:19px;line-height:1.1}
@@ -120,6 +151,12 @@
 .financeiro-selo.despesa,.financeiro-selo.vencido,.financeiro-selo.cancelado{border-color:#F0D5D0;background:var(--alerta-bg);color:var(--alerta)}
 .financeiro-lancamento-acoes{display:flex;gap:7px;flex-wrap:wrap;margin-top:9px;padding-top:9px;border-top:1px solid var(--linha)}
 .financeiro-lancamento-acoes button{padding:7px 9px;border:1px solid var(--dourado);border-radius:7px;background:#fff;color:var(--dourado);font-family:inherit;font-size:10px;cursor:pointer}
+.financeiro-lancamento-detalhes{margin-top:9px;padding:8px;border:1px solid var(--linha);border-radius:8px;background:#fff}
+.financeiro-lancamento-detalhes summary{cursor:pointer;color:var(--dourado);font-size:10.5px;font-weight:600}
+.financeiro-lancamento-detalhes>div{display:grid;gap:7px;padding-top:8px}
+.financeiro-lancamento-detalhes p{margin:0!important;font-size:10px!important;color:var(--cinza)!important}
+.financeiro-detalhe-lista{display:grid;gap:4px;padding-top:6px;border-top:1px solid var(--linha)}
+.financeiro-detalhe-lista strong{font-size:10.5px;color:var(--tinta)}
 .financeiro-parcelas-resumo{display:grid;gap:6px;margin-top:9px;padding:9px;border:1px solid var(--linha);border-radius:8px;background:#fff}
 .financeiro-parcelas-resumo>strong{font-size:10.5px;color:var(--tinta)}
 .financeiro-parcela-registro{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:8px;padding-top:6px;border-top:1px solid var(--linha)}
@@ -140,11 +177,31 @@
 .financeiro-auditoria-item strong{font-size:11.5px;color:var(--tinta)}
 .financeiro-auditoria-item span{font-size:10.5px;color:var(--cinza)}
 .financeiro-auditoria-item small{font-size:9.5px;color:var(--dourado);text-align:right}
+.financeiro-duplicidades-lista{display:grid;gap:9px}
+.financeiro-duplicidade-item{padding:12px;border:1px solid var(--linha);border-radius:9px;background:#FFFDF9}
+.financeiro-duplicidade-topo{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.financeiro-duplicidade-topo strong,.financeiro-duplicidade-topo small{display:block}
+.financeiro-duplicidade-topo strong{font-size:12px;color:var(--tinta)}
+.financeiro-duplicidade-topo small{margin-top:2px;font-size:9.5px;color:var(--cinza)}
+.financeiro-duplicidade-comparacao{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:9px}
+.financeiro-duplicidade-parte{display:grid;gap:3px;padding:9px;border:1px solid var(--linha);border-radius:8px;background:#fff}
+.financeiro-duplicidade-parte small{font-size:9px;text-transform:uppercase;letter-spacing:.06em;color:var(--dourado)}
+.financeiro-duplicidade-parte strong{font-size:11.5px;color:var(--tinta);overflow-wrap:anywhere}
+.financeiro-duplicidade-parte span{font-size:9.5px;line-height:1.4;color:var(--cinza);overflow-wrap:anywhere}
+.financeiro-duplicidade-parte button,.financeiro-duplicidade-acoes button{padding:7px 9px;border:1px solid var(--dourado);border-radius:7px;background:#fff;color:var(--dourado);font:inherit;font-size:9.5px;cursor:pointer}
+.financeiro-duplicidade-parte button{justify-self:start;margin-top:4px}
+.financeiro-duplicidade-motivo{margin:9px 0 0!important;padding:8px;border-radius:7px;background:#F8F2E8;color:var(--cinza)!important;font-size:10px!important}
+.financeiro-duplicidade-acoes{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px;padding-top:9px;border-top:1px solid var(--linha)}
+.financeiro-duplicidade-acoes button.secundario{border-color:var(--linha);color:var(--cinza)}
+.financeiro-duplicidade-acoes button:disabled{opacity:.55;cursor:wait}
 
 @media(max-width:720px){
   .financeiro-atalhos{grid-template-columns:repeat(2,minmax(0,1fr))}
   .financeiro-cadastros-grid{grid-template-columns:1fr}
   .financeiro-subformularios{grid-template-columns:1fr}
+  .financeiro-custo-form{grid-template-columns:1fr}
+  .financeiro-pendencia-estoque{grid-template-columns:1fr 1fr}
+  .financeiro-pendencia-descricao,.financeiro-pendencia-estoque .financeiro-check{grid-column:1/-1}
 }
 
 @media(max-width:640px){
@@ -155,6 +212,9 @@
   .financeiro-grid .largo{grid-column:auto}
   .financeiro-item{grid-template-columns:1fr 1fr}
   .financeiro-item label:first-child{grid-column:1/-1}
+  .financeiro-item-estoque{grid-column:1/-1}
+  .financeiro-pendencia-estoque{grid-template-columns:1fr}
+  .financeiro-pendencia-descricao,.financeiro-pendencia-estoque .financeiro-check{grid-column:auto}
   .financeiro-parcelas-topo{flex-direction:column}
   .financeiro-parcelas-topo small{text-align:left}
   .financeiro-parcela-linha{grid-template-columns:42px 1fr}
@@ -163,6 +223,8 @@
   .financeiro-parcela-registro button{grid-column:1/-1;width:100%}
   .financeiro-filtros select{flex:1;width:100%}
   .financeiro-lancamento-topo{flex-direction:column}
+  .financeiro-duplicidade-comparacao{grid-template-columns:1fr}
+  .financeiro-duplicidade-topo{flex-direction:column}
 }
 
 @media(max-width:390px){

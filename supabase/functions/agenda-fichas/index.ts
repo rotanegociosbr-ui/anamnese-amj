@@ -8,15 +8,12 @@ import {
   writeClinicAudit,
 } from "../_shared/dual-auth.ts";
 
-const HASH_SENHA = (Deno.env.get("PAINEL_HASH_SENHA") || "").toLowerCase();
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 const AUTH_CONFIG: DualAuthConfig = {
   supabaseUrl: SUPABASE_URL,
   serviceRoleKey: SERVICE_ROLE,
-  legacyHash: HASH_SENHA,
-  legacyClinicId: Deno.env.get("CLINIC_ID") || "",
-  allowedRoles: ["owner", "professional", "assistant"],
+  allowedRoles: ["owner"],
   requireAal2: true,
 };
 const MAX_BODY_BYTES = 32 * 1024;
@@ -222,7 +219,7 @@ function cors(req: Request): Record<string, string> {
       ? origin
       : "https://anamariajacob.com.br",
     "Access-Control-Allow-Headers":
-      "authorization, apikey, content-type, x-senha",
+      "authorization, apikey, content-type, x-client-info",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
     "Vary": "Origin",
   };

@@ -12,20 +12,30 @@
     loaded: false,
     loading: false,
     catalogs: { formas_pagamento: [], fornecedores: [], marcas: [], produtos: [] },
+    costs: [],
+    inventory: [],
+    pendingStock: [],
     clients: [],
     entries: [],
     audit: [],
+    duplicateReviews: [],
     summary: {},
     flow: [],
     selectedCandidate: null,
     candidateConfirmed: false,
     searchTimer: null,
     intentKeys: Object.create(null),
+    entryView: 'procedimentos',
     generation: 0,
     pendingRequests: new Set()
   };
 
   function byId(id) { return document.getElementById(id); }
+  function removeNode(node) {
+    if (!node) return;
+    if (typeof node.remove === 'function') node.remove();
+    else if (node.parentNode && typeof node.parentNode.removeChild === 'function') node.parentNode.removeChild(node);
+  }
   function escapeHtml(value) {
     return String(value == null ? '' : value)
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -219,7 +229,15 @@
   }
   function setBusy(form, busy) {
     form.querySelectorAll('button,input,select,textarea').forEach(function (control) {
-      control.disabled = Boolean(busy);
+      if (busy) {
+        if (!control.disabled) {
+          control.dataset.amjBusyDisabled = '1';
+          control.disabled = true;
+        }
+      } else if (control.dataset.amjBusyDisabled === '1') {
+        control.disabled = false;
+        delete control.dataset.amjBusyDisabled;
+      }
     });
     form.setAttribute('aria-busy', String(Boolean(busy)));
   }
@@ -255,7 +273,7 @@
     return Boolean(error && (error.code === 'stale_session' || error.name === 'AbortError'));
   }
 
-  async function call(action, payload) {
+  async function call(action, payload, passwordProof) {
     const generation = state.generation;
     const controller = new AbortController();
     state.pendingRequests.add(controller);
@@ -265,7 +283,7 @@
       error.code = 'owner_mfa_required';
       throw error;
     }
-    const headers = await cabecalhosAcesso(true);
+    const headers = await cabecalhosAcesso(true, passwordProof);
     if (generation !== state.generation || !ownerAccess()) throw staleSessionError();
     const response = await fetch(API_FINANCEIRO, {
       method: 'POST',
@@ -282,6 +300,7 @@
       const error = new Error(data.erro || 'Não foi possível concluir a operação financeira.');
       error.code = data.codigo || String(response.status);
       error.status = response.status;
+      error.data = data.dados || null;
       throw error;
     }
     if (data.identity && typeof atualizarIdentidade === 'function') atualizarIdentidade(data);
@@ -291,6 +310,26 @@
       throw error;
     } finally {
       state.pendingRequests.delete(controller);
+    }
+  }
+
+  async function protectedCall(action, payload, options) {
+    if (!window.AMJProtecao || typeof window.AMJProtecao.solicitarSenhaRecente !== 'function') {
+      throw new Error('A confirmação segura por senha não está disponível. Atualize a página e tente novamente.');
+    }
+    let proof = null;
+    try {
+      proof = await window.AMJProtecao.solicitarSenhaRecente(options || {});
+      const securedPayload = Object.assign({}, payload || {}, {
+        operation_id: proof.operation_id,
+        motivo: proof.motivo || (payload && payload.motivo) || 'Alteração confirmada pelo proprietário'
+      });
+      if (options && options.campoMotivoPayload) {
+        securedPayload[options.campoMotivoPayload] = securedPayload.motivo;
+      }
+      return await call(action, securedPayload, proof);
+    } finally {
+      if (proof && typeof proof.encerrar === 'function') await proof.encerrar();
     }
   }
 
@@ -307,6 +346,46 @@
     content.classList.toggle('oculto', !allowed);
     if (!allowed && button.getAttribute('aria-selected') === 'true' &&
         typeof agendaAtivarAba === 'function') agendaAtivarAba('fichas', false);
+  }
+
+  function ensureProductIdentityFields() {
+    const form = byId('financeiro-form-produto');
+    const unit = byId('financeiro-produto-unidade');
+    if (!form || !unit || byId('financeiro-produto-apresentacao')) return;
+    const presentation = document.createElement('label');
+    presentation.innerHTML = '<span>Apresentação / concentração</span>' +
+      '<input id="financeiro-produto-apresentacao" type="text" minlength="1" maxlength="160" ' +
+      'placeholder="Ex.: 100 U, 1 mL, 210 mg, caixa com 10" required>';
+    const ean = document.createElement('label');
+    ean.innerHTML = '<span>EAN/GTIN <small>opcional</small></span>' +
+      '<input id="financeiro-produto-ean" type="text" inputmode="numeric" maxlength="18" ' +
+      'placeholder="8 a 14 dígitos">';
+    const anchor = unit.closest('label');
+    anchor.insertAdjacentElement('afterend', ean);
+    anchor.insertAdjacentElement('afterend', presentation);
+  }
+
+  function ensureDuplicateReviewPanel() {
+    if (byId('financeiro-duplicidades')) return;
+    const audit = byId('financeiro-editor-auditoria');
+    if (!audit || !audit.parentNode) return;
+    const section = document.createElement('section');
+    section.className = 'financeiro-lista-card financeiro-duplicidades-card';
+    section.id = 'financeiro-duplicidades';
+    section.setAttribute('aria-labelledby', 'financeiro-duplicidades-titulo');
+    section.innerHTML = '<div class="financeiro-lista-topo"><div>' +
+      '<h3 id="financeiro-duplicidades-titulo">Revisão de possíveis duplicidades</h3>' +
+      '<p>Confira os dois registros. A decisão nunca une nem apaga cadastros automaticamente.</p></div>' +
+      '<div class="financeiro-filtros"><select id="financeiro-duplicidades-status" aria-label="Filtrar revisões">' +
+      '<option value="pendente">Pendentes</option><option value="todos">Todas</option>' +
+      '<option value="confirmado_distinto">Confirmados como distintos</option>' +
+      '<option value="resolvido_existente">Resolvidos como já existentes</option>' +
+      '<option value="descartado">Alertas descartados</option></select>' +
+      '<button class="financeiro-botao secundario" id="financeiro-duplicidades-atualizar" type="button">Atualizar fila</button>' +
+      '</div></div><p class="financeiro-nota">Encerrar uma pendência exige conta proprietária, MFA, senha individual recente e motivo. A trilha de auditoria é imutável.</p>' +
+      '<p class="financeiro-form-status" id="financeiro-duplicidades-status-msg" role="status" aria-live="polite"></p>' +
+      '<div class="financeiro-duplicidades-lista" id="financeiro-duplicidades-lista" aria-live="polite"></div>';
+    audit.parentNode.insertBefore(section, audit);
   }
 
   function options(items, placeholder, getLabel) {
@@ -329,30 +408,46 @@
     }
   }
 
+  function isArchived(item) {
+    return Boolean(item && (item.arquivado_em || item.archived_at || item.ativo === false || item.active === false));
+  }
+
+  function activeRows(items) {
+    return (Array.isArray(items) ? items : []).filter(function (item) { return !isArchived(item); });
+  }
+
   function populateCatalogs() {
     const catalog = state.catalogs;
-    const clientOptions = options(state.clients, 'Selecione um cliente', function (item) {
+    const activeClients = activeRows(state.clients);
+    const activeSuppliers = activeRows(catalog.fornecedores);
+    const activeBrands = activeRows(catalog.marcas);
+    const activeProducts = activeRows(catalog.produtos);
+    const clientOptions = options(activeClients, 'Selecione um cliente', function (item) {
       return item.nome || item.name || item.full_name || 'Cliente';
     });
-    const supplierOptions = options(catalog.fornecedores, 'Sem fornecedor', function (item) {
+    const supplierOptions = options(activeSuppliers, 'Sem fornecedor', function (item) {
       return item.nome || item.name;
     });
-    const requiredSupplier = options(catalog.fornecedores, 'Selecione', function (item) {
+    const requiredSupplier = options(activeSuppliers, 'Selecione', function (item) {
       return item.nome || item.name;
     });
-    const brandOptions = options(catalog.marcas, 'Sem marca', function (item) { return item.nome || item.name; });
+    const brandOptions = options(activeBrands, 'Sem marca', function (item) { return item.nome || item.name; });
     const methodOptions = options(catalog.formas_pagamento, 'Selecione', function (item) {
       return item.nome || item.label;
     });
     byId('financeiro-lancamento-cliente').innerHTML = clientOptions;
     byId('financeiro-atendimento-cliente').innerHTML = options(
-      state.clients, 'Selecione um cliente cadastrado', function (item) {
+      activeClients, 'Selecione um cliente cadastrado', function (item) {
         return item.nome || item.name || item.full_name || 'Cliente';
       }
     );
     byId('financeiro-lancamento-fornecedor').innerHTML = supplierOptions;
     byId('financeiro-compra-fornecedor').innerHTML = requiredSupplier;
     byId('financeiro-produto-marca').innerHTML = brandOptions;
+    replaceOptions('financeiro-custo-produto', options(activeProducts, 'Selecione', function (item) {
+      return item.nome || item.name;
+    }));
+    replaceOptions('financeiro-custo-fornecedor', supplierOptions);
     replaceOptions('financeiro-pagamento-forma', methodOptions);
     replaceOptions('financeiro-atendimento-forma', methodOptions);
     replaceOptions('financeiro-atendimento-saldo-forma', methodOptions, 'boleto');
@@ -366,57 +461,207 @@
   }
 
   function productOptions() {
-    return options(state.catalogs.produtos, 'Selecione o produto', function (item) {
+    return options(activeRows(state.catalogs.produtos), 'Selecione o produto', function (item) {
       const brandRow = state.catalogs.marcas.find(function (row) {
         return row.id === (item.marca_id || item.brand_id);
       });
       const brand = item.brand_name || (item.financeiro_marcas && item.financeiro_marcas.name) ||
         (brandRow && (brandRow.nome || brandRow.name)) || '';
-      return [item.nome || item.name, brand].filter(Boolean).join(' · ');
+      const lots = inventoryForProduct(item.id);
+      const balance = lots.reduce(function (sum, lot) { return sum + num(lot.saldo); }, 0);
+      const stock = item.controla_estoque ? 'Estoque ' + balance + ' ' + (item.unidade || '') : '';
+      return [item.nome || item.name, brand, stock].filter(Boolean).join(' · ');
     });
+  }
+
+  function inventoryForProduct(productId) {
+    return state.inventory.filter(function (item) {
+      return String(item.produto_id) === String(productId) && num(item.saldo) > 0;
+    });
+  }
+
+  function renderInventory() {
+    const box = byId('financeiro-estoque-resumo');
+    if (!box) return;
+    const controlled = activeRows(state.catalogs.produtos).filter(function (product) {
+      return product.controla_estoque;
+    });
+    if (!controlled.length) {
+      box.innerHTML = '<p class="financeiro-vazio">Nenhum produto está marcado para controle de estoque.</p>';
+      return;
+    }
+    box.innerHTML = controlled.map(function (product) {
+      const lots = inventoryForProduct(product.id);
+      const balance = lots.reduce(function (sum, lot) { return sum + num(lot.saldo); }, 0);
+      return '<article class="financeiro-estoque-produto"><div><strong>' +
+        escapeHtml(product.nome || product.name) + '</strong><span>Saldo: ' +
+        escapeHtml(String(balance)) + ' ' + escapeHtml(product.unidade || '') + '</span></div>' +
+        (lots.length ? '<ul>' + lots.map(function (lot) {
+          return '<li><span>Lote ' + escapeHtml(lot.lote) + '</span><span>' +
+            escapeHtml(String(lot.saldo)) + ' ' + escapeHtml(lot.unidade) +
+            ' · validade ' + escapeHtml(safeDate(lot.validade)) + '</span></li>';
+        }).join('') + '</ul>' : '<p class="financeiro-vazio">Sem saldo disponível.</p>') + '</article>';
+    }).join('');
+  }
+
+  function renderPendingStock() {
+    const box = byId('financeiro-pendencias-estoque');
+    const count = byId('financeiro-pendencias-contagem');
+    if (!box || !count) return;
+    const rows = Array.isArray(state.pendingStock) ? state.pendingStock : [];
+    count.textContent = rows.length ? String(rows.length) + ' pendente(s)' : 'Nenhuma pendência';
+    if (!rows.length) {
+      box.innerHTML = '<p class="financeiro-vazio">Todas as compras controladas já possuem lote e entrada de estoque.</p>';
+      return;
+    }
+    box.innerHTML = rows.map(function (item) {
+      const documentLabel = item.documento ? ' · documento ' + item.documento : '';
+      return '<form class="financeiro-pendencia-estoque" data-financeiro-regularizar="' +
+        escapeHtml(item.item_compra_id) + '" novalidate><div class="financeiro-pendencia-descricao"><strong>' +
+        escapeHtml(item.produto || 'Produto') + '</strong><span>' +
+        escapeHtml(String(item.quantidade)) + ' ' + escapeHtml(item.unidade || '') + ' · ' +
+        escapeHtml(item.fornecedor || 'Fornecedor') + ' · compra ' + escapeHtml(safeDate(item.data_compra)) +
+        escapeHtml(documentLabel) + '</span><small>Custo original preservado: ' +
+        escapeHtml(money(item.custo_total_original)) + ' (' +
+        escapeHtml(money(item.custo_unitario_original)) + ' por ' +
+        escapeHtml(item.unidade || 'unidade') + ')</small></div>' +
+        '<label><span>Lote</span><input name="lote" type="text" minlength="1" maxlength="100" required></label>' +
+        '<label><span>Validade</span><input name="validade" type="date" min="' +
+        escapeHtml(item.data_compra || '') + '" required></label>' +
+        '<label class="financeiro-check"><input name="usar_como_custo_atual" type="checkbox"><span>Usar também como custo atual</span></label>' +
+        '<button class="financeiro-botao" type="submit">Regularizar com senha</button>' +
+        '<p class="financeiro-form-status" role="status"></p></form>';
+    }).join('');
+  }
+
+  async function regularizePendingStock(form) {
+    if (!requireValid(form)) return;
+    const itemId = form.dataset.financeiroRegularizar;
+    const statusNode = form.querySelector('.financeiro-form-status');
+    const lot = form.elements.lote.value.trim();
+    const expiry = form.elements.validade.value;
+    const useCurrent = form.elements.usar_como_custo_atual.checked;
+    setBusy(form, true);
+    statusNode.textContent = 'Aguardando confirmação segura…';
+    statusNode.classList.remove('erro');
+    try {
+      await protectedCall('regularizar_item_compra_estoque', {
+        item_compra_id: itemId,
+        lote: lot,
+        validade: expiry,
+        usar_como_custo_atual: useCurrent
+      }, {
+        titulo: 'Regularizar entrada de estoque',
+        explicacao: 'O lote e a validade informados gerarão uma entrada auditável sem alterar a compra original.',
+        motivo: 'Regularização manual de lote e validade de compra anterior'
+      });
+      status('financeiro-pendencias-status', 'Entrada regularizada. A compra original e o histórico foram preservados.', false);
+      await load({ silent: true });
+    } catch (error) {
+      if (!isStaleSession(error)) {
+        statusNode.textContent = error.message || 'Não foi possível regularizar este item.';
+        statusNode.classList.add('erro');
+      }
+    } finally {
+      if (form.isConnected) setBusy(form, false);
+    }
   }
 
   function renderRegistries() {
     const clientQuery = normalizeSearch(byId('financeiro-clientes-busca').value);
     const supplierQuery = normalizeSearch(byId('financeiro-fornecedores-busca').value);
     const productQuery = normalizeSearch(byId('financeiro-produtos-busca').value);
+    const showArchived = byId('financeiro-mostrar-arquivados').checked;
     const clients = state.clients.filter(function (item) {
-      return normalizeSearch([item.nome, item.telefone, item.email, item.cpf_mascarado].join(' '))
+      return (showArchived || !isArchived(item)) && normalizeSearch(
+        [item.nome, item.telefone, item.email, item.cpf_mascarado].join(' '))
         .includes(clientQuery);
     });
     const suppliers = state.catalogs.fornecedores.filter(function (item) {
-      return normalizeSearch([item.nome, item.telefone, item.email, item.documento].join(' '))
+      return (showArchived || !isArchived(item)) && normalizeSearch(
+        [item.nome, item.telefone, item.email, item.documento].join(' '))
         .includes(supplierQuery);
     });
     const products = state.catalogs.produtos.filter(function (item) {
       const brand = state.catalogs.marcas.find(function (row) { return row.id === item.marca_id; });
-      return normalizeSearch([item.nome, item.tipo, brand && brand.nome].join(' ')).includes(productQuery);
+      return (showArchived || !isArchived(item)) &&
+        normalizeSearch([item.nome, item.tipo, brand && brand.nome].join(' ')).includes(productQuery);
     });
-    byId('financeiro-clientes-contagem').textContent = String(state.clients.length);
-    byId('financeiro-fornecedores-contagem').textContent = String(state.catalogs.fornecedores.length);
-    byId('financeiro-produtos-contagem').textContent = String(state.catalogs.produtos.length);
+    const brands = state.catalogs.marcas.filter(function (item) {
+      return (showArchived || !isArchived(item)) && normalizeSearch([item.nome, 'marca'].join(' ')).includes(productQuery);
+    });
+    byId('financeiro-clientes-contagem').textContent = String(activeRows(state.clients).length);
+    byId('financeiro-fornecedores-contagem').textContent = String(activeRows(state.catalogs.fornecedores).length);
+    byId('financeiro-produtos-contagem').textContent = String(activeRows(state.catalogs.produtos).length) + ' + ' +
+      String(activeRows(state.catalogs.marcas).length) + ' marcas';
     byId('financeiro-clientes-lista').innerHTML = clients.length ? clients.map(function (item) {
       const contact = [item.telefone, item.email].filter(Boolean).join(' · ');
       const details = [contact, item.cpf_mascarado, item.data_nascimento ? 'Nasc. ' + safeDate(item.data_nascimento) : '']
         .filter(Boolean).join(' · ');
-      return '<article class="financeiro-cadastro-item"><div><strong>' + escapeHtml(item.nome) +
-        '</strong><small>' + escapeHtml(details || 'Sem contato informado') + '</small></div>' +
-        '<button type="button" data-financeiro-atender="' + escapeHtml(item.id) + '">Registrar atendimento</button></article>';
+      const archived = isArchived(item);
+      return '<article class="financeiro-cadastro-item' + (archived ? ' arquivado' : '') + '"><div><strong>' +
+        escapeHtml(item.nome) + (archived ? ' · Arquivado' : '') + '</strong><small>' +
+        escapeHtml(details || 'Sem contato informado') + '</small></div><div class="financeiro-cadastro-acoes">' +
+        (archived ? '' : '<button type="button" data-financeiro-atender="' + escapeHtml(item.id) + '">Atendimento</button>') +
+        (archived ? '' : '<button type="button" data-financeiro-prontuario="' + escapeHtml(item.id) + '">Prontuário</button>') +
+        '<button type="button" data-financeiro-editar="cliente" data-financeiro-id="' + escapeHtml(item.id) + '">Editar</button>' +
+        '<button class="' + (archived ? '' : 'perigo') + '" type="button" data-financeiro-registro-acao="' +
+        (archived ? 'restaurar' : 'arquivar') + '" data-financeiro-entidade="cliente" data-financeiro-id="' +
+        escapeHtml(item.id) + '">' + (archived ? 'Restaurar' : 'Apagar/Arquivar') + '</button></div></article>';
     }).join('') : '<p class="financeiro-vazio">Nenhum cliente encontrado.</p>';
     byId('financeiro-fornecedores-lista').innerHTML = suppliers.length ? suppliers.map(function (item) {
-      const details = [maskedDocument(item.documento), item.telefone, item.email].filter(Boolean).join(' · ');
-      return '<article class="financeiro-cadastro-item"><div><strong>' + escapeHtml(item.nome) +
-        '</strong><small>' + escapeHtml(details || 'Sem contato informado') + '</small></div>' +
-        '<button type="button" data-financeiro-comprar="' + escapeHtml(item.id) + '">Registrar compra</button></article>';
+      const details = [item.documento_mascarado || maskedDocument(item.documento), item.telefone, item.email]
+        .filter(Boolean).join(' · ');
+      const archived = isArchived(item);
+      return '<article class="financeiro-cadastro-item' + (archived ? ' arquivado' : '') + '"><div><strong>' +
+        escapeHtml(item.nome) + (archived ? ' · Arquivado' : '') + '</strong><small>' +
+        escapeHtml(details || 'Sem contato informado') + '</small></div><div class="financeiro-cadastro-acoes">' +
+        (archived ? '' : '<button type="button" data-financeiro-comprar="' + escapeHtml(item.id) + '">Compra</button>') +
+        '<button type="button" data-financeiro-editar="fornecedor" data-financeiro-id="' + escapeHtml(item.id) + '">Editar</button>' +
+        '<button class="' + (archived ? '' : 'perigo') + '" type="button" data-financeiro-registro-acao="' +
+        (archived ? 'restaurar' : 'arquivar') + '" data-financeiro-entidade="fornecedor" data-financeiro-id="' +
+        escapeHtml(item.id) + '">' + (archived ? 'Restaurar' : 'Apagar/Arquivar') + '</button></div></article>';
     }).join('') : '<p class="financeiro-vazio">Nenhum fornecedor encontrado.</p>';
-    byId('financeiro-produtos-lista').innerHTML = products.length ? products.map(function (item) {
+    const brandHtml = brands.map(function (item) {
+      const archived = isArchived(item);
+      return '<article class="financeiro-cadastro-item' + (archived ? ' arquivado' : '') + '"><div><strong>' +
+        escapeHtml(item.nome) + (archived ? ' · Arquivada' : '') + '</strong><small>Marca</small></div>' +
+        '<div class="financeiro-cadastro-acoes"><button type="button" data-financeiro-editar="marca" data-financeiro-id="' +
+        escapeHtml(item.id) + '">Editar</button><button class="' + (archived ? '' : 'perigo') +
+        '" type="button" data-financeiro-registro-acao="' + (archived ? 'restaurar' : 'arquivar') +
+        '" data-financeiro-entidade="marca" data-financeiro-id="' + escapeHtml(item.id) + '">' +
+        (archived ? 'Restaurar' : 'Apagar/Arquivar') + '</button></div></article>';
+    }).join('');
+    const productHtml = products.map(function (item) {
       const brand = state.catalogs.marcas.find(function (row) { return row.id === item.marca_id; });
+      const archived = isArchived(item);
       const values = [brand && brand.nome, productTypeLabel(item.tipo),
         item.custo_referencia != null ? 'Custo ' + money(item.custo_referencia) : '',
         item.preco_venda != null ? 'Venda ' + money(item.preco_venda) : ''].filter(Boolean).join(' · ');
-      return '<article class="financeiro-cadastro-item somente-info"><div><strong>' + escapeHtml(item.nome) +
-        '</strong><small>' + escapeHtml(values) + '</small></div></article>';
-    }).join('') : '<p class="financeiro-vazio">Nenhum produto encontrado.</p>';
+      return '<article class="financeiro-cadastro-item' + (archived ? ' arquivado' : '') + '"><div><strong>' +
+        escapeHtml(item.nome) + (archived ? ' · Arquivado' : '') + '</strong><small>' + escapeHtml(values) +
+        '</small></div><div class="financeiro-cadastro-acoes">' +
+        (archived ? '' : '<button type="button" data-financeiro-custo="' + escapeHtml(item.id) + '">Custos</button>') +
+        '<button type="button" data-financeiro-editar="produto" data-financeiro-id="' + escapeHtml(item.id) + '">Editar</button>' +
+        '<button class="' + (archived ? '' : 'perigo') + '" type="button" data-financeiro-registro-acao="' +
+        (archived ? 'restaurar' : 'arquivar') + '" data-financeiro-entidade="produto" data-financeiro-id="' +
+        escapeHtml(item.id) + '">' + (archived ? 'Restaurar' : 'Apagar/Arquivar') + '</button></div></article>';
+    }).join('');
+    byId('financeiro-produtos-lista').innerHTML = brandHtml || productHtml
+      ? brandHtml + productHtml
+      : '<p class="financeiro-vazio">Nenhum produto ou marca encontrado.</p>';
+  }
+
+  function showClientsRegistry(query, message) {
+    const search = byId('financeiro-clientes-busca');
+    const title = byId('financeiro-cadastros-titulo');
+    if (!search || !title) return;
+    search.value = query || '';
+    renderRegistries();
+    const card = title.closest('.financeiro-cadastros-card');
+    if (card) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    search.focus({ preventScroll: true });
+    if (message) status('financeiro-status', message, false);
   }
 
   function populateOpenEntries() {
@@ -531,20 +776,188 @@
       }).join('') + '</div>';
   }
 
+  function entryViewOf(entry) {
+    if (entryType(entry) === 'despesa') return 'despesas';
+    return entryOrigin(entry) === 'atendimento' ? 'procedimentos' : 'receitas_avulsas';
+  }
+
+  function entryViewLabel(view) {
+    return view === 'despesas' ? 'Despesas' : (view === 'receitas_avulsas' ? 'Receitas avulsas' : 'Procedimentos');
+  }
+
+  function ensureEntryViews() {
+    if (byId('financeiro-visoes-lancamentos')) return;
+    const list = byId('financeiro-lista');
+    if (!list || !list.parentNode) return;
+    const navigation = document.createElement('nav');
+    navigation.id = 'financeiro-visoes-lancamentos';
+    navigation.className = 'financeiro-visoes-lancamentos';
+    navigation.setAttribute('aria-label', 'Visões financeiras');
+    navigation.innerHTML = [
+      ['procedimentos', 'Procedimentos'],
+      ['receitas_avulsas', 'Receitas avulsas'],
+      ['despesas', 'Despesas']
+    ].map(function (item) {
+      return '<button type="button" data-financeiro-visao="' + item[0] + '">' + item[1] + '</button>';
+    }).join('');
+    list.parentNode.insertBefore(navigation, list);
+    navigation.addEventListener('click', function (event) {
+      const button = event.target.closest('[data-financeiro-visao]');
+      if (!button) return;
+      state.entryView = button.dataset.financeiroVisao;
+      const typeFilter = byId('financeiro-filtro-tipo');
+      if (typeFilter) typeFilter.value = '';
+      renderEntries();
+    });
+    const typeFilter = byId('financeiro-filtro-tipo');
+    if (typeFilter && typeFilter.closest('label')) typeFilter.closest('label').hidden = true;
+  }
+
+  function openEntryView(view) {
+    if (!['procedimentos', 'receitas_avulsas', 'despesas'].includes(view)) return false;
+    ensureEntryViews();
+    state.entryView = view;
+    const typeFilter = byId('financeiro-filtro-tipo');
+    if (typeFilter) typeFilter.value = '';
+    renderEntries();
+    const list = byId('financeiro-lista');
+    if (list) list.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    return true;
+  }
+
+  function renderPaymentHistory(entry) {
+    const payments = Array.isArray(entry.pagamentos) ? entry.pagamentos : [];
+    if (!payments.length) return '<p>Nenhum recebimento ou pagamento registrado.</p>';
+    return '<div class="financeiro-detalhe-lista"><strong>Movimentações</strong>' + payments.map(function (payment) {
+      const kind = (payment.movement_type || payment.tipo) === 'estorno' ? 'Estorno' :
+        (entryType(entry) === 'receita' ? 'Recebimento' : 'Pagamento');
+      return '<p>' + escapeHtml(kind + ' · ' + money(payment.amount != null ? payment.amount : payment.valor) +
+        ' · ' + paymentMethodLabel(payment.payment_method || payment.forma) + ' · ' +
+        safeDateTime(payment.paid_at || payment.pago_em || payment.created_at)) + '</p>';
+    }).join('') + '</div>';
+  }
+
+  function renderPurchaseDetails(entry) {
+    const purchase = entry.compra;
+    if (!purchase) return '';
+    const items = Array.isArray(purchase.itens) ? purchase.itens : [];
+    return '<div class="financeiro-detalhe-lista"><strong>Compra vinculada</strong><p>' +
+      escapeHtml('Subtotal ' + money(purchase.subtotal_itens) + ' · frete ' + money(purchase.frete) +
+        ' · total ' + money(purchase.valor_total) + (purchase.nota_fiscal ? ' · documento ' + purchase.nota_fiscal : '')) +
+      '</p>' + items.map(function (item) {
+        const product = recordByType('produto', item.produto_id);
+        return '<p>' + escapeHtml((product && product.nome ? product.nome : 'Produto') + ' · ' +
+          num(item.quantidade) + ' · ' + money(item.valor_total) + ' · frete rateado ' + money(item.frete_rateado) +
+          ' · custo unitário com frete ' + money(item.custo_unitario_efetivo) +
+          (item.lote ? ' · lote ' + item.lote : '') + (item.validade ? ' · validade ' + safeDate(item.validade) : '')) + '</p>';
+      }).join('') + '</div>';
+  }
+
+  function renderEntryDetails(entry) {
+    const paymentCondition = entry.condicao_pagamento ? '<p>Condição: ' +
+      escapeHtml(entry.condicao_pagamento) + '</p>' : '';
+    const attendance = entry.atendimento ? '<div class="financeiro-detalhe-lista"><strong>Procedimento vinculado</strong><p>' +
+      escapeHtml(String(entry.atendimento.tipo_procedimento || 'Procedimento').replace(/_/g, ' ') + ' · ' +
+        safeDateTime(entry.atendimento.realizado_em) + ' · ' + (entry.atendimento.status || 'realizado')) +
+      '</p></div>' : '';
+    return '<details class="financeiro-lancamento-detalhes"><summary>Ver detalhes</summary><div>' +
+      '<p>Total ' + escapeHtml(money(entryTotal(entry))) + ' · realizado ' +
+      escapeHtml(money(entryPaid(entry))) + ' · saldo ' + escapeHtml(money(entryBalance(entry))) + '</p>' +
+      paymentCondition + attendance + renderPaymentHistory(entry) + renderPurchaseDetails(entry) + '</div></details>';
+  }
+
+  function openAdministrativePrint(entry) {
+    if (!entry) return;
+    const expense = entryType(entry) === 'despesa';
+    const procedure = !expense && entryOrigin(entry) === 'atendimento';
+    const purchase = entry.compra || null;
+    const documentKind = expense ? (purchase ? 'Compra / despesa' : 'Despesa') :
+      (procedure ? 'Procedimento' : 'Receita avulsa');
+    const partyLabel = expense ? 'Fornecedor' : 'Paciente';
+    const partyName = expense
+      ? (entry.supplier_name || (entry.fornecedor && entry.fornecedor.nome) || 'Fornecedor não informado')
+      : (entry.patient_name || (entry.cliente && entry.cliente.nome) || 'Paciente não informado');
+    const payments = Array.isArray(entry.pagamentos) ? entry.pagamentos : [];
+    const installments = entryInstallments(entry);
+    const row = function (label, value) {
+      return '<tr><th>' + escapeHtml(label) + '</th><td>' + escapeHtml(value) + '</td></tr>';
+    };
+    const paymentRows = payments.map(function (payment) {
+      const kind = (payment.movement_type || payment.tipo) === 'estorno' ? 'Estorno' :
+        (expense ? 'Pagamento' : 'Recebimento');
+      return '<tr><td>' + escapeHtml(kind) + '</td><td>' + escapeHtml(money(payment.amount != null ? payment.amount : payment.valor)) +
+        '</td><td>' + escapeHtml(paymentMethodLabel(payment.payment_method || payment.forma)) + '</td><td>' +
+        escapeHtml(safeDateTime(payment.paid_at || payment.pago_em || payment.created_at)) + '</td></tr>';
+    }).join('') || '<tr><td colspan="4">Nenhuma movimentação registrada.</td></tr>';
+    const installmentRows = installments.map(function (installment) {
+      return '<tr><td>' + escapeHtml(String(installment.numero || '')) + '</td><td>' +
+        escapeHtml(safeDate(installment.vencimento)) + '</td><td>' + escapeHtml(money(installment.valor)) +
+        '</td><td>' + escapeHtml(paymentMethodLabel(installment.forma_pagamento)) + '</td><td>' +
+        escapeHtml(statusLabel(installment.status)) + '</td></tr>';
+    }).join('') || '<tr><td colspan="5">Sem parcelas programadas.</td></tr>';
+    const purchaseRows = purchase ? row('Subtotal dos produtos', money(purchase.subtotal_itens)) +
+      row('Frete da compra', money(purchase.frete)) + row('Total da compra', money(purchase.valor_total)) +
+      row('Data da compra', safeDate(purchase.data_compra)) +
+      (purchase.nota_fiscal ? row('Documento da compra', purchase.nota_fiscal) : '') : '';
+    const purchaseItems = purchase && Array.isArray(purchase.itens) ? purchase.itens : [];
+    const purchaseItemRows = purchaseItems.map(function (item) {
+      const product = recordByType('produto', item.produto_id);
+      return '<tr><td>' + escapeHtml(product && product.nome ? product.nome : 'Produto') + '</td><td>' +
+        escapeHtml(String(num(item.quantidade))) + '</td><td>' + escapeHtml(money(item.valor_total)) + '</td><td>' +
+        escapeHtml(money(item.frete_rateado)) + '</td><td>' + escapeHtml(money(item.custo_unitario_efetivo)) + '</td><td>' +
+        escapeHtml(item.lote || '—') + '</td></tr>';
+    }).join('');
+    const purchaseItemsSection = purchase ? '<h2>Produtos e rateio do frete</h2><table><thead><tr><th>Produto</th><th>Quantidade</th>' +
+      '<th>Subtotal</th><th>Frete rateado</th><th>Custo unitário com frete</th><th>Lote</th></tr></thead><tbody>' +
+      (purchaseItemRows || '<tr><td colspan="6">Nenhum item vinculado.</td></tr>') + '</tbody></table>' : '';
+    const popup = window.open('', '_blank');
+    if (!popup) {
+      status('financeiro-status', 'O navegador bloqueou a janela de impressão. Libere pop-ups e tente novamente.', true);
+      return;
+    }
+    popup.opener = null;
+    popup.document.write('<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>' +
+      escapeHtml('Resumo administrativo de ' + documentKind.toLowerCase()) +
+      '</title><style>@page{size:A4;margin:18mm}body{font-family:Arial,sans-serif;color:#2c2623;line-height:1.4;max-width:820px;margin:28px auto;padding:0 20px}h1{font-size:22px;margin-bottom:4px}h2{font-size:15px;margin-top:24px}p.aviso{padding:10px;border:1px solid #9a7b52;background:#faf6ef}table{width:100%;border-collapse:collapse;margin-top:8px}th,td{border:1px solid #ddd;padding:7px;text-align:left;font-size:12px}th{background:#f5f1eb}button{padding:10px 14px;margin-bottom:20px}@media print{button{display:none}body{margin:0;max-width:none}}</style></head><body>' +
+      '<button type="button" onclick="window.print()">Imprimir / Salvar como PDF</button><h1>Ana Maria Jacob Estética</h1>' +
+      '<p class="aviso">Resumo administrativo — não é nota fiscal nem recibo fiscal.</p><h2>' +
+      escapeHtml(documentKind) + '</h2><table>' +
+      row(partyLabel, partyName) + row('Data', safeDate(entry.competencia || entry.competence_date)) +
+      row('Descrição', entryDescription(entry) || 'Sem descrição') + row('Valor total', money(entryTotal(entry))) +
+      (procedure && entry.atendimento ? row('Procedimento vinculado',
+        String(entry.atendimento.tipo_procedimento || 'Procedimento').replace(/_/g, ' ')) : '') +
+      purchaseRows + row(expense ? 'Pago' : 'Recebido', money(entryPaid(entry))) +
+      row('Saldo', money(entryBalance(entry))) +
+      row('Status', statusLabel(entryState(entry) === 'cancelado' ? 'cancelado' : entryStatus(entry))) +
+      row('ID administrativo', String(entry.id || '')) + row('Gerado em', DATE_TIME.format(new Date())) +
+      '</table><h2>Parcelas</h2><table><thead><tr><th>Nº</th><th>Vencimento</th><th>Valor</th><th>Forma</th><th>Status</th></tr></thead><tbody>' +
+      installmentRows + '</tbody></table><h2>' + escapeHtml(expense ? 'Pagamentos e estornos' : 'Recebimentos e estornos') +
+      '</h2><table><thead><tr><th>Tipo</th><th>Valor</th><th>Forma</th><th>Data</th></tr></thead><tbody>' +
+      paymentRows + '</tbody></table>' + purchaseItemsSection + '</body></html>');
+    popup.document.close();
+    popup.focus();
+  }
+
   function filteredEntries() {
-    const type = byId('financeiro-filtro-tipo').value;
     const situation = byId('financeiro-filtro-status').value;
     return state.entries.filter(function (entry) {
       const calculated = entry.calculated_status || entry.status || '';
-      return (!type || entryType(entry) === type) && (!situation || calculated === situation ||
+      return entryViewOf(entry) === state.entryView && (!situation || calculated === situation ||
         (situation === 'cancelado' && entryState(entry) === 'cancelado'));
     });
   }
 
   function renderEntries() {
+    ensureEntryViews();
+    document.querySelectorAll('[data-financeiro-visao]').forEach(function (button) {
+      const active = button.dataset.financeiroVisao === state.entryView;
+      button.classList.toggle('ativo', active);
+      button.setAttribute('aria-pressed', active ? 'true' : 'false');
+    });
     const list = byId('financeiro-lista');
     const entries = filteredEntries();
-    byId('financeiro-contagem').textContent = entries.length + (entries.length === 1 ? ' lançamento' : ' lançamentos');
+    byId('financeiro-contagem').textContent = entryViewLabel(state.entryView) + ': ' + entries.length +
+      (entries.length === 1 ? ' registro' : ' registros');
     list.setAttribute('aria-busy', 'false');
     if (!entries.length) {
       list.innerHTML = '<p class="financeiro-vazio">Nenhum lançamento encontrado neste filtro.</p>';
@@ -554,10 +967,12 @@
     list.innerHTML = entries.map(function (entry) {
       const calculated = entryState(entry) === 'cancelado' ? 'cancelado' : (entryStatus(entry) || 'pendente');
       const type = entryType(entry) === 'receita' ? 'receita' : 'despesa';
+      const view = entryViewOf(entry);
       const received = num(entryPaid(entry));
       const balance = num(entryBalance(entry));
-      const party = entry.cliente && entry.cliente.nome ? 'Cliente: ' + entry.cliente.nome :
-        (entry.fornecedor && entry.fornecedor.nome ? 'Fornecedor: ' + entry.fornecedor.nome : '');
+      const patientName = entry.patient_name || (entry.cliente && entry.cliente.nome);
+      const supplierName = entry.supplier_name || (entry.fornecedor && entry.fornecedor.nome);
+      const party = patientName ? 'Paciente: ' + patientName : (supplierName ? 'Fornecedor: ' + supplierName : '');
       const payments = Array.isArray(entry.pagamentos) ? entry.pagamentos : [];
       const scheduled = entryInstallments(entry);
       const openScheduled = scheduled.filter(function (row) { return installmentBalance(row) > 0; });
@@ -589,19 +1004,26 @@
           '" data-financeiro-forma="' + escapeHtml(payment.payment_method || payment.forma || '') + '">Estornar ' +
           escapeHtml(money(available)) + '</button>');
       });
-      return '<article class="financeiro-lancamento"><div class="financeiro-lancamento-topo"><div>' +
+      actions.push('<button type="button" data-financeiro-imprimir="' + escapeHtml(entry.id) +
+        '">Abrir resumo para imprimir/PDF</button>');
+      if (view === 'procedimentos') {
+        actions.push('<button type="button" data-financeiro-abrir-procedimentos="' + escapeHtml(entry.id) +
+          '">Abrir gestão do procedimento</button>');
+      }
+      return '<article class="financeiro-lancamento" data-financeiro-entry-card="' + escapeHtml(entry.id) + '"><div class="financeiro-lancamento-topo"><div>' +
         '<h4>' + escapeHtml(entryDescription(entry) || 'Lançamento') + '</h4>' +
         '<p class="financeiro-lancamento-meta">Competência ' + escapeHtml(safeDate(entry.competence_date || entry.competencia)) +
         ' · vencimento ' + escapeHtml(safeDate(entry.due_date || entry.vencimento)) + '</p></div>' +
         '<span class="financeiro-lancamento-valor">' + escapeHtml(money(entryTotal(entry))) + '</span></div>' +
         (party ? '<p class="financeiro-lancamento-parte">' + escapeHtml(party) + '</p>' : '') +
         '<div class="financeiro-selos"><span class="financeiro-selo ' + type + '">' +
-        (type === 'receita' ? 'Receita' : 'Despesa') + '</span><span class="financeiro-selo ' +
+        escapeHtml(entryViewLabel(view)) + '</span><span class="financeiro-selo ' +
         escapeHtml(calculated) + '">' + escapeHtml(statusLabel(calculated)) + '</span>' +
         '<span class="financeiro-selo">' + escapeHtml(entryCategory(entry)) + '</span></div>' +
         '<p class="financeiro-lancamento-meta">Pago: ' + escapeHtml(money(received)) +
         ' · saldo: ' + escapeHtml(money(balance)) + '</p>' +
         renderInstallmentSummary(entry) +
+        renderEntryDetails(entry) +
         (actions.length ? '<div class="financeiro-lancamento-acoes">' + actions.join('') + '</div>' : '') +
         '</article>';
     }).join('');
@@ -625,6 +1047,110 @@
     }).join('');
   }
 
+  function duplicateEntityLabel(value) {
+    return ({ cliente: 'Cliente', fornecedor: 'Fornecedor', marca: 'Marca', produto: 'Produto',
+      compra: 'Compra', lancamento: 'Lançamento', pagamento: 'Pagamento',
+      custo_produto: 'Custo de produto', foto_clinica: 'Foto clínica' })[String(value || '')] ||
+      String(value || 'Registro');
+  }
+
+  function duplicateStatusLabel(value) {
+    return ({ pendente: 'Pendente', confirmado_distinto: 'Registros distintos',
+      resolvido_existente: 'Registro já existente', descartado: 'Alerta descartado' })[String(value || '')] ||
+      String(value || '');
+  }
+
+  function renderDuplicateParty(party, caption, entityKind) {
+    const item = party || {};
+    const canOpen = ['cliente', 'fornecedor', 'marca', 'produto'].includes(entityKind) && item.id;
+    return '<article class="financeiro-duplicidade-parte"><small>' + escapeHtml(caption) + '</small>' +
+      '<strong>' + escapeHtml(item.titulo || 'Registro não localizado') + '</strong>' +
+      '<span>' + escapeHtml(item.resumo || '') + '</span>' +
+      (canOpen ? '<button type="button" data-financeiro-duplicidade-abrir data-tipo="' +
+        escapeHtml(entityKind) + '" data-id="' + escapeHtml(item.id) + '">Abrir existente</button>' : '') +
+      '</article>';
+  }
+
+  function renderDuplicateReviews() {
+    const box = byId('financeiro-duplicidades-lista');
+    if (!box) return;
+    const reviews = Array.isArray(state.duplicateReviews) ? state.duplicateReviews : [];
+    if (!reviews.length) {
+      box.innerHTML = '<p class="financeiro-vazio">Nenhuma revisão encontrada neste filtro.</p>';
+      return;
+    }
+    box.innerHTML = reviews.map(function (review) {
+      const pending = review.status === 'pendente';
+      const entityKind = String(review.entidade || '');
+      const actions = pending
+        ? '<div class="financeiro-duplicidade-acoes">' +
+          '<button type="button" data-financeiro-duplicidade-resolver="confirmado_distinto" data-id="' +
+          escapeHtml(review.id) + '" data-versao="' + escapeHtml(review.versao) + '">Confirmar que são distintos</button>' +
+          '<button type="button" data-financeiro-duplicidade-resolver="resolvido_existente" data-id="' +
+          escapeHtml(review.id) + '" data-versao="' + escapeHtml(review.versao) + '">Marcar como já existente</button>' +
+          '<button class="secundario" type="button" data-financeiro-duplicidade-resolver="descartado" data-id="' +
+          escapeHtml(review.id) + '" data-versao="' + escapeHtml(review.versao) + '">Descartar alerta</button></div>'
+        : '';
+      return '<article class="financeiro-duplicidade-item"><div class="financeiro-duplicidade-topo"><div><strong>' +
+        escapeHtml(duplicateEntityLabel(entityKind)) + '</strong><small>Detecção ' +
+        escapeHtml(safeDateTime(review.detectado_em)) + ' · ' +
+        escapeHtml(String(review.tipo_correspondencia || '').replace(/_/g, ' ')) + '</small></div>' +
+        '<span class="financeiro-selo ' + (pending ? 'parcial' : 'pago') + '">' +
+        escapeHtml(duplicateStatusLabel(review.status)) + '</span></div>' +
+        '<div class="financeiro-duplicidade-comparacao">' +
+        renderDuplicateParty(review.principal, 'Registro principal', entityKind) +
+        renderDuplicateParty(review.candidato, 'Registro candidato', entityKind) + '</div>' +
+        (!pending && review.motivo_revisao
+          ? '<p class="financeiro-duplicidade-motivo"><strong>Motivo:</strong> ' +
+            escapeHtml(review.motivo_revisao) + '</p>' : '') + actions + '</article>';
+    }).join('');
+  }
+
+  async function loadDuplicateReviews(options) {
+    const select = byId('financeiro-duplicidades-status');
+    const filter = select ? select.value : 'pendente';
+    if (!(options && options.silent)) {
+      status('financeiro-duplicidades-status-msg', 'Atualizando a fila de duplicidades…', false);
+    }
+    const result = await call('listar_revisoes_duplicidade', {
+      status: filter,
+      por_pagina: 100
+    });
+    state.duplicateReviews = Array.isArray(result.revisoes) ? result.revisoes : [];
+    renderDuplicateReviews();
+    status('financeiro-duplicidades-status-msg',
+      state.duplicateReviews.length + ' revisão(ões) neste filtro.', false);
+  }
+
+  async function resolveDuplicateReview(button) {
+    const resolution = button.dataset.financeiroDuplicidadeResolver;
+    const labels = {
+      confirmado_distinto: 'Confirmar registros distintos',
+      resolvido_existente: 'Marcar como registro já existente',
+      descartado: 'Descartar alerta de duplicidade'
+    };
+    button.disabled = true;
+    status('financeiro-duplicidades-status-msg', 'Aguardando confirmação segura…', false);
+    try {
+      await protectedCall('resolver_revisao_duplicidade', {
+        revisao_id: button.dataset.id,
+        versao: Number(button.dataset.versao),
+        resolucao: resolution
+      }, {
+        titulo: labels[resolution] || 'Encerrar revisão de duplicidade',
+        explicacao: 'A decisão encerra somente o alerta. Nenhum cadastro será unido ou apagado automaticamente.',
+        motivo: 'Revisão manual dos dois registros pelo proprietário'
+      });
+      await loadDuplicateReviews({ silent: true });
+      status('financeiro-duplicidades-status-msg',
+        'Revisão encerrada com auditoria. Os registros originais foram preservados.', false);
+    } catch (error) {
+      if (!isStaleSession(error)) status('financeiro-duplicidades-status-msg', error.message, true);
+    } finally {
+      if (button.isConnected) button.disabled = false;
+    }
+  }
+
   async function load(options) {
     if (state.loading || !ownerAccess()) return;
     state.loading = true;
@@ -632,18 +1158,31 @@
     byId('financeiro-lista').setAttribute('aria-busy', 'true');
     try {
       const results = await Promise.all([
-        call('resumo'), call('listar_catalogos'), call('listar_clientes', { por_pagina: 100 }),
-        call('listar_lancamentos', { por_pagina: 100 }), call('listar_auditoria', { limite: 50 })
+        call('resumo'), call('listar_catalogos', { incluir_arquivados: true }),
+        call('listar_clientes', { por_pagina: 100, incluir_arquivados: true }),
+        call('listar_lancamentos', { por_pagina: 100 }), call('listar_auditoria', { limite: 50 }),
+        call('listar_estoque', { limite: 500 }),
+        call('listar_pendencias_estoque', { limite: 200 }),
+        call('listar_revisoes_duplicidade', {
+          status: byId('financeiro-duplicidades-status').value || 'pendente',
+          por_pagina: 100
+        })
       ]);
       renderSummary(results[0]);
       state.catalogs = Object.assign(state.catalogs, results[1] || {});
       state.clients = Array.isArray(results[2].clientes) ? results[2].clientes : [];
       state.entries = Array.isArray(results[3].lancamentos) ? results[3].lancamentos : state.entries;
       state.audit = Array.isArray(results[4].auditoria) ? results[4].auditoria : [];
+      state.inventory = Array.isArray(results[5].estoque) ? results[5].estoque : [];
+      state.pendingStock = Array.isArray(results[6].pendencias) ? results[6].pendencias : [];
+      state.duplicateReviews = Array.isArray(results[7].revisoes) ? results[7].revisoes : [];
       populateCatalogs();
       renderRegistries();
+      renderInventory();
+      renderPendingStock();
       renderEntries();
       renderAudit();
+      renderDuplicateReviews();
       state.loaded = true;
       status('financeiro-status', 'Financeiro atualizado com dados do servidor.', false);
     } catch (error) {
@@ -674,14 +1213,26 @@
     state.loaded = false;
     state.loading = false;
     state.catalogs = { formas_pagamento: [], fornecedores: [], marcas: [], produtos: [] };
+    state.costs = [];
+    state.inventory = [];
+    state.pendingStock = [];
     state.clients = [];
     state.entries = [];
     state.audit = [];
+    state.duplicateReviews = [];
     state.summary = {};
     state.flow = [];
     state.selectedCandidate = null;
     state.candidateConfirmed = false;
     state.intentKeys = Object.create(null);
+    state.entryView = 'procedimentos';
+    resetClientEdit();
+    ['fornecedor', 'marca', 'produto'].forEach(resetCatalogEdit);
+    if (byId('financeiro-form-custo-produto')) byId('financeiro-form-custo-produto').reset();
+    if (byId('financeiro-custos-historico')) {
+      byId('financeiro-custos-historico').innerHTML =
+        '<p class="financeiro-vazio">Selecione um produto para consultar o histórico.</p>';
+    }
     const panel = byId('aba-financeiro');
     if (panel) {
       panel.querySelectorAll('form').forEach(function (form) {
@@ -703,8 +1254,8 @@
       });
       ['financeiro-lista', 'financeiro-auditoria', 'financeiro-cliente-candidatos',
         'financeiro-compra-itens', 'financeiro-clientes-lista', 'financeiro-fornecedores-lista',
-        'financeiro-produtos-lista', 'financeiro-atendimento-parcelas-lista',
-        'financeiro-parcelas-lista'].forEach(function (id) {
+        'financeiro-produtos-lista', 'financeiro-pendencias-estoque', 'financeiro-atendimento-parcelas-lista',
+        'financeiro-parcelas-lista', 'financeiro-duplicidades-lista'].forEach(function (id) {
         const node = byId(id);
         if (node) node.innerHTML = '';
       });
@@ -729,6 +1280,7 @@
       syncEntryForm();
       syncPaymentEntry();
       syncInstallmentEditor();
+      syncPurchaseForm();
       addPurchaseItem();
     }
     updateAccess();
@@ -1023,14 +1575,22 @@
         const contact = [item.telefone_mascarado || item.phone_masked || item.telefone_final,
           item.email_mascarado || item.email_masked]
           .filter(Boolean).join(' · ');
-        const linked = item.vinculo && item.vinculo.cliente_id;
+        const linked = item.cliente_id || (item.vinculo && item.vinculo.cliente_id);
+        const matchLabel = linked ? 'Cadastro existente' : 'Possível cadastro · revisar';
         return '<article class="financeiro-candidato"><div><strong>' + escapeHtml(item.nome || item.name) +
           '</strong><small>' + escapeHtml(contact || 'Sem contato exibido') + ' · ' +
-          escapeHtml(item.origem_rotulo || item.source_kind || item.origem || 'cadastro') + '</small></div>' +
+          escapeHtml(item.origem_rotulo || item.source_kind || item.origem || 'cadastro') +
+          ' · ' + escapeHtml(matchLabel) + '</small></div>' +
           (linked
-            ? '<button type="button" disabled title="Este registro já está ligado ao cadastro canônico">Já vinculado</button>'
+            ? '<button type="button" data-financeiro-abrir-existente data-tipo="cliente" data-id="' +
+              escapeHtml(linked) + '">Abrir existente</button>'
             : '<button type="button" data-financeiro-candidato="' + index + '">Usar dados</button>') + '</article>';
       }).join('');
+      box.querySelectorAll('[data-financeiro-abrir-existente]').forEach(function (button) {
+        button.addEventListener('click', function () {
+          openExistingRegistration(button.dataset.tipo, button.dataset.id);
+        });
+      });
       box.querySelectorAll('[data-financeiro-candidato]').forEach(function (button) {
         button.addEventListener('click', function () {
           const candidate = candidates[Number(button.dataset.financeiroCandidato)];
@@ -1088,6 +1648,181 @@
     }
   }
 
+  function versionOf(item) {
+    return Number(item && (item.versao != null ? item.versao : item.version)) || 1;
+  }
+
+  function recordByType(type, id) {
+    const source = type === 'cliente' ? state.clients
+      : type === 'fornecedor' ? state.catalogs.fornecedores
+      : type === 'marca' ? state.catalogs.marcas
+      : type === 'produto' ? state.catalogs.produtos : [];
+    return source.find(function (item) { return String(item.id) === String(id); }) || null;
+  }
+
+  function resetClientEdit() {
+    const form = byId('financeiro-form-cliente');
+    if (!form) return;
+    form.reset();
+    byId('financeiro-cliente-id').value = '';
+    byId('financeiro-cliente-versao').value = '';
+    byId('financeiro-cliente-pesquisa').disabled = false;
+    byId('financeiro-cliente-salvar').textContent = 'Salvar cliente';
+    byId('financeiro-cliente-cancelar-edicao').classList.add('oculto');
+    byId('financeiro-cliente-candidatos').innerHTML = '';
+    state.selectedCandidate = null;
+    state.candidateConfirmed = false;
+    const duplicate = form.querySelector('[data-financeiro-duplicata-exata]');
+    removeNode(duplicate);
+    clearIntent('cliente');
+  }
+
+  function resetCatalogEdit(type) {
+    const form = byId('financeiro-form-' + type);
+    if (!form) return;
+    form.reset();
+    byId('financeiro-' + type + '-id').value = '';
+    byId('financeiro-' + type + '-versao').value = '';
+    const singular = type === 'fornecedor' ? 'fornecedor' : type === 'marca' ? 'marca' : 'produto';
+    byId('financeiro-' + type + '-titulo').textContent =
+      (type === 'marca' ? 'Nova ' : 'Novo ') + singular;
+    byId('financeiro-' + type + '-salvar').textContent =
+      'Salvar ' + singular;
+    byId('financeiro-' + type + '-cancelar-edicao').classList.add('oculto');
+    if (type === 'produto') byId('financeiro-produto-tipo').value = 'bioestimulador';
+    const duplicate = form.querySelector('[data-financeiro-duplicata-exata]');
+    removeNode(duplicate);
+    clearIntent('criar_' + type);
+  }
+
+  async function openExistingRegistration(type, id) {
+    if (!['cliente', 'fornecedor', 'marca', 'produto'].includes(type) || !id) return;
+    if (!recordByType(type, id)) await load({ silent: true });
+    await beginRegistryEdit(type, id);
+  }
+
+  function showExactDuplicate(statusId, error) {
+    const details = error && error.data;
+    const existingId = details && (details.existing_id ||
+      (details.candidato && details.candidato.id));
+    const type = details && (details.tipo || details.type);
+    if (!existingId || !type) return false;
+    const statusNode = byId(statusId);
+    if (!statusNode) return false;
+    const previous = statusNode.parentElement.querySelector('[data-financeiro-duplicata-exata]');
+    removeNode(previous);
+    const box = document.createElement('div');
+    box.className = 'financeiro-nota';
+    box.setAttribute('data-financeiro-duplicata-exata', '');
+    box.innerHTML = '<strong>Cadastro exato já existente.</strong> ' +
+      '<button type="button" data-financeiro-abrir-existente data-tipo="' + escapeHtml(type) +
+      '" data-id="' + escapeHtml(existingId) + '">Abrir existente</button>';
+    statusNode.insertAdjacentElement('afterend', box);
+    box.querySelector('[data-financeiro-abrir-existente]').addEventListener('click', function (event) {
+      const button = event.currentTarget;
+      openExistingRegistration(button.dataset.tipo, button.dataset.id);
+    });
+    return true;
+  }
+
+  async function beginRegistryEdit(type, id) {
+    let item = recordByType(type, id);
+    if (!item) {
+      status('financeiro-status', 'O cadastro selecionado não foi encontrado. Atualize os dados.', true);
+      return;
+    }
+    if (type === 'cliente' || type === 'fornecedor') {
+      status('financeiro-status', 'Carregando os dados protegidos para edição…', false);
+      try {
+        const result = await call('obter_' + type, { id: id });
+        item = result[type] || item;
+      } catch (error) {
+        status('financeiro-status', error.message, true);
+        return;
+      }
+    }
+    if (type === 'cliente') {
+      resetClientEdit();
+      byId('financeiro-cliente-id').value = item.id;
+      byId('financeiro-cliente-versao').value = versionOf(item);
+      byId('financeiro-cliente-nome').value = item.nome || '';
+      byId('financeiro-cliente-nascimento').value = item.data_nascimento || '';
+      byId('financeiro-cliente-telefone').value = item.telefone || '';
+      byId('financeiro-cliente-email').value = item.email || '';
+      byId('financeiro-cliente-cpf').value = item.cpf || '';
+      byId('financeiro-cliente-emergencia').value = item.telefone_emergencia || '';
+      byId('financeiro-cliente-pesquisa').disabled = true;
+      byId('financeiro-cliente-salvar').textContent = 'Salvar alterações';
+      byId('financeiro-cliente-cancelar-edicao').classList.remove('oculto');
+      byId('financeiro-editor-cliente').open = true;
+      byId('financeiro-editor-cliente').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      byId('financeiro-cliente-nome').focus({ preventScroll: true });
+      return;
+    }
+    resetCatalogEdit(type);
+    byId('financeiro-' + type + '-id').value = item.id;
+    byId('financeiro-' + type + '-versao').value = versionOf(item);
+    byId('financeiro-' + type + '-titulo').textContent =
+      'Editar ' + (type === 'marca' ? 'marca' : type);
+    byId('financeiro-' + type + '-salvar').textContent = 'Salvar alterações';
+    byId('financeiro-' + type + '-cancelar-edicao').classList.remove('oculto');
+    if (type === 'fornecedor') {
+      byId('financeiro-fornecedor-nome').value = item.nome || '';
+      byId('financeiro-fornecedor-documento').value = item.documento || '';
+      byId('financeiro-fornecedor-telefone').value = item.telefone || '';
+      byId('financeiro-fornecedor-email').value = item.email || '';
+    } else if (type === 'marca') {
+      byId('financeiro-marca-nome').value = item.nome || '';
+    } else if (type === 'produto') {
+      byId('financeiro-produto-nome').value = item.nome || '';
+      if (item.marca_id && !Array.from(byId('financeiro-produto-marca').options).some(function (option) {
+        return option.value === item.marca_id;
+      })) {
+        const historicalBrand = state.catalogs.marcas.find(function (row) { return row.id === item.marca_id; });
+        if (historicalBrand) byId('financeiro-produto-marca').insertAdjacentHTML('beforeend',
+          '<option value="' + escapeHtml(historicalBrand.id) + '">' + escapeHtml(historicalBrand.nome) +
+          ' · arquivada (restaure ou troque)</option>');
+      }
+      byId('financeiro-produto-marca').value = item.marca_id || '';
+      byId('financeiro-produto-tipo').value = item.tipo || 'outro';
+      byId('financeiro-produto-unidade').value = item.unidade || 'un';
+      byId('financeiro-produto-apresentacao').value = item.apresentacao || '';
+      byId('financeiro-produto-ean').value = item.ean || '';
+      byId('financeiro-produto-custo').value = item.custo_referencia == null ? '' : moneyInput(item.custo_referencia);
+      byId('financeiro-produto-venda').value = item.preco_venda == null ? '' : moneyInput(item.preco_venda);
+      byId('financeiro-produto-anvisa').value = item.registro_anvisa || '';
+      byId('financeiro-produto-estoque').checked = Boolean(item.controla_estoque);
+    }
+    byId('financeiro-editor-catalogo').open = true;
+    byId('financeiro-editor-catalogo').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    byId('financeiro-' + type + '-nome').focus({ preventScroll: true });
+  }
+
+  async function changeRegistryState(type, id, action) {
+    const item = recordByType(type, id);
+    if (!item) return;
+    const restoring = action === 'restaurar';
+    const label = item.nome || 'cadastro';
+    try {
+      await protectedCall(action + '_' + type, {
+        id: item.id,
+        version: versionOf(item)
+      }, {
+        titulo: (restoring ? 'Restaurar ' : 'Arquivar ') + type,
+        explicacao: (restoring ? 'O cadastro voltará a aparecer nas seleções ativas.' :
+          'O cadastro deixará de aparecer nas novas operações, mas o histórico será preservado.') +
+          ' Cadastro: ' + label + '.',
+        motivo: (restoring ? 'Restauração' : 'Arquivamento') + ' solicitado pela gestão'
+      });
+      status('financeiro-status', label + (restoring ? ' foi restaurado.' : ' foi arquivado com auditoria.'), false);
+      if (type === 'cliente' && byId('financeiro-cliente-id').value === String(id)) resetClientEdit();
+      if (type !== 'cliente' && byId('financeiro-' + type + '-id').value === String(id)) resetCatalogEdit(type);
+      await load({ silent: true });
+    } catch (error) {
+      if (!isStaleSession(error)) status('financeiro-status', error.message, true);
+    }
+  }
+
   async function submitClient(event) {
     event.preventDefault();
     const form = event.currentTarget;
@@ -1101,8 +1836,8 @@
     setBusy(form, true);
     try {
       const candidate = state.selectedCandidate;
-      await call('criar_cliente', {
-        idempotency_key: intentKey('cliente'),
+      const clientId = byId('financeiro-cliente-id').value;
+      const payload = {
         nome: byId('financeiro-cliente-nome').value.trim(),
         data_nascimento: byId('financeiro-cliente-nascimento').value || null,
         telefone: byId('financeiro-cliente-telefone').value.trim() || null,
@@ -1112,29 +1847,188 @@
         origem: candidate ? (candidate.origem || candidate.source_kind) : null,
         origem_id: candidate ? (candidate.origem_id || candidate.source_id) : null,
         match_method: candidate ? (candidate.match_method || 'manual') : null
-      });
+      };
+      if (clientId) {
+        payload.id = clientId;
+        payload.version = Number(byId('financeiro-cliente-versao').value);
+        delete payload.origem;
+        delete payload.origem_id;
+        delete payload.match_method;
+        await protectedCall('editar_cliente', payload, {
+          titulo: 'Editar cliente',
+          explicacao: 'Confirme com sua senha atual a alteração dos dados de ' + payload.nome + '.',
+          motivo: 'Atualização cadastral solicitada pela gestão'
+        });
+      } else {
+        payload.idempotency_key = intentKey('cliente');
+        await call('criar_cliente', payload);
+      }
       clearIntent('cliente');
-      form.reset();
-      state.selectedCandidate = null;
-      state.candidateConfirmed = false;
-      byId('financeiro-cliente-candidatos').innerHTML = '';
-      status('financeiro-cliente-status', 'Cliente salvo para reaproveitamento.', false);
+      resetClientEdit();
+      const successMessage = clientId ? 'Dados do cliente atualizados.' :
+        'Cliente salvo e exibido em Clientes cadastrados.';
+      status('financeiro-cliente-status', successMessage, false);
       await load({ silent: true });
-    } catch (error) { if (!isStaleSession(error)) status('financeiro-cliente-status', error.message, true); }
+      showClientsRegistry(payload.nome, successMessage);
+    } catch (error) {
+      if (!isStaleSession(error)) {
+        status('financeiro-cliente-status', error.message, true);
+        showExactDuplicate('financeiro-cliente-status', error);
+      }
+    }
     finally { setBusy(form, false); }
   }
 
-  async function simpleCreate(form, action, payload, statusId, success) {
+  async function saveRegistry(form, type, payload, statusId, success) {
     if (!requireValid(form)) return;
     setBusy(form, true);
     try {
-      await call(action, Object.assign({ idempotency_key: intentKey(action) }, payload));
-      clearIntent(action);
-      form.reset();
-      status(statusId, success, false);
+      const id = byId('financeiro-' + type + '-id').value;
+      if (id) {
+        await protectedCall('editar_' + type, Object.assign({}, payload, {
+          id: id,
+          version: Number(byId('financeiro-' + type + '-versao').value)
+        }), {
+          titulo: 'Editar ' + type,
+          explicacao: 'Confirme com sua senha atual a alteração deste cadastro.',
+          motivo: 'Atualização de ' + type + ' solicitada pela gestão'
+        });
+      } else {
+        await call('criar_' + type, Object.assign({ idempotency_key: intentKey('criar_' + type) }, payload));
+      }
+      clearIntent('criar_' + type);
+      resetCatalogEdit(type);
+      status(statusId, id ? 'Cadastro atualizado.' : success, false);
       await load({ silent: true });
-    } catch (error) { if (!isStaleSession(error)) status(statusId, error.message, true); }
+    } catch (error) {
+      if (!isStaleSession(error)) {
+        status(statusId, error.message, true);
+        showExactDuplicate(statusId, error);
+      }
+    }
     finally { setBusy(form, false); }
+  }
+
+  function renderCosts() {
+    const box = byId('financeiro-custos-historico');
+    if (!box) return;
+    if (!state.costs.length) {
+      box.innerHTML = '<p class="financeiro-vazio">Ainda não há custos registrados para este produto.</p>';
+      return;
+    }
+    box.innerHTML = state.costs.map(function (item) {
+      const source = [item.fornecedor_nome, item.fonte, item.condicao_pagamento].filter(Boolean).join(' · ');
+      const pack = num(item.quantidade_embalagem) + ' ' + (item.unidade_embalagem || 'un');
+      const cancellation = item.cancelamento || {};
+      const cancelled = item.cancelado === true;
+      return '<article class="financeiro-custo-item"><div><strong>' + escapeHtml(safeDate(item.data_custo)) +
+        ' · total ' + escapeHtml(money(item.custo_total)) + '</strong><small>' + escapeHtml(pack +
+          ' · custo unitário ' + money(item.custo_unitario) + (source ? ' · ' + source : '')) +
+        '</small>' + (cancelled ? '<small>Cancelado com auditoria' +
+          (cancellation.motivo ? ' · ' + escapeHtml(cancellation.motivo) : '') + '</small>' : '') +
+        '</div>' + (cancelled ? '<em>Cancelado</em>' : (item.atual ? '<em>Custo atual</em>' : '')) +
+        (cancelled ? '' : '<button class="perigo" type="button" data-financeiro-cancelar-custo="' +
+          escapeHtml(item.id) + '">Apagar/Cancelar custo</button>') + '</article>';
+    }).join('');
+  }
+
+  async function loadCosts(productId) {
+    const box = byId('financeiro-custos-historico');
+    state.costs = [];
+    if (!productId) {
+      if (box) box.innerHTML = '<p class="financeiro-vazio">Selecione um produto para consultar o histórico.</p>';
+      return;
+    }
+    if (box) box.innerHTML = '<p class="financeiro-vazio">Carregando histórico de custos…</p>';
+    try {
+      const result = await call('listar_custos_produto', { produto_id: productId, por_pagina: 100 });
+      state.costs = Array.isArray(result.custos) ? result.custos : [];
+      renderCosts();
+    } catch (error) {
+      if (!isStaleSession(error) && box) box.innerHTML = '<p class="financeiro-vazio">' +
+        escapeHtml(error.message) + '</p>';
+    }
+  }
+
+  async function cancelProductCost(costId) {
+    const cost = state.costs.find(function (item) { return String(item.id) === String(costId); });
+    const productId = cost && cost.produto_id;
+    const product = recordByType('produto', productId);
+    if (!cost || cost.cancelado || !product) {
+      status('financeiro-custo-status', 'Recarregue o histórico antes de cancelar este custo.', true);
+      return;
+    }
+    try {
+      const result = await protectedCall('cancelar_custo_produto', {
+        custo_id: cost.id,
+        produto_id: productId,
+        version: versionOf(product)
+      }, {
+        titulo: 'Apagar/Cancelar custo incorreto',
+        explicacao: 'O lançamento original será preservado como cancelado. Se ele for o custo atual, o sistema vai repor o último custo válido ou marcar o custo como pendente.',
+        motivo: 'Cancelamento de custo lançado incorretamente pela gestão'
+      });
+      status('financeiro-custo-status', result.custo_substituto ?
+        'Custo cancelado. A referência anterior foi recomposta por evento auditável.' :
+        'Custo cancelado com auditoria. Cadastre um novo custo se a referência ficou pendente.', false);
+      await load({ silent: true });
+      byId('financeiro-custo-produto').value = productId;
+      await loadCosts(productId);
+    } catch (error) {
+      if (!isStaleSession(error)) status('financeiro-custo-status', error.message, true);
+    }
+  }
+
+  async function submitCost(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    if (!requireValid(form)) return;
+    const productId = byId('financeiro-custo-produto').value;
+    const product = recordByType('produto', productId);
+    const quantity = Number(byId('financeiro-custo-quantidade').value);
+    const total = parseMoney(byId('financeiro-custo-total').value);
+    if (!product || isArchived(product)) {
+      status('financeiro-custo-status', 'Selecione um produto ativo.', true);
+      return;
+    }
+    if (!(quantity > 0) || !(total >= 0)) {
+      status('financeiro-custo-status', 'Revise a quantidade e o valor total.', true);
+      return;
+    }
+    const unitCost = Math.round((total / quantity + Number.EPSILON) * 10000) / 10000;
+    setBusy(form, true);
+    try {
+      await protectedCall('salvar_custo_produto', {
+        produto_id: productId,
+        fornecedor_id: byId('financeiro-custo-fornecedor').value || null,
+        fonte: byId('financeiro-custo-fonte').value.trim() || 'Registro manual',
+        data_custo: byId('financeiro-custo-data').value,
+        condicao_pagamento: byId('financeiro-custo-condicao').value.trim() || null,
+        quantidade_embalagem: quantity,
+        unidade_embalagem: byId('financeiro-custo-unidade').value,
+        custo_total: total,
+        custo_unitario: unitCost,
+        observacoes: byId('financeiro-custo-observacoes').value.trim() || null,
+        atual: byId('financeiro-custo-atual').checked,
+        version: versionOf(product)
+      }, {
+        titulo: 'Salvar custo do produto',
+        explicacao: 'O histórico será preservado. Se marcado como atual, a referência do produto será atualizada.',
+        motivo: 'Registro de custo confirmado pela gestão'
+      });
+      form.reset();
+      byId('financeiro-custo-data').value = today();
+      byId('financeiro-custo-quantidade').value = '1';
+      byId('financeiro-custo-atual').checked = true;
+      status('financeiro-custo-status', 'Custo salvo sem apagar os preços anteriores.', false);
+      await load({ silent: true });
+      byId('financeiro-custo-produto').value = productId;
+      await loadCosts(productId);
+    } catch (error) {
+      if (!isStaleSession(error)) status('financeiro-custo-status', error.message, true);
+    } finally {
+      setBusy(form, false);
+    }
   }
 
   function addPurchaseItem() {
@@ -1143,6 +2037,9 @@
     row.innerHTML = '<label><span>Produto</span><select class="financeiro-item-produto" required>' +
       productOptions() + '</select></label><label><span>Quantidade</span><input class="financeiro-item-quantidade" type="number" min="0.0001" max="9999999999" step="0.0001" value="1" required></label>' +
       '<label><span>Valor unitário</span><input class="financeiro-item-valor" type="text" inputmode="decimal" placeholder="0,00" required></label>' +
+      '<label><span>Lote <small>obrigatório quando controla estoque</small></span><input class="financeiro-item-lote" type="text" maxlength="100"></label>' +
+      '<label><span>Validade <small>obrigatória quando controla estoque</small></span><input class="financeiro-item-validade" type="date"></label>' +
+      '<p class="financeiro-item-estoque"></p>' +
       '<button class="financeiro-botao perigo financeiro-remover-item" type="button" aria-label="Remover item">Remover</button>';
     row.querySelector('.financeiro-remover-item').addEventListener('click', function () {
       row.remove();
@@ -1153,9 +2050,40 @@
       control.addEventListener('input', updatePurchaseTotal);
       control.addEventListener('change', updatePurchaseTotal);
     });
+    row.querySelector('.financeiro-item-produto').addEventListener('change', function () {
+      syncPurchaseItem(row);
+    });
     byId('financeiro-compra-itens').appendChild(row);
     clearIntent('compra');
+    syncPurchaseItem(row);
     updatePurchaseTotal();
+  }
+
+  function syncPurchaseItem(row) {
+    const productId = row.querySelector('.financeiro-item-produto').value;
+    const product = state.catalogs.produtos.find(function (item) {
+      return String(item.id) === String(productId);
+    });
+    const lot = row.querySelector('.financeiro-item-lote');
+    const expiry = row.querySelector('.financeiro-item-validade');
+    const hint = row.querySelector('.financeiro-item-estoque');
+    const controlled = Boolean(product && product.controla_estoque);
+    lot.required = controlled;
+    expiry.required = controlled;
+    if (!product) {
+      hint.textContent = '';
+      return;
+    }
+    const lots = inventoryForProduct(product.id);
+    const balance = lots.reduce(function (sum, item) { return sum + num(item.saldo); }, 0);
+    hint.textContent = controlled
+      ? 'Unidade canônica: ' + (product.unidade || '—') + '. Saldo atual: ' + balance +
+        ' em ' + lots.length + ' lote(s). Esta compra criará uma entrada.'
+      : 'Produto sem controle automático de estoque; lote e validade são opcionais.';
+    const value = row.querySelector('.financeiro-item-valor');
+    if (!value.value && product.custo_referencia != null) {
+      value.value = moneyInput(product.custo_referencia);
+    }
   }
 
   function purchaseItems() {
@@ -1163,67 +2091,228 @@
       return {
         produto_id: row.querySelector('.financeiro-item-produto').value,
         quantidade: Number(row.querySelector('.financeiro-item-quantidade').value),
-        valor_unitario: parseMoney(row.querySelector('.financeiro-item-valor').value)
+        valor_unitario: parseMoney(row.querySelector('.financeiro-item-valor').value),
+        lote: row.querySelector('.financeiro-item-lote').value.trim() || null,
+        validade: row.querySelector('.financeiro-item-validade').value || null
       };
     });
   }
 
   function updatePurchaseTotal() {
-    const total = purchaseItems().reduce(function (sum, item) {
+    const subtotal = purchaseItems().reduce(function (sum, item) {
       return sum + (Number.isFinite(item.quantidade) && Number.isFinite(item.valor_unitario)
         ? roundMoney(item.quantidade * item.valor_unitario) : 0);
     }, 0);
-    byId('financeiro-compra-total').textContent = money(total);
+    const parsedFreight = parseMoney(byId('financeiro-compra-frete').value || '0');
+    const freight = Number.isFinite(parsedFreight) && parsedFreight >= 0 ? parsedFreight : 0;
+    byId('financeiro-compra-subtotal').textContent = money(subtotal);
+    byId('financeiro-compra-frete-resumo').textContent = money(freight);
+    byId('financeiro-compra-total').textContent = money(roundMoney(subtotal + freight));
+  }
+
+  function syncPurchaseForm() {
+    const condition = byId('financeiro-compra-condicao').value;
+    const installments = byId('financeiro-compra-parcelas');
+    const cash = condition === 'avista';
+    installments.min = cash ? '1' : '2';
+    installments.readOnly = cash;
+    if (cash) installments.value = '1';
+    else if (!Number.isInteger(Number(installments.value)) || Number(installments.value) < 2) {
+      installments.value = '2';
+    }
+  }
+
+  function removePurchaseDuplicateNotice() {
+    const form = byId('financeiro-form-compra');
+    removeNode(form && form.querySelector('[data-financeiro-compra-duplicata]'));
+  }
+
+  async function openExistingPurchase(id) {
+    let entry = state.entries.find(function (item) {
+      return item.compra && String(item.compra.id) === String(id);
+    });
+    if (!entry) {
+      await load({ silent: true });
+      entry = state.entries.find(function (item) {
+        return item.compra && String(item.compra.id) === String(id);
+      });
+    }
+    if (entry) {
+      openEntryView('despesas');
+      const card = document.querySelector('[data-financeiro-entry-card="' + String(entry.id) + '"]');
+      if (card) {
+        const details = card.querySelector('.financeiro-lancamento-detalhes');
+        if (details) details.open = true;
+        card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      return;
+    }
+    try {
+      const result = await call('obter_compra', { compra_id: id });
+      const purchase = result.compra || {};
+      status('financeiro-compra-status', 'Compra existente: ' + safeDate(purchase.data_compra) +
+        ' · subtotal ' + money(purchase.subtotal_itens) + ' · frete ' + money(purchase.valor_frete) +
+        ' · total ' + money(purchase.total) + '.', false);
+    } catch (error) {
+      if (!isStaleSession(error)) status('financeiro-compra-status', error.message, true);
+    }
+  }
+
+  async function completePurchaseSave(form) {
+    clearIntent('compra');
+    removePurchaseDuplicateNotice();
+    form.reset();
+    byId('financeiro-compra-itens').innerHTML = '';
+    byId('financeiro-compra-categoria').value = 'Produtos e insumos';
+    byId('financeiro-compra-parcelas').value = '1';
+    byId('financeiro-compra-data').value = today();
+    syncPurchaseForm();
+    addPurchaseItem();
+    status('financeiro-compra-status', 'Compra e despesa vinculada foram salvas.', false);
+    await load({ silent: true });
+  }
+
+  function showPurchaseDuplicate(error, payload, form) {
+    const details = error && error.data;
+    const candidate = details && details.candidato;
+    const existingId = details && (details.existing_id || (candidate && candidate.id));
+    const possible = details && details.correspondencia === 'possivel';
+    if (!existingId || !candidate || !['purchase_exact_duplicate', 'purchase_possible_duplicate'].includes(error.code)) {
+      return false;
+    }
+    removePurchaseDuplicateNotice();
+    const box = document.createElement('div');
+    box.className = 'financeiro-nota';
+    box.setAttribute('data-financeiro-compra-duplicata', '');
+    const itemLabels = Array.isArray(candidate.itens) ? candidate.itens.map(function (item) {
+      return (item.produto || 'Produto') + ' × ' + num(item.quantidade);
+    }).join(', ') : '';
+    box.innerHTML = '<strong>' + (possible ? 'Possível compra repetida.' : 'Compra já cadastrada.') + '</strong>' +
+      '<p>' + escapeHtml((candidate.fornecedor || 'Fornecedor') + ' · ' + safeDate(candidate.data_compra) +
+        (candidate.numero_documento ? ' · documento ' + candidate.numero_documento : '') +
+        ' · subtotal ' + money(candidate.subtotal_itens) + ' · frete ' + money(candidate.valor_frete) +
+        ' · total ' + money(candidate.total)) + '</p>' +
+      (itemLabels ? '<small>' + escapeHtml(itemLabels) + '</small>' : '') +
+      '<div class="financeiro-lancamento-acoes"><button type="button" data-financeiro-abrir-compra-existente>Abrir existente</button>' +
+      (possible ? '<button type="button" data-financeiro-confirmar-compra-distinta>Confirmar compra distinta com senha</button>' : '') +
+      '</div>';
+    byId('financeiro-compra-status').insertAdjacentElement('afterend', box);
+    box.querySelector('[data-financeiro-abrir-compra-existente]').addEventListener('click', function () {
+      openExistingPurchase(existingId);
+    });
+    const confirmButton = box.querySelector('[data-financeiro-confirmar-compra-distinta]');
+    if (confirmButton) confirmButton.addEventListener('click', async function () {
+      setBusy(form, true);
+      confirmButton.disabled = true;
+      try {
+        await protectedCall('criar_compra', Object.assign({}, payload, {
+          confirmar_compra_distinta: true,
+          compra_duplicada_id: existingId
+        }), {
+          titulo: 'Confirmar compra distinta',
+          explicacao: 'Os valores e itens coincidem com uma compra sem documento. Confirme apenas se esta é outra compra legítima.',
+          motivo: 'Compra legítima distinta conferida pela gestão',
+          campoMotivoPayload: 'motivo_duplicidade'
+        });
+        await completePurchaseSave(form);
+      } catch (retryError) {
+        if (!isStaleSession(retryError)) {
+          status('financeiro-compra-status', retryError.message, true);
+          showPurchaseDuplicate(retryError, payload, form);
+        }
+      } finally {
+        setBusy(form, false);
+      }
+    });
+    return true;
   }
 
   async function submitPurchase(event) {
     event.preventDefault();
     const form = event.currentTarget;
+    const condition = byId('financeiro-compra-condicao').value;
+    const installments = Number(byId('financeiro-compra-parcelas').value);
+    const termsAreValid = Number.isInteger(installments) && installments >= 1 && installments <= 120 &&
+      ((condition === 'avista' && installments === 1) ||
+        (['parcelado', 'entrada_saldo'].includes(condition) && installments >= 2));
+    if (!termsAreValid) {
+      status('financeiro-compra-status', condition === 'avista'
+        ? 'Uma compra à vista deve ter exatamente 1 parcela.'
+        : 'Compra parcelada ou com entrada e saldo deve ter pelo menos 2 parcelas.', true);
+      byId('financeiro-compra-parcelas').focus();
+      return;
+    }
     if (!requireValid(form)) return;
     const items = purchaseItems();
     if (!items.length || items.some(function (item) {
-      return !item.produto_id || !(item.quantidade > 0) || !(item.valor_unitario >= 0);
-    })) { status('financeiro-compra-status', 'Revise os produtos, quantidades e valores.', true); return; }
-    setBusy(form, true);
-    try {
-      await call('criar_compra', {
-        fornecedor_id: byId('financeiro-compra-fornecedor').value,
-        data_compra: byId('financeiro-compra-data').value,
-        numero_documento: byId('financeiro-compra-nota').value.trim() || null,
-        condicao_pagamento: byId('financeiro-compra-condicao').value,
-        parcelas: Number(byId('financeiro-compra-parcelas').value),
-        categoria: byId('financeiro-compra-categoria').value.trim(),
-        observacoes: byId('financeiro-compra-observacoes').value.trim() || null,
-        itens: items,
-        idempotency_key: intentKey('compra')
+      const product = state.catalogs.produtos.find(function (candidate) {
+        return String(candidate.id) === String(item.produto_id);
       });
-      clearIntent('compra');
-      form.reset();
-      byId('financeiro-compra-itens').innerHTML = '';
-      byId('financeiro-compra-categoria').value = 'Produtos e insumos';
-      byId('financeiro-compra-parcelas').value = '1';
-      byId('financeiro-compra-data').value = today();
-      addPurchaseItem();
-      status('financeiro-compra-status', 'Compra e despesa vinculada foram salvas.', false);
-      await load({ silent: true });
-    } catch (error) { if (!isStaleSession(error)) status('financeiro-compra-status', error.message, true); }
+      return !item.produto_id || !(item.quantidade > 0) || !(item.valor_unitario >= 0) ||
+        (product && product.controla_estoque && (!item.lote || !item.validade));
+    })) { status('financeiro-compra-status', 'Revise produtos, quantidades, valores, lotes e validades.', true); return; }
+    const freight = parseMoney(byId('financeiro-compra-frete').value || '0');
+    if (!(freight >= 0)) {
+      status('financeiro-compra-status', 'Revise o valor do frete.', true);
+      byId('financeiro-compra-frete').focus();
+      return;
+    }
+    setBusy(form, true);
+    removePurchaseDuplicateNotice();
+    const payload = {
+      fornecedor_id: byId('financeiro-compra-fornecedor').value,
+      data_compra: byId('financeiro-compra-data').value,
+      numero_documento: byId('financeiro-compra-nota').value.trim() || null,
+      condicao_pagamento: condition,
+      parcelas: installments,
+      categoria: byId('financeiro-compra-categoria').value.trim(),
+      valor_frete: freight,
+      observacoes: byId('financeiro-compra-observacoes').value.trim() || null,
+      itens: items,
+      idempotency_key: intentKey('compra')
+    };
+    try {
+      await call('criar_compra', payload);
+      await completePurchaseSave(form);
+    } catch (error) {
+      if (!isStaleSession(error)) {
+        status('financeiro-compra-status', error.message, true);
+        showPurchaseDuplicate(error, payload, form);
+      }
+    }
     finally { setBusy(form, false); }
   }
 
   async function cancelEntry(id) {
-    const reason = window.prompt('Informe o motivo do cancelamento (mínimo 3 caracteres):');
-    if (reason === null) return;
-    if (reason.trim().length < 3) { status('financeiro-status', 'O motivo precisa ter ao menos 3 caracteres.', true); return; }
-    if (!window.confirm('Cancelar este lançamento sem pagamento? A auditoria será preservada.')) return;
+    const entry = state.entries.find(function (item) { return String(item.id) === String(id); });
     try {
       const intent = 'cancelar:' + id;
-      await call('cancelar_lancamento', {
-        entry_id: id,
-        motivo: reason.trim(),
-        idempotency_key: intentKey(intent)
-      });
+      if (entryOrigin(entry || {}) === 'compra') {
+        const purchaseResult = await call('obter_compra', { lancamento_id: id });
+        const purchase = purchaseResult.compra;
+        if (!purchase) throw new Error('A compra ligada a este lançamento não foi encontrada.');
+        await protectedCall('cancelar_compra', {
+          lancamento_id: id,
+          version: versionOf(purchase)
+        }, {
+          titulo: 'Cancelar compra',
+          explicacao: 'A compra, as parcelas e o lançamento financeiro serão cancelados em conjunto. Os itens e a auditoria serão preservados.',
+          motivo: 'Cancelamento de compra solicitado pela gestão'
+        });
+      } else {
+        await protectedCall('cancelar_lancamento', {
+          entry_id: id,
+          idempotency_key: intentKey(intent)
+        }, {
+          titulo: 'Cancelar lançamento',
+          explicacao: 'O lançamento “' + (entryDescription(entry || {}) || 'selecionado') +
+            '” será cancelado, sem apagar a auditoria.',
+          motivo: 'Cancelamento de lançamento solicitado pela gestão'
+        });
+      }
       clearIntent(intent);
-      status('financeiro-status', 'Lançamento cancelado com auditoria.', false);
+      status('financeiro-status', entryOrigin(entry || {}) === 'compra' ?
+        'Compra e movimentações vinculadas canceladas com auditoria.' : 'Lançamento cancelado com auditoria.', false);
       await load({ silent: true });
     } catch (error) { if (!isStaleSession(error)) status('financeiro-status', error.message, true); }
   }
@@ -1234,14 +2323,17 @@
     if (raw === null) return;
     const amount = parseMoney(raw);
     if (!(amount > 0) || amount > max) { status('financeiro-status', 'Valor de estorno inválido.', true); return; }
-    if (!window.confirm('Confirmar o estorno de ' + money(amount) + '?')) return;
     try {
-      await call('estornar_pagamento', {
+      await protectedCall('estornar_pagamento', {
         entry_id: button.dataset.financeiroEntry,
         pagamento_id: button.dataset.financeiroEstornar,
         forma_pagamento: button.dataset.financeiroForma,
         valor: amount,
         idempotency_key: intentKey('estorno:' + button.dataset.financeiroEstornar + ':' + amount)
+      }, {
+        titulo: 'Estornar pagamento',
+        explicacao: 'Será registrado um estorno de ' + money(amount) + ' ligado ao pagamento original.',
+        motivo: 'Estorno de pagamento solicitado pela gestão'
       });
       clearIntent('estorno:' + button.dataset.financeiroEstornar + ':' + amount);
       status('financeiro-status', 'Estorno registrado e ligado ao pagamento original.', false);
@@ -1255,17 +2347,33 @@
     byId('financeiro-lancamento-competencia').value = date;
     byId('financeiro-lancamento-vencimento').value = date;
     byId('financeiro-compra-data').value = date;
+    byId('financeiro-custo-data').value = date;
     byId('financeiro-pagamento-data').value = isoLocalNow();
   }
 
   function bind() {
+    ensureProductIdentityFields();
+    ensureDuplicateReviewPanel();
     setInitialDates();
     syncServiceForm();
     syncEntryForm();
     syncPaymentEntry();
     syncInstallmentEditor();
+    syncPurchaseForm();
     addPurchaseItem();
     byId('financeiro-atualizar').addEventListener('click', function () { load(); });
+    byId('financeiro-duplicidades-atualizar').addEventListener('click', function () {
+      loadDuplicateReviews();
+    });
+    byId('financeiro-duplicidades-status').addEventListener('change', function () {
+      loadDuplicateReviews();
+    });
+    byId('financeiro-duplicidades-lista').addEventListener('click', function (event) {
+      const open = event.target.closest('[data-financeiro-duplicidade-abrir]');
+      const resolve = event.target.closest('[data-financeiro-duplicidade-resolver]');
+      if (open) openExistingRegistration(open.dataset.tipo, open.dataset.id);
+      else if (resolve) resolveDuplicateReview(resolve);
+    });
     document.querySelectorAll('[data-financeiro-abrir]').forEach(function (button) {
       button.addEventListener('click', function () {
         const details = byId(button.dataset.financeiroAbrir);
@@ -1274,6 +2382,10 @@
         const focusable = details.querySelector('input:not([type=hidden]),select,button');
         if (focusable) focusable.focus({ preventScroll: true });
       });
+    });
+    const viewClients = document.querySelector('[data-financeiro-ver-clientes]');
+    if (viewClients) viewClients.addEventListener('click', function () {
+      showClientsRegistry('', 'Clientes cadastrados carregados. Use a busca para localizar um cadastro.');
     });
     byId('financeiro-lancamento-tipo').addEventListener('change', syncEntryForm);
     byId('financeiro-lancamento-origem').addEventListener('change', syncEntryForm);
@@ -1296,9 +2408,17 @@
     resetIntentOnEdit(byId('financeiro-form-parcelas'), 'parcelas');
     resetIntentOnEdit(byId('financeiro-form-cliente'), 'cliente');
     resetIntentOnEdit(byId('financeiro-form-compra'), 'compra');
+    byId('financeiro-form-compra').addEventListener('input', removePurchaseDuplicateNotice);
+    byId('financeiro-form-compra').addEventListener('change', removePurchaseDuplicateNotice);
     resetIntentOnEdit(byId('financeiro-form-fornecedor'), 'criar_fornecedor');
     resetIntentOnEdit(byId('financeiro-form-marca'), 'criar_marca');
     resetIntentOnEdit(byId('financeiro-form-produto'), 'criar_produto');
+    byId('financeiro-cliente-cancelar-edicao').addEventListener('click', resetClientEdit);
+    ['fornecedor', 'marca', 'produto'].forEach(function (type) {
+      byId('financeiro-' + type + '-cancelar-edicao').addEventListener('click', function () {
+        resetCatalogEdit(type);
+      });
+    });
     byId('financeiro-cliente-pesquisa').addEventListener('input', function () {
       clearSelectedCandidate('A origem selecionada foi removida porque uma nova pesquisa foi iniciada.');
       clearTimeout(state.searchTimer);
@@ -1312,6 +2432,27 @@
     });
     ['financeiro-clientes-busca', 'financeiro-fornecedores-busca', 'financeiro-produtos-busca']
       .forEach(function (id) { byId(id).addEventListener('input', renderRegistries); });
+    byId('financeiro-mostrar-arquivados').addEventListener('change', renderRegistries);
+    byId('financeiro-cadastros-titulo').closest('.financeiro-cadastros-card').addEventListener('click', function (event) {
+      const edit = event.target.closest('[data-financeiro-editar]');
+      const stateButton = event.target.closest('[data-financeiro-registro-acao]');
+      const cost = event.target.closest('[data-financeiro-custo]');
+      const protocol = event.target.closest('[data-financeiro-prontuario]');
+      if (edit) {
+        beginRegistryEdit(edit.dataset.financeiroEditar, edit.dataset.financeiroId);
+      } else if (stateButton) {
+        changeRegistryState(stateButton.dataset.financeiroEntidade, stateButton.dataset.financeiroId,
+          stateButton.dataset.financeiroRegistroAcao);
+      } else if (cost) {
+        const productId = cost.dataset.financeiroCusto;
+        byId('financeiro-editor-catalogo').open = true;
+        byId('financeiro-custo-produto').value = productId;
+        byId('financeiro-form-custo-produto').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        loadCosts(productId);
+      } else if (protocol && window.AMJProntuario && typeof window.AMJProntuario.novoParaPaciente === 'function') {
+        window.AMJProntuario.novoParaPaciente(protocol.dataset.financeiroProntuario);
+      }
+    });
     byId('financeiro-clientes-lista').addEventListener('click', function (event) {
       const button = event.target.closest('[data-financeiro-atender]');
       if (!button) return;
@@ -1329,7 +2470,7 @@
     });
     byId('financeiro-form-fornecedor').addEventListener('submit', function (event) {
       event.preventDefault();
-      simpleCreate(event.currentTarget, 'criar_fornecedor', {
+      saveRegistry(event.currentTarget, 'fornecedor', {
         nome: byId('financeiro-fornecedor-nome').value.trim(),
         documento: digits(byId('financeiro-fornecedor-documento').value) || null,
         telefone: byId('financeiro-fornecedor-telefone').value.trim() || null,
@@ -1338,7 +2479,7 @@
     });
     byId('financeiro-form-marca').addEventListener('submit', function (event) {
       event.preventDefault();
-      simpleCreate(event.currentTarget, 'criar_marca', {
+      saveRegistry(event.currentTarget, 'marca', {
         nome: byId('financeiro-marca-nome').value.trim()
       }, 'financeiro-marca-status', 'Marca salva.');
     });
@@ -1360,19 +2501,37 @@
         saleField.focus();
         return;
       }
-      simpleCreate(event.currentTarget, 'criar_produto', {
+      saveRegistry(event.currentTarget, 'produto', {
         nome: byId('financeiro-produto-nome').value.trim(),
         marca_id: byId('financeiro-produto-marca').value || null,
         tipo: byId('financeiro-produto-tipo').value,
         unidade: byId('financeiro-produto-unidade').value,
+        apresentacao: byId('financeiro-produto-apresentacao').value.trim(),
+        ean: digits(byId('financeiro-produto-ean').value) || null,
         custo_referencia: Number.isFinite(cost) ? cost : null,
         preco_venda: Number.isFinite(sale) ? sale : null,
         registro_anvisa: byId('financeiro-produto-anvisa').value.trim() || null,
         controla_estoque: byId('financeiro-produto-estoque').checked
       }, 'financeiro-produto-status', 'Produto salvo.');
     });
+    byId('financeiro-form-custo-produto').addEventListener('submit', submitCost);
+    byId('financeiro-custos-historico').addEventListener('click', function (event) {
+      const button = event.target.closest('[data-financeiro-cancelar-custo]');
+      if (button) cancelProductCost(button.dataset.financeiroCancelarCusto);
+    });
+    byId('financeiro-custo-produto').addEventListener('change', function () {
+      loadCosts(byId('financeiro-custo-produto').value);
+    });
     byId('financeiro-adicionar-item').addEventListener('click', addPurchaseItem);
+    byId('financeiro-compra-condicao').addEventListener('change', syncPurchaseForm);
+    byId('financeiro-compra-frete').addEventListener('input', updatePurchaseTotal);
     byId('financeiro-form-compra').addEventListener('submit', submitPurchase);
+    byId('financeiro-pendencias-estoque').addEventListener('submit', function (event) {
+      const form = event.target.closest('[data-financeiro-regularizar]');
+      if (!form) return;
+      event.preventDefault();
+      regularizePendingStock(form);
+    });
     byId('financeiro-pagamento-lancamento').addEventListener('change', function () { syncPaymentEntry(); });
     byId('financeiro-pagamento-parcela').addEventListener('change', syncPaymentSelection);
     byId('financeiro-pagamento-forma').addEventListener('change', syncPaymentForm);
@@ -1387,6 +2546,8 @@
       const schedule = event.target.closest('[data-financeiro-programar-parcelas]');
       const cancel = event.target.closest('[data-financeiro-cancelar]');
       const reversal = event.target.closest('[data-financeiro-estornar]');
+      const print = event.target.closest('[data-financeiro-imprimir]');
+      const procedure = event.target.closest('[data-financeiro-abrir-procedimentos]');
       if (installmentPayment) {
         byId('financeiro-pagamento-lancamento').value = installmentPayment.dataset.financeiroParcelaEntry;
         syncPaymentEntry(installmentPayment.dataset.financeiroPagarParcela);
@@ -1403,6 +2564,17 @@
         syncPaymentEntry();
         byId('financeiro-editor-pagamento').open = true;
         byId('financeiro-editor-pagamento').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } else if (print) {
+        openAdministrativePrint(state.entries.find(function (entry) {
+          return String(entry.id) === String(print.dataset.financeiroImprimir);
+        }));
+      } else if (procedure) {
+        const root = byId('operacao-clinica-root');
+        if (window.AMJOperacaoClinica && typeof window.AMJOperacaoClinica.carregar === 'function') {
+          window.AMJOperacaoClinica.carregar();
+        }
+        if (root) root.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        else status('financeiro-status', 'A gestão integrada de procedimentos ainda não está montada nesta tela.', true);
       } else if (cancel) cancelEntry(cancel.dataset.financeiroCancelar);
       else if (reversal) reversePayment(reversal);
     });
@@ -1413,7 +2585,9 @@
     ativar: activate,
     atualizarAcesso: updateAccess,
     reset: reset,
-    carregar: load
+    carregar: load,
+    abrirCadastro: openExistingRegistration,
+    abrirVisao: openEntryView
   };
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bind, { once: true });

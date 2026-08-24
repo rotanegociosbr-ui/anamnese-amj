@@ -5,6 +5,7 @@ import {
   DualAuthConfig,
   DualAuthContext,
   DualAuthError,
+  requireRecentPasswordProof,
   writeClinicAudit,
 } from "../_shared/dual-auth.ts";
 
@@ -12,12 +13,10 @@ type JsonRecord = Record<string, unknown>;
 
 const SUPABASE_URL = (Deno.env.get("SUPABASE_URL") || "").replace(/\/+$/, "");
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-const LEGACY_CLINIC_ID = Deno.env.get("CLINIC_ID") || "";
+const SOURCE_CLINIC_ID = Deno.env.get("CLINIC_ID") || "";
 const AUTH_CONFIG: DualAuthConfig = {
   supabaseUrl: SUPABASE_URL,
   serviceRoleKey: SERVICE_ROLE,
-  legacyHash: (Deno.env.get("PAINEL_HASH_SENHA") || "").toLowerCase(),
-  legacyClinicId: LEGACY_CLINIC_ID,
   allowedRoles: ["owner"],
   requireAal2: true,
 };
@@ -69,9 +68,35 @@ const PRODUCT_TYPES = new Set([
   "revenda",
   "outro",
 ]);
-const PRODUCT_UNITS = new Set(["un", "cx", "frasco", "seringa", "ml", "mg", "g", "kit"]);
+const PRODUCT_UNITS = new Set([
+  "un",
+  "u",
+  "cx",
+  "frasco",
+  "seringa",
+  "ampola",
+  "aplicacao",
+  "canula",
+  "dose",
+  "ml",
+  "mg",
+  "g",
+  "kit",
+]);
 const SOURCE_KINDS = new Set(["anamnese", "documento_clinico", "agendamento"]);
 const PAYMENT_SITUATIONS = new Set(["recebido", "parcial", "pendente"]);
+const PATIENT_STATUSES = new Set(["active", "inactive"]);
+const DUPLICATE_REVIEW_STATUSES = new Set([
+  "pendente",
+  "confirmado_distinto",
+  "resolvido_existente",
+  "descartado",
+]);
+const DUPLICATE_REVIEW_RESOLUTIONS = new Set([
+  "confirmado_distinto",
+  "resolvido_existente",
+  "descartado",
+]);
 const PROCEDURE_LABELS: Record<string, string> = {
   toxina_terco_superior: "Toxina botulínica · terço superior",
   toxina_full_face: "Toxina botulínica · full face",
@@ -100,6 +125,27 @@ const FORBIDDEN_PAYMENT_KEYS = new Set([
   "senha_cartao",
   "track1",
   "track2",
+]);
+const RECENT_PASSWORD_ACTIONS = new Set([
+  "editar_cliente",
+  "arquivar_cliente",
+  "restaurar_cliente",
+  "editar_fornecedor",
+  "arquivar_fornecedor",
+  "restaurar_fornecedor",
+  "editar_marca",
+  "arquivar_marca",
+  "restaurar_marca",
+  "editar_produto",
+  "arquivar_produto",
+  "restaurar_produto",
+  "salvar_custo_produto",
+  "cancelar_custo_produto",
+  "regularizar_item_compra_estoque",
+  "cancelar_compra",
+  "cancelar_lancamento",
+  "estornar_pagamento",
+  "resolver_revisao_duplicidade",
 ]);
 
 const ENTRY_SELECT = [
@@ -159,6 +205,7 @@ class ApiError extends Error {
     readonly status: number,
     readonly code: string,
     readonly publicMessage: string,
+    readonly details: JsonRecord | null = null,
   ) {
     super(publicMessage);
     this.name = "ApiError";
@@ -291,6 +338,22 @@ function booleanValue(value: unknown, field: string, fallback = false): boolean 
   return value;
 }
 
+function expectedVersion(payload: JsonRecord): number {
+  const value = payload.version ?? payload.versao;
+  if (value === undefined || value === null || value === "") {
+    throw new ApiError(422, "version_required", "Informe a versão atual do cadastro.");
+  }
+  return integerValue(value, "version", 1, 1, 2_147_483_647);
+}
+
+function operationId(payload: JsonRecord): string {
+  return requiredUuid(payload.operation_id ?? payload.idempotency_key, "operation_id");
+}
+
+function operationReason(payload: JsonRecord): string {
+  return requiredText(payload.motivo, "motivo", 3, 500);
+}
+
 function decimalValue(
   value: unknown,
   field: string,
@@ -316,6 +379,15 @@ function decimalValue(
     throw new ApiError(422, "invalid_" + field, "Valor monetário inválido.");
   }
   return canonical;
+}
+
+function optionalDecimal(
+  value: unknown,
+  field: string,
+  decimals: number,
+): string | null {
+  if (value === undefined || value === null || value === "") return null;
+  return decimalValue(value, field, decimals, true);
 }
 
 export function dateValue(value: unknown, field: string, minimumYear = 2000): string {
@@ -384,6 +456,10 @@ function normalizeSearchName(value: string): string {
     .trim();
 }
 
+function normalizeExactText(value: string): string {
+  return normalizeSearchName(value).replace(/\s+/g, "");
+}
+
 function normalizeCpf(value: unknown, required = false): string | null {
   if (value === undefined || value === null || value === "") {
     if (required) throw new ApiError(422, "invalid_cpf", "CPF inválido.");
@@ -426,6 +502,25 @@ function normalizeEmail(value: unknown): string | null {
     throw new ApiError(422, "invalid_email", "E-mail inválido.");
   }
   return email;
+}
+
+function normalizeDocument(value: unknown): string | null {
+  if (value === undefined || value === null || value === "") return null;
+  const document = String(value).replace(/\D/g, "");
+  if (!/^\d{11,14}$/.test(document)) {
+    throw new ApiError(422, "invalid_document", "CPF/CNPJ do fornecedor inválido.");
+  }
+  return document;
+}
+
+function normalizeEan(value: unknown): string | null {
+  const raw = optionalText(value, "ean", 24);
+  if (raw === null) return null;
+  const digits = raw.replace(/\D/g, "");
+  if (digits.length < 8 || digits.length > 14) {
+    throw new ApiError(422, "invalid_ean", "Informe um EAN/GTIN com 8 a 14 dígitos.");
+  }
+  return digits;
 }
 
 function passesLuhn(digits: string): boolean {
@@ -490,6 +585,14 @@ function maskCpf(value: unknown): string | null {
   return "***.***.***-" + value.slice(-2);
 }
 
+function maskDocument(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const digits = value.replace(/\D/g, "");
+  if (digits.length === 11) return maskCpf(digits);
+  if (digits.length === 14) return "**.***.***/****-" + digits.slice(-2);
+  return digits.length >= 4 ? "***" + digits.slice(-4) : null;
+}
+
 function maskEmail(value: unknown): string | null {
   if (typeof value !== "string" || !value.includes("@")) return null;
   const [name, domain] = value.split("@", 2);
@@ -536,9 +639,16 @@ function json(req: Request, body: unknown, status = 200): Response {
   });
 }
 
-function fail(req: Request, message: string, status: number, code?: string): Response {
+function fail(
+  req: Request,
+  message: string,
+  status: number,
+  code?: string,
+  details?: JsonRecord | null,
+): Response {
   const body: JsonRecord = { erro: message };
   if (code) body.codigo = code;
+  if (details) body.dados = details;
   return json(req, body, status);
 }
 
@@ -614,6 +724,120 @@ function tenant(context: DualAuthContext): { clinicId: string; userId: string } 
     throw new ApiError(403, "legacy_auth_forbidden", "Use seu acesso individual com MFA.");
   }
   return { clinicId: context.clinicId, userId: context.userId };
+}
+
+async function requireProtectedOperation(
+  req: Request,
+  context: DualAuthContext,
+  payload: JsonRecord,
+  action: string,
+  targetId: string,
+): Promise<void> {
+  const protectedOperationId = requiredUuid(payload.operation_id, "operation_id");
+  // Os session_id seguem transitoriamente às RPCs privadas; somente HMAC e
+  // metadados técnicos da operação são persistidos. JWT/senha nunca vão ao banco.
+  try {
+    await requireRecentPasswordProof(req, AUTH_CONFIG, context, {
+      operationId: protectedOperationId,
+      action: `financeiro.${action}`,
+      targetId,
+    });
+  } catch (error) {
+    if (error instanceof DualAuthError) {
+      if (error.auditContext) {
+        await writeClinicAudit(AUTH_CONFIG, error.auditContext, {
+          entity: "financial_protected_operation",
+          action: "reauthenticate",
+          outcome: "denied",
+          details: { endpoint: "financeiro-fichas", reason_code: error.code },
+        });
+      }
+      throw new ApiError(error.status, error.code, error.publicMessage);
+    }
+    throw new ApiError(
+      503,
+      "reauthentication_unavailable",
+      "Não foi possível confirmar sua senha agora.",
+    );
+  }
+}
+
+async function protectedTargetForAction(
+  action: string,
+  payload: JsonRecord,
+  context: DualAuthContext,
+): Promise<string> {
+  switch (action) {
+    case "editar_cliente":
+    case "arquivar_cliente":
+    case "restaurar_cliente":
+      return requiredUuid(payload.id ?? payload.cliente_id, "cliente_id");
+    case "editar_fornecedor":
+    case "arquivar_fornecedor":
+    case "restaurar_fornecedor":
+      return requiredUuid(payload.id ?? payload.fornecedor_id, "fornecedor_id");
+    case "editar_marca":
+    case "arquivar_marca":
+    case "restaurar_marca":
+      return requiredUuid(payload.id ?? payload.marca_id, "marca_id");
+    case "editar_produto":
+    case "arquivar_produto":
+    case "restaurar_produto":
+    case "salvar_custo_produto":
+      return requiredUuid(payload.id ?? payload.produto_id, "produto_id");
+    case "cancelar_custo_produto":
+      return requiredUuid(payload.custo_id ?? payload.id, "custo_id");
+    case "regularizar_item_compra_estoque":
+      return requiredUuid(
+        payload.item_compra_id ?? payload.purchase_item_id,
+        "item_compra_id",
+      );
+    case "estornar_pagamento":
+      return requiredUuid(payload.pagamento_id ?? payload.payment_id, "pagamento_id");
+    case "cancelar_lancamento":
+      return requiredUuid(
+        payload.lancamento_id ?? payload.entry_id,
+        "lancamento_id",
+      );
+    case "cancelar_compra": {
+      const { clinicId } = tenant(context);
+      const suppliedPurchaseId = optionalUuid(
+        payload.id ?? payload.compra_id,
+        "compra_id",
+      );
+      const suppliedEntryId = suppliedPurchaseId ? null : requiredUuid(
+        payload.lancamento_id ?? payload.entry_id,
+        "lancamento_id",
+      );
+      const purchase = await getPurchase(
+        clinicId,
+        suppliedPurchaseId,
+        suppliedEntryId,
+      );
+      if (!purchase || !validUuid(purchase.id)) {
+        throw new ApiError(404, "purchase_not_found", "Compra não encontrada.");
+      }
+      return purchase.id;
+    }
+    case "resolver_revisao_duplicidade":
+      enumValue(
+        payload.resolucao ?? payload.status,
+        "resolucao",
+        DUPLICATE_REVIEW_RESOLUTIONS,
+      );
+      requiredText(payload.motivo, "motivo", 10, 500);
+      expectedVersion(payload);
+      return requiredUuid(
+        payload.revisao_id ?? payload.review_id ?? payload.id,
+        "revisao_id",
+      );
+    default:
+      throw new ApiError(
+        500,
+        "protected_scope_missing",
+        "Operação protegida sem escopo seguro.",
+      );
+  }
 }
 
 async function admin(
@@ -719,6 +943,21 @@ function mapDatabaseError(
       "purchase_cancel_requires_full_workflow",
       "Uma compra não pode ser cancelada parcialmente.",
     ],
+    purchase_exact_duplicate: [
+      409,
+      "purchase_exact_duplicate",
+      "Esta compra já foi cadastrada. Abra o registro existente.",
+    ],
+    purchase_possible_duplicate: [
+      409,
+      "purchase_possible_duplicate",
+      "Há uma compra muito parecida já cadastrada. Confira antes de continuar.",
+    ],
+    purchase_duplicate_confirmation_stale: [
+      409,
+      "purchase_duplicate_confirmation_stale",
+      "A compra parecida mudou. Confira novamente antes de continuar.",
+    ],
     parcelas_invalidas: [422, "invalid_installments", "As parcelas informadas são inválidas."],
     parcela_data_ou_forma_invalida: [
       422,
@@ -757,6 +996,113 @@ function mapDatabaseError(
       409,
       "amount_exceeds_installment_balance",
       "O valor excede o saldo desta parcela.",
+    ],
+    version_conflict: [
+      409,
+      "version_conflict",
+      "Este cadastro foi alterado em outro acesso. Recarregue os dados e tente novamente.",
+    ],
+    registro_arquivado: [409, "record_archived", "O cadastro está arquivado."],
+    motivo_invalido: [422, "invalid_reason", "Informe um motivo válido."],
+    cliente_nao_encontrado: [404, "client_not_found", "Cliente não encontrado."],
+    fornecedor_nao_encontrado: [404, "supplier_not_found", "Fornecedor não encontrado."],
+    marca_nao_encontrada: [404, "brand_not_found", "Marca não encontrada."],
+    produto_nao_encontrado: [404, "product_not_found", "Produto não encontrado."],
+    custo_nao_encontrado: [404, "product_cost_not_found", "Custo não encontrado."],
+    custo_ja_cancelado: [409, "product_cost_already_cancelled", "Este custo já foi cancelado."],
+    cancelamento_custo_parametros_invalidos: [
+      422,
+      "invalid_product_cost_cancellation",
+      "Revise o custo e a confirmação do cancelamento.",
+    ],
+    marca_invalida: [422, "invalid_brand", "Marca inválida ou arquivada."],
+    custo_total_diverge: [
+      422,
+      "cost_total_mismatch",
+      "O custo total deve corresponder à quantidade multiplicada pelo custo unitário.",
+    ],
+    compra_nao_encontrada: [404, "purchase_not_found", "Compra não encontrada."],
+    compra_ja_cancelada: [409, "purchase_already_cancelled", "A compra já foi cancelada."],
+    item_compra_nao_encontrado: [404, "purchase_item_not_found", "Item de compra não encontrado."],
+    regularizacao_item_conflitante: [
+      409,
+      "stock_regularization_conflict",
+      "Este item já foi regularizado com outros dados. Recarregue a lista.",
+    ],
+    regularizacao_parametros_invalidos: [
+      422,
+      "invalid_stock_regularization",
+      "Revise o lote, a validade e os dados da regularização.",
+    ],
+    validade_anterior_compra: [
+      422,
+      "expiry_before_purchase",
+      "A validade não pode ser anterior à data da compra.",
+    ],
+    stock_control_disabled: [
+      409,
+      "stock_control_disabled",
+      "O produto não está habilitado para controle de estoque.",
+    ],
+    stock_insufficient: [
+      409,
+      "stock_insufficient",
+      "O saldo do lote é insuficiente para concluir esta operação.",
+    ],
+    stock_purchase_consumed: [
+      409,
+      "purchase_stock_already_consumed",
+      "Esta compra não pode ser cancelada porque um de seus lotes já teve consumo posterior. Registre um ajuste compensatório separado.",
+    ],
+    stock_product_configuration_locked: [
+      409,
+      "stock_product_configuration_locked",
+      "A unidade e o controle de estoque não podem ser alterados depois do primeiro movimento deste produto.",
+    ],
+    stock_product_has_balance: [
+      409,
+      "stock_product_has_balance",
+      "Este produto ainda possui saldo em estoque e não pode ser arquivado.",
+    ],
+    compra_lancamento_inconsistente: [
+      409,
+      "purchase_entry_inconsistent",
+      "A compra possui vínculo financeiro inconsistente e não foi alterada.",
+    ],
+    duplicate_review_invalid_arguments: [
+      422,
+      "invalid_duplicate_review",
+      "Confira a revisão de duplicidade e tente novamente.",
+    ],
+    duplicate_review_resolution_invalid: [
+      422,
+      "invalid_duplicate_resolution",
+      "Escolha uma decisão válida para a duplicidade.",
+    ],
+    duplicate_review_reason_invalid: [
+      422,
+      "invalid_duplicate_reason",
+      "Informe um motivo detalhado entre 10 e 500 caracteres.",
+    ],
+    duplicate_review_not_found: [
+      404,
+      "duplicate_review_not_found",
+      "Revisão de duplicidade não encontrada.",
+    ],
+    duplicate_review_already_resolved: [
+      409,
+      "duplicate_review_already_resolved",
+      "Esta revisão já foi encerrada. Atualize a lista.",
+    ],
+    duplicate_review_version_conflict: [
+      409,
+      "duplicate_review_version_conflict",
+      "Esta revisão foi alterada em outro acesso. Atualize a lista.",
+    ],
+    duplicate_review_operation_reused: [
+      409,
+      "duplicate_review_operation_reused",
+      "Esta confirmação já foi usada para outra decisão.",
     ],
   };
   for (const [needle, mapped] of Object.entries(mappings)) {
@@ -1006,7 +1352,11 @@ async function paymentsForEntries(
         `&limit=${Math.min(paymentIds.length, 1000)}`,
     );
     if (!links.response.ok) {
-      throw new ApiError(502, "payment_links_read_failed", "Não foi possível ler os vínculos das parcelas.");
+      throw new ApiError(
+        502,
+        "payment_links_read_failed",
+        "Não foi possível ler os vínculos das parcelas.",
+      );
     }
     for (const link of rows(links.data)) {
       if (typeof link.payment_id === "string" && typeof link.installment_id === "string") {
@@ -1047,7 +1397,11 @@ async function installmentsForEntries(
       "&state=eq.ativa&order=entry_id.asc,installment_number.asc&limit=1000",
   );
   if (!result.response.ok) {
-    throw new ApiError(502, "installments_read_failed", "Não foi possível ler as parcelas previstas.");
+    throw new ApiError(
+      502,
+      "installments_read_failed",
+      "Não foi possível ler as parcelas previstas.",
+    );
   }
   for (const row of rows(result.data)) {
     if (typeof row.entry_id !== "string") continue;
@@ -1070,16 +1424,128 @@ async function installmentsForEntries(
   return grouped;
 }
 
+async function purchasesForEntries(
+  clinicId: string,
+  entryIds: string[],
+): Promise<Map<string, JsonRecord>> {
+  const grouped = new Map<string, JsonRecord>();
+  const uniqueEntries = [...new Set(entryIds.filter(validUuid))];
+  if (!uniqueEntries.length) return grouped;
+  const purchaseResult = await admin(
+    "/rest/v1/financeiro_compras?select=id,expense_entry_id,supplier_id,purchase_date," +
+      "invoice_number,payment_condition,installments,items_subtotal,freight_amount," +
+      "total_amount,state,cancelled_at,version" +
+      `&clinic_id=eq.${encode(clinicId)}&expense_entry_id=in.${inFilter(uniqueEntries)}` +
+      `&limit=${uniqueEntries.length}`,
+  );
+  if (!purchaseResult.response.ok) {
+    throw new ApiError(502, "purchases_read_failed", "Não foi possível ler as compras vinculadas.");
+  }
+  const purchases = rows(purchaseResult.data);
+  const purchaseIds = purchases.map((row) => row.id).filter(validUuid);
+  const itemsByPurchase = new Map<string, JsonRecord[]>();
+  if (purchaseIds.length) {
+    const itemResult = await admin(
+      "/rest/v1/financeiro_compra_itens?select=id,purchase_id,product_id,quantity," +
+        "unit_cost,total_amount,position,lot,expiry,allocated_freight,landed_unit_cost" +
+        `&clinic_id=eq.${encode(clinicId)}&purchase_id=in.${inFilter(purchaseIds)}` +
+        `&order=purchase_id.asc,position.asc&limit=${Math.min(purchaseIds.length * 50, 5000)}`,
+    );
+    if (!itemResult.response.ok) {
+      throw new ApiError(
+        502,
+        "purchase_items_read_failed",
+        "Não foi possível ler os itens das compras.",
+      );
+    }
+    for (const item of rows(itemResult.data)) {
+      if (!validUuid(item.purchase_id)) continue;
+      const list = itemsByPurchase.get(item.purchase_id) || [];
+      list.push({
+        id: item.id,
+        produto_id: item.product_id,
+        quantidade: numberFrom(item.quantity),
+        custo_unitario: numberFrom(item.unit_cost),
+        valor_total: numberFrom(item.total_amount),
+        posicao: item.position,
+        lote: item.lot,
+        validade: item.expiry,
+        frete_rateado: numberFrom(item.allocated_freight),
+        custo_unitario_efetivo: numberFrom(item.landed_unit_cost),
+      });
+      itemsByPurchase.set(item.purchase_id, list);
+    }
+  }
+  for (const purchase of purchases) {
+    if (!validUuid(purchase.expense_entry_id) || !validUuid(purchase.id)) continue;
+    grouped.set(purchase.expense_entry_id, {
+      id: purchase.id,
+      fornecedor_id: purchase.supplier_id,
+      data_compra: purchase.purchase_date,
+      nota_fiscal: purchase.invoice_number,
+      condicao_pagamento: purchase.payment_condition,
+      parcelas: purchase.installments,
+      subtotal_itens: numberFrom(purchase.items_subtotal),
+      frete: numberFrom(purchase.freight_amount),
+      valor_total: numberFrom(purchase.total_amount),
+      estado: purchase.state,
+      cancelada_em: purchase.cancelled_at,
+      versao: purchase.version,
+      itens: itemsByPurchase.get(purchase.id) || [],
+    });
+  }
+  return grouped;
+}
+
+async function attendancesForEntries(
+  clinicId: string,
+  entryIds: string[],
+): Promise<Map<string, JsonRecord>> {
+  const grouped = new Map<string, JsonRecord>();
+  const unique = [...new Set(entryIds.filter(validUuid))];
+  if (!unique.length) return grouped;
+  const result = await admin(
+    "/rest/v1/atendimentos_realizados?select=id,financial_entry_id,patient_id," +
+      "appointment_id,protocol_id,procedure_kind,attended_at,status,archived_at" +
+      `&clinic_id=eq.${encode(clinicId)}&financial_entry_id=in.${inFilter(unique)}` +
+      `&limit=${unique.length}`,
+  );
+  if (!result.response.ok) {
+    throw new ApiError(
+      502,
+      "attendances_read_failed",
+      "Não foi possível ler os procedimentos vinculados.",
+    );
+  }
+  for (const row of rows(result.data)) {
+    if (!validUuid(row.financial_entry_id)) continue;
+    grouped.set(row.financial_entry_id, {
+      id: row.id,
+      paciente_id: row.patient_id,
+      agendamento_id: row.appointment_id,
+      prontuario_id: row.protocol_id,
+      tipo_procedimento: row.procedure_kind,
+      realizado_em: row.attended_at,
+      status: row.status,
+      arquivado_em: row.archived_at,
+    });
+  }
+  return grouped;
+}
+
 async function presentEntries(clinicId: string, rawRows: JsonRecord[]): Promise<JsonRecord[]> {
   const patientIds = rawRows.map((row) => row.patient_id).filter(validUuid);
   const supplierIds = rawRows.map((row) => row.supplier_id).filter(validUuid);
   const entryIds = rawRows.map((row) => row.id).filter(validUuid);
-  const [patientNames, supplierNames, payments, installments] = await Promise.all([
-    relatedNames(clinicId, "patients", patientIds),
-    relatedNames(clinicId, "financeiro_fornecedores", supplierIds),
-    paymentsForEntries(clinicId, entryIds),
-    installmentsForEntries(clinicId, entryIds),
-  ]);
+  const [patientNames, supplierNames, payments, installments, purchases, attendances] =
+    await Promise.all([
+      relatedNames(clinicId, "patients", patientIds),
+      relatedNames(clinicId, "financeiro_fornecedores", supplierIds),
+      paymentsForEntries(clinicId, entryIds),
+      installmentsForEntries(clinicId, entryIds),
+      purchasesForEntries(clinicId, entryIds),
+      attendancesForEntries(clinicId, entryIds),
+    ]);
   return rawRows.map((row) => {
     const patientId = typeof row.patient_id === "string" ? row.patient_id : null;
     const supplierId = typeof row.supplier_id === "string" ? row.supplier_id : null;
@@ -1100,12 +1566,16 @@ async function presentEntries(clinicId: string, rawRows: JsonRecord[]): Promise<
       status: row.calculated_status,
       estado: row.state,
       observacoes: row.notes,
+      patient_name: patientId ? patientNames.get(patientId) || "Cliente" : null,
+      supplier_name: supplierId ? supplierNames.get(supplierId) || "Fornecedor" : null,
       cliente: patientId ? { id: patientId, nome: patientNames.get(patientId) || "Cliente" } : null,
       fornecedor: supplierId
         ? { id: supplierId, nome: supplierNames.get(supplierId) || "Fornecedor" }
         : null,
       pagamentos: payments.get(id) || [],
       parcelas_previstas: installments.get(id) || [],
+      compra: purchases.get(id) || null,
+      atendimento: attendances.get(id) || null,
       criado_em: row.created_at,
       atualizado_em: row.updated_at,
       versao: row.version,
@@ -1275,7 +1745,10 @@ async function handleCreateEntry(
   payload: JsonRecord,
 ): Promise<Response> {
   const { clinicId, userId } = tenant(context);
-  const key = requiredUuid(payload.idempotency_key, "idempotency_key");
+  const key = requiredUuid(
+    payload.idempotency_key ?? payload.operation_id,
+    "idempotency_key",
+  );
   const type = enumValue(payload.tipo, "tipo", ENTRY_TYPES);
   const origin = enumValue(payload.origem, "origem", ENTRY_ORIGINS);
   const patientId = optionalUuid(payload.cliente_id ?? payload.patient_id, "cliente_id");
@@ -1444,13 +1917,17 @@ async function handleRegisterService(
     }
     plannedInstallments = await installmentSchedule(rawSchedule, serviceDate, balance);
   }
-  let installments = plannedInstallments.length ||
+  const installments = plannedInstallments.length ||
     integerValue(payload.parcelas, "parcelas", 1, 1, 120);
-  let dueDate = plannedInstallments.length
+  const dueDate = plannedInstallments.length
     ? String(plannedInstallments[0].vencimento)
     : dateValue(payload.vencimento ?? serviceDate, "vencimento");
   if (dueDate < serviceDate) {
-    throw new ApiError(422, "invalid_due_date", "O vencimento não pode ser anterior ao atendimento.");
+    throw new ApiError(
+      422,
+      "invalid_due_date",
+      "O vencimento não pode ser anterior ao atendimento.",
+    );
   }
   let paymentMethod: string | null = null;
   let paymentKey: string | null = null;
@@ -1528,7 +2005,11 @@ async function handleRegisterService(
   }
   const row = await getEntryById(clinicId, entryId);
   if (!row) {
-    throw new ApiError(502, "service_read_failed", "Atendimento salvo, mas não foi possível recarregá-lo.");
+    throw new ApiError(
+      502,
+      "service_read_failed",
+      "Atendimento salvo, mas não foi possível recarregá-lo.",
+    );
   }
   return success(req, context, {
     lancamento: (await presentEntries(clinicId, [row]))[0] || null,
@@ -1614,7 +2095,10 @@ async function handlePayment(
   refund: boolean,
 ): Promise<Response> {
   const { clinicId, userId } = tenant(context);
-  const key = requiredUuid(payload.idempotency_key, "idempotency_key");
+  const key = requiredUuid(
+    payload.idempotency_key ?? payload.operation_id,
+    "idempotency_key",
+  );
   const entryId = requiredUuid(payload.lancamento_id ?? payload.entry_id, "lancamento_id");
   let installmentId = optionalUuid(payload.parcela_id ?? payload.installment_id, "parcela_id");
   const originalId = refund
@@ -1721,7 +2205,11 @@ async function handlePayment(
   }
   const createdInstallmentId = await installmentForPayment(clinicId, id);
   if (createdInstallmentId !== installmentId) {
-    throw new ApiError(409, "payment_link_failed", "Não foi possível vincular o pagamento à parcela.");
+    throw new ApiError(
+      409,
+      "payment_link_failed",
+      "Não foi possível vincular o pagamento à parcela.",
+    );
   }
   created.parcela_id = createdInstallmentId;
   return success(req, context, {
@@ -1736,7 +2224,7 @@ async function handleCancelEntry(
   payload: JsonRecord,
 ): Promise<Response> {
   const { clinicId, userId } = tenant(context);
-  requiredUuid(payload.idempotency_key, "idempotency_key");
+  const requestId = operationId(payload);
   const entryId = requiredUuid(payload.lancamento_id ?? payload.entry_id, "lancamento_id");
   const reason = requiredText(payload.motivo, "motivo", 3, 500);
   const existing = await getEntryById(clinicId, entryId);
@@ -1756,7 +2244,7 @@ async function handleCancelEntry(
     p_user_id: userId,
     p_entry_id: entryId,
     p_reason: reason,
-    p_request_id: context.requestId,
+    p_request_id: requestId,
   });
   return success(req, context, { cancelado: true, idempotente: false });
 }
@@ -1769,10 +2257,32 @@ function presentClient(row: JsonRecord): JsonRecord {
     telefone: row.phone,
     email: row.email,
     telefone_emergencia: row.emergency_phone,
+    cpf: row.cpf,
     cpf_mascarado: maskCpf(row.cpf),
     status: row.status,
+    ativo: row.status === "active" && row.archived_at === null,
+    arquivado_em: row.archived_at,
+    versao: row.version,
     criado_em: row.created_at,
     atualizado_em: row.updated_at,
+  };
+}
+
+function presentClientList(row: JsonRecord): JsonRecord {
+  const presented = presentClient(row);
+  delete presented.cpf;
+  return presented;
+}
+
+function presentExistingClientCandidate(row: JsonRecord): JsonRecord {
+  return {
+    id: row.id,
+    nome: row.full_name,
+    cpf_mascarado: maskCpf(row.cpf),
+    telefone_final: phoneSuffix(row.phone),
+    email_mascarado: maskEmail(row.email),
+    data_nascimento: row.birth_date,
+    arquivado: Boolean(row.archived_at) || row.status !== "active",
   };
 }
 
@@ -1784,10 +2294,16 @@ async function handleListClients(
   const { clinicId } = tenant(context);
   const page = integerValue(payload.pagina, "pagina", 1, 1, 100_000);
   const pageSize = integerValue(payload.por_pagina, "por_pagina", 50, 1, MAX_PAGE_SIZE);
+  const includeArchived = booleanValue(
+    payload.incluir_arquivados,
+    "incluir_arquivados",
+    false,
+  );
   const offset = (page - 1) * pageSize;
   let path = "/rest/v1/patients?select=id,full_name,birth_date,phone,email,emergency_phone,cpf," +
-    "status,created_at,updated_at" +
-    `&clinic_id=eq.${encode(clinicId)}&archived_at=is.null`;
+    "status,archived_at,version,created_at,updated_at" +
+    `&clinic_id=eq.${encode(clinicId)}` +
+    (includeArchived ? "" : "&archived_at=is.null");
   if (payload.busca !== undefined && payload.busca !== null && payload.busca !== "") {
     const rawSearch = requiredText(payload.busca, "busca", 2, 80);
     const search = normalizeSearchName(rawSearch);
@@ -1806,7 +2322,7 @@ async function handleListClients(
   }
   const clientRows = rows(result.data);
   return success(req, context, {
-    clientes: clientRows.slice(0, pageSize).map(presentClient),
+    clientes: clientRows.slice(0, pageSize).map(presentClientList),
     paginacao: { pagina: page, por_pagina: pageSize, tem_mais: clientRows.length > pageSize },
   });
 }
@@ -1827,11 +2343,11 @@ interface ConfirmedSource {
 }
 
 async function assertLegacySourceTenant(clinicId: string): Promise<void> {
-  if (LEGACY_CLINIC_ID.trim()) {
-    if (!validUuid(LEGACY_CLINIC_ID)) {
+  if (SOURCE_CLINIC_ID.trim()) {
+    if (!validUuid(SOURCE_CLINIC_ID)) {
       throw new ApiError(503, "legacy_source_tenant_unavailable", "Fontes clínicas indisponíveis.");
     }
-    if (LEGACY_CLINIC_ID.toLowerCase() !== clinicId) {
+    if (SOURCE_CLINIC_ID.toLowerCase() !== clinicId) {
       throw new ApiError(403, "legacy_source_tenant_forbidden", "Fontes clínicas indisponíveis.");
     }
     return;
@@ -1895,7 +2411,11 @@ async function handleSuggestClients(
   const search = normalizeSearchName(requiredText(payload.busca, "busca", 2, 80));
   const digits = String(payload.busca).replace(/\D/g, "");
   const limit = integerValue(payload.limite, "limite", 30, 1, 100);
-  const [anamneses, documents, appointments, links] = await Promise.all([
+  const [currentPatients, anamneses, documents, appointments, links] = await Promise.all([
+    admin(
+      "/rest/v1/patients?select=id,full_name,birth_date,cpf,phone,email,status,archived_at," +
+        `created_at&clinic_id=eq.${encode(clinicId)}&order=created_at.desc&limit=300`,
+    ),
     admin(
       "/rest/v1/anamneses?select=id,nome,cpf,telefone,criado_em&arquivado_em=is.null" +
         "&order=criado_em.desc&limit=150",
@@ -1913,7 +2433,11 @@ async function handleSuggestClients(
         `&clinic_id=eq.${encode(clinicId)}&limit=1000`,
     ),
   ]);
-  if (![anamneses, documents, appointments, links].every((result) => result.response.ok)) {
+  if (
+    ![currentPatients, anamneses, documents, appointments, links].every((result) =>
+      result.response.ok
+    )
+  ) {
     throw new ApiError(502, "sources_read_failed", "Não foi possível ler as fontes de clientes.");
   }
   const candidates: SourceCandidate[] = [];
@@ -1961,7 +2485,25 @@ async function handleSuggestClients(
       .filter((row) => typeof row.source_kind === "string" && typeof row.source_id === "string")
       .map((row) => [row.source_kind + ":" + row.source_id, row]),
   );
-  const filtered = candidates.filter((candidate) => {
+  const currentMatches = rows(currentPatients.data).filter((row) => {
+    const name = normalizeSearchName(String(row.full_name || ""));
+    const candidateDigits = String(row.cpf || "") + String(row.phone || "");
+    return name.includes(search) || (digits.length >= 4 && candidateDigits.includes(digits));
+  }).map((row) => ({
+    origem: "cliente_cadastrado",
+    origem_id: null,
+    cliente_id: row.id,
+    nome: row.full_name,
+    cpf_mascarado: maskCpf(row.cpf),
+    telefone_final: phoneSuffix(row.phone),
+    email_mascarado: maskEmail(row.email),
+    data_origem: row.created_at,
+    vinculo: { status: "canonical", cliente_id: row.id },
+    correspondencia: "existente",
+    abrir_existente: true,
+    exige_confirmacao: false,
+  }));
+  const legacyMatches = candidates.filter((candidate) => {
     const name = normalizeSearchName(candidate.nome);
     const candidateDigits = ((candidate.cpf || "") + (candidate.telefone || "")).replace(
       /\D/g,
@@ -1979,16 +2521,19 @@ async function handleSuggestClients(
       email_mascarado: maskEmail(candidate.email),
       data_origem: candidate.data,
       vinculo: link ? { status: link.status, cliente_id: link.patient_id } : null,
+      correspondencia: link ? "existente" : "possivel",
+      abrir_existente: Boolean(link && link.patient_id),
       exige_confirmacao: true,
     };
   });
+  const filtered: JsonRecord[] = [...currentMatches, ...legacyMatches].slice(0, limit);
   return success(req, context, { candidatos: filtered, mesclagem_automatica: false });
 }
 
 async function getClientByIdempotency(clinicId: string, key: string): Promise<JsonRecord | null> {
   const result = await admin(
     "/rest/v1/patients?select=id,full_name,birth_date,phone,email,emergency_phone,cpf,status," +
-      "created_at,updated_at,idempotency_key" +
+      "archived_at,version,created_at,updated_at,idempotency_key" +
       `&clinic_id=eq.${encode(clinicId)}&idempotency_key=eq.${encode(key)}&limit=1`,
   );
   if (!result.response.ok) {
@@ -1997,11 +2542,16 @@ async function getClientByIdempotency(clinicId: string, key: string): Promise<Js
   return rows(result.data)[0] || null;
 }
 
-async function getClientById(clinicId: string, id: string): Promise<JsonRecord | null> {
+async function getClientById(
+  clinicId: string,
+  id: string,
+  includeArchived = false,
+): Promise<JsonRecord | null> {
   const result = await admin(
     "/rest/v1/patients?select=id,full_name,birth_date,phone,email,emergency_phone,cpf,status," +
-      "created_at,updated_at,idempotency_key" +
-      `&clinic_id=eq.${encode(clinicId)}&id=eq.${encode(id)}&archived_at=is.null&limit=1`,
+      "archived_at,version,created_at,updated_at,idempotency_key" +
+      `&clinic_id=eq.${encode(clinicId)}&id=eq.${encode(id)}` +
+      (includeArchived ? "" : "&archived_at=is.null") + "&limit=1",
   );
   if (!result.response.ok) {
     throw new ApiError(502, "client_read_failed", "Não foi possível ler o cliente.");
@@ -2042,22 +2592,36 @@ async function handleCreateClient(
     }
   }
 
-  if (!existing && (cpf || phone)) {
+  if (!existing && (cpf || phone || email)) {
     const filters: string[] = [];
     if (cpf) filters.push(`cpf.eq.${cpf}`);
     if (phone) filters.push(`phone.eq.${phone}`);
+    if (email) filters.push(`email.eq.${email}`);
     const duplicate = await admin(
-      "/rest/v1/patients?select=id,full_name&clinic_id=eq." + encode(clinicId) +
-        "&archived_at=is.null&or=(" + filters.map(encode).join(",") + ")&limit=5",
+      "/rest/v1/patients?select=id,full_name,birth_date,cpf,phone,email,status,archived_at" +
+        "&clinic_id=eq." + encode(clinicId) +
+        "&or=(" + filters.map(encode).join(",") + ")&limit=10",
     );
     if (!duplicate.response.ok) {
       throw new ApiError(502, "duplicate_check_failed", "Não foi possível conferir o cadastro.");
     }
-    if (rows(duplicate.data).length) {
+    const exact = rows(duplicate.data).find((candidate) =>
+      (cpf !== null && candidate.cpf === cpf) ||
+      (birthDate !== null && candidate.birth_date === birthDate &&
+        normalizeExactText(String(candidate.full_name || "")) === normalizeExactText(name) &&
+        (phone !== null ? candidate.phone === phone : email !== null && candidate.email === email))
+    );
+    if (exact) {
       throw new ApiError(
         409,
-        "possible_duplicate",
-        "Já existe um cliente com o mesmo CPF ou telefone.",
+        "exact_duplicate",
+        "Este cliente já está cadastrado. Abra o registro existente.",
+        {
+          tipo: "cliente",
+          correspondencia: "exata",
+          existing_id: exact.id,
+          candidato: presentExistingClientCandidate(exact),
+        },
       );
     }
   }
@@ -2090,22 +2654,167 @@ async function handleCreateClient(
   }, result.idempotent === true ? 200 : 201);
 }
 
-async function handleListCatalogs(req: Request, context: DualAuthContext): Promise<Response> {
+async function handleGetClient(
+  req: Request,
+  context: DualAuthContext,
+  payload: JsonRecord,
+): Promise<Response> {
   const { clinicId } = tenant(context);
+  const id = requiredUuid(payload.id ?? payload.cliente_id, "cliente_id");
+  const client = await getClientById(clinicId, id, true);
+  if (!client) throw new ApiError(404, "client_not_found", "Cliente não encontrado.");
+  return success(req, context, { cliente: presentClient(client) });
+}
+
+async function handleEditClient(
+  req: Request,
+  context: DualAuthContext,
+  payload: JsonRecord,
+): Promise<Response> {
+  const { clinicId, userId } = tenant(context);
+  const id = requiredUuid(payload.id ?? payload.cliente_id, "cliente_id");
+  const version = expectedVersion(payload);
+  const reason = operationReason(payload);
+  const requestId = operationId(payload);
+  const name = requiredText(payload.nome, "nome", 2, 160);
+  const cpf = normalizeCpf(payload.cpf);
+  const phone = normalizePhone(payload.telefone);
+  const email = normalizeEmail(payload.email);
+  const emergencyPhone = normalizePhone(payload.telefone_emergencia, "telefone_emergencia");
+  const birthDate = optionalDate(payload.data_nascimento, "data_nascimento", 1900);
+  const status = enumValue(payload.status ?? "active", "status", PATIENT_STATUSES);
+  if (birthDate && birthDate > dateKeyInSaoPaulo()) {
+    throw new ApiError(422, "invalid_birth_date", "Data de nascimento inválida.");
+  }
+  const result = await rpc("financeiro_editar_cliente", {
+    p_clinic_id: clinicId,
+    p_user_id: userId,
+    p_patient_id: id,
+    p_expected_version: version,
+    p_full_name: name,
+    p_birth_date: birthDate,
+    p_cpf: cpf,
+    p_phone: phone,
+    p_email: email,
+    p_emergency_phone: emergencyPhone,
+    p_status: status,
+    p_search_name: normalizeSearchName(name),
+    p_reason: reason,
+    p_request_id: requestId,
+  });
+  if (!isRecord(result)) {
+    throw new ApiError(502, "client_update_failed", "Não foi possível atualizar o cliente.");
+  }
+  return success(req, context, { cliente: presentClient(result) });
+}
+
+async function handleClientArchiveState(
+  req: Request,
+  context: DualAuthContext,
+  payload: JsonRecord,
+  restore: boolean,
+): Promise<Response> {
+  const { clinicId, userId } = tenant(context);
+  const id = requiredUuid(payload.id ?? payload.cliente_id, "cliente_id");
+  const result = await rpc(
+    restore ? "financeiro_restaurar_cliente" : "financeiro_arquivar_cliente",
+    {
+      p_clinic_id: clinicId,
+      p_user_id: userId,
+      p_patient_id: id,
+      p_expected_version: expectedVersion(payload),
+      p_reason: operationReason(payload),
+      p_request_id: operationId(payload),
+    },
+  );
+  if (!isRecord(result)) {
+    throw new ApiError(502, "client_archive_failed", "Não foi possível alterar o cliente.");
+  }
+  return success(req, context, { cliente: presentClient(result) });
+}
+
+function presentSupplier(row: JsonRecord): JsonRecord {
+  return {
+    id: row.id,
+    nome: row.name,
+    documento: row.document,
+    telefone: row.phone,
+    email: row.email,
+    ativo: row.active,
+    arquivado_em: row.archived_at,
+    versao: row.version,
+    criado_em: row.created_at,
+    atualizado_em: row.updated_at,
+  };
+}
+
+function presentSupplierList(row: JsonRecord): JsonRecord {
+  const presented = presentSupplier(row);
+  delete presented.documento;
+  presented.documento_mascarado = maskDocument(row.document);
+  return presented;
+}
+
+function presentBrand(row: JsonRecord): JsonRecord {
+  return {
+    id: row.id,
+    nome: row.name,
+    ativo: row.active,
+    arquivado_em: row.archived_at,
+    versao: row.version,
+    criado_em: row.created_at,
+    atualizado_em: row.updated_at,
+  };
+}
+
+function presentProduct(row: JsonRecord): JsonRecord {
+  return {
+    id: row.id,
+    marca_id: row.brand_id,
+    nome: row.name,
+    tipo: row.product_type,
+    unidade: row.unit,
+    apresentacao: row.presentation,
+    ean: row.ean,
+    custo_referencia: row.reference_cost === null ? null : numberFrom(row.reference_cost),
+    preco_venda: row.sale_price === null ? null : numberFrom(row.sale_price),
+    registro_anvisa: row.anvisa_registration,
+    controla_estoque: row.stock_control,
+    ativo: row.active,
+    arquivado_em: row.archived_at,
+    versao: row.version,
+    criado_em: row.created_at,
+    atualizado_em: row.updated_at,
+  };
+}
+
+async function handleListCatalogs(
+  req: Request,
+  context: DualAuthContext,
+  payload: JsonRecord,
+): Promise<Response> {
+  const { clinicId } = tenant(context);
+  const includeArchived = booleanValue(
+    payload.incluir_arquivados,
+    "incluir_arquivados",
+    false,
+  );
+  const archiveFilter = includeArchived ? "" : "&archived_at=is.null";
   const [forms, suppliers, brands, products] = await Promise.all([
     paymentForms(),
     admin(
       "/rest/v1/financeiro_fornecedores?select=id,name,document,phone,email,active,created_at," +
-        `updated_at&clinic_id=eq.${encode(clinicId)}&archived_at=is.null&order=name.asc&limit=1000`,
+        `updated_at,archived_at,version&clinic_id=eq.${encode(clinicId)}${archiveFilter}` +
+        "&order=name.asc&limit=1000",
     ),
     admin(
-      "/rest/v1/financeiro_marcas?select=id,name,active,created_at,updated_at" +
-        `&clinic_id=eq.${encode(clinicId)}&archived_at=is.null&order=name.asc&limit=1000`,
+      "/rest/v1/financeiro_marcas?select=id,name,active,created_at,updated_at,archived_at,version" +
+        `&clinic_id=eq.${encode(clinicId)}${archiveFilter}&order=name.asc&limit=1000`,
     ),
     admin(
-      "/rest/v1/financeiro_produtos?select=id,brand_id,name,product_type,unit,reference_cost," +
-        "sale_price,anvisa_registration,stock_control,active,created_at,updated_at" +
-        `&clinic_id=eq.${encode(clinicId)}&archived_at=is.null&order=name.asc&limit=2000`,
+      "/rest/v1/financeiro_produtos?select=id,brand_id,name,product_type,unit,presentation,ean,reference_cost," +
+        "sale_price,anvisa_registration,stock_control,active,created_at,updated_at,archived_at,version" +
+        `&clinic_id=eq.${encode(clinicId)}${archiveFilter}&order=name.asc&limit=2000`,
     ),
   ]);
   if (![suppliers, brands, products].every((result) => result.response.ok)) {
@@ -2113,38 +2822,65 @@ async function handleListCatalogs(req: Request, context: DualAuthContext): Promi
   }
   return success(req, context, {
     formas_pagamento: forms,
-    fornecedores: rows(suppliers.data).map((row) => ({
-      id: row.id,
-      nome: row.name,
-      documento: row.document,
-      telefone: row.phone,
-      email: row.email,
-      ativo: row.active,
-      criado_em: row.created_at,
-      atualizado_em: row.updated_at,
-    })),
-    marcas: rows(brands.data).map((row) => ({
-      id: row.id,
-      nome: row.name,
-      ativo: row.active,
-      criado_em: row.created_at,
-      atualizado_em: row.updated_at,
-    })),
-    produtos: rows(products.data).map((row) => ({
-      id: row.id,
-      marca_id: row.brand_id,
-      nome: row.name,
-      tipo: row.product_type,
-      unidade: row.unit,
-      custo_referencia: row.reference_cost === null ? null : numberFrom(row.reference_cost),
-      preco_venda: row.sale_price === null ? null : numberFrom(row.sale_price),
-      registro_anvisa: row.anvisa_registration,
-      controla_estoque: row.stock_control,
-      ativo: row.active,
-      criado_em: row.created_at,
-      atualizado_em: row.updated_at,
-    })),
+    fornecedores: rows(suppliers.data).map(presentSupplierList),
+    marcas: rows(brands.data).map(presentBrand),
+    produtos: rows(products.data).map(presentProduct),
   });
+}
+
+async function findExactCatalogCandidate(
+  clinicId: string,
+  table: "financeiro_marcas" | "financeiro_fornecedores" | "financeiro_produtos",
+  record: JsonRecord,
+  excludeId?: string,
+): Promise<JsonRecord | null> {
+  let path = `/rest/v1/${table}?select=*&clinic_id=eq.${encode(clinicId)}`;
+  if (table === "financeiro_marcas") {
+    // O banco remove acentos na chave canonica; a filtragem final em memoria
+    // usa a mesma regra para nao perder, por exemplo, nomes com/sem acento.
+  } else if (table === "financeiro_fornecedores") {
+    if (record.document) {
+      path += `&document=eq.${encode(String(record.document))}`;
+    } else if (record.phone) {
+      path += `&phone=eq.${encode(String(record.phone))}`;
+    } else if (record.email) {
+      path += `&email=eq.${encode(String(record.email))}`;
+    } else {
+      return null;
+    }
+  } else if (record.ean) {
+    path += `&ean=eq.${encode(String(record.ean))}`;
+  } else if (record.brand_id && record.presentation) {
+    path += `&brand_id=eq.${encode(String(record.brand_id))}` +
+      `&unit=eq.${encode(String(record.unit || ""))}`;
+  } else {
+    return null;
+  }
+  path += "&order=created_at.asc,id.asc&limit=2000";
+  const result = await admin(path);
+  if (!result.response.ok) {
+    throw new ApiError(502, "duplicate_check_failed", "Não foi possível conferir o cadastro.");
+  }
+  const normalizedName = normalizeExactText(String(record.name || ""));
+  const normalizedPresentation = normalizeExactText(String(record.presentation || ""));
+  return rows(result.data).find((row) => {
+    if (excludeId && row.id === excludeId) return false;
+    if (table === "financeiro_marcas") {
+      return normalizeExactText(String(row.name || "")) === normalizedName;
+    }
+    if (table === "financeiro_fornecedores") {
+      return record.document
+        ? row.document === record.document
+        : normalizeExactText(String(row.name || "")) === normalizedName &&
+          (record.phone ? row.phone === record.phone : row.email === record.email);
+    }
+    return record.ean ? row.ean === record.ean : row.brand_id === record.brand_id &&
+      normalizeExactText(String(row.name || "")) === normalizedName &&
+      normalizeExactText(String(row.presentation || "")) === normalizedPresentation &&
+      row.unit === record.unit &&
+      normalizeExactText(String(row.anvisa_registration || "")) ===
+        normalizeExactText(String(record.anvisa_registration || ""));
+  }) || null;
 }
 
 async function createCatalogRecord(
@@ -2174,6 +2910,25 @@ async function createCatalogRecord(
     }
     return { row: existing, idempotent: true };
   }
+  const exactCandidate = await findExactCatalogCandidate(clinicId, table, record, id);
+  if (exactCandidate) {
+    const kind = table === "financeiro_fornecedores"
+      ? "fornecedor"
+      : table === "financeiro_marcas"
+      ? "marca"
+      : "produto";
+    throw new ApiError(
+      409,
+      "exact_duplicate",
+      "Este cadastro já existe. Abra o registro existente.",
+      {
+        tipo: kind,
+        correspondencia: "exata",
+        existing_id: exactCandidate.id,
+        candidato: presentCatalog(kind, exactCandidate),
+      },
+    );
+  }
   const result = await admin(
     `/rest/v1/${table}`,
     "POST",
@@ -2188,6 +2943,25 @@ async function createCatalogRecord(
       const concurrentRow = rows(concurrent.data)[0];
       if (concurrent.response.ok && concurrentRow && compare(concurrentRow)) {
         return { row: concurrentRow, idempotent: true };
+      }
+      const duplicate = await findExactCatalogCandidate(clinicId, table, record, id);
+      if (duplicate) {
+        const kind = table === "financeiro_fornecedores"
+          ? "fornecedor"
+          : table === "financeiro_marcas"
+          ? "marca"
+          : "produto";
+        throw new ApiError(
+          409,
+          "exact_duplicate",
+          "Este cadastro já existe. Abra o registro existente.",
+          {
+            tipo: kind,
+            correspondencia: "exata",
+            existing_id: duplicate.id,
+            candidato: presentCatalog(kind, duplicate),
+          },
+        );
       }
     }
     mapDatabaseError(result, "catalog_create_failed", "Não foi possível salvar o cadastro.");
@@ -2217,7 +2991,7 @@ async function handleCreateBrand(
     (row) => row.name === name,
   );
   return success(req, context, {
-    marca: { id: created.row.id, nome: created.row.name, ativo: created.row.active },
+    marca: presentBrand(created.row),
     idempotente: created.idempotent,
   }, created.idempotent ? 200 : 201);
 }
@@ -2230,13 +3004,7 @@ async function handleCreateSupplier(
   const { userId } = tenant(context);
   const key = requiredUuid(payload.idempotency_key, "idempotency_key");
   const name = requiredText(payload.nome, "nome", 2, 160);
-  const document =
-    payload.documento === undefined || payload.documento === null || payload.documento === ""
-      ? null
-      : String(payload.documento).replace(/\D/g, "");
-  if (document && !/^\d{11,14}$/.test(document)) {
-    throw new ApiError(422, "invalid_document", "CPF/CNPJ do fornecedor inválido.");
-  }
+  const document = normalizeDocument(payload.documento);
   const phone = normalizePhone(payload.telefone);
   const email = normalizeEmail(payload.email);
   const created = await createCatalogRecord(
@@ -2249,14 +3017,7 @@ async function handleCreateSupplier(
       row.name === name && row.document === document && row.phone === phone && row.email === email,
   );
   return success(req, context, {
-    fornecedor: {
-      id: created.row.id,
-      nome: created.row.name,
-      documento: created.row.document,
-      telefone: created.row.phone,
-      email: created.row.email,
-      ativo: created.row.active,
-    },
+    fornecedor: presentSupplier(created.row),
     idempotente: created.idempotent,
   }, created.idempotent ? 200 : 201);
 }
@@ -2273,6 +3034,8 @@ async function handleCreateProduct(
   const name = requiredText(payload.nome, "nome", 2, 160);
   const type = enumValue(payload.tipo, "tipo", PRODUCT_TYPES);
   const unit = enumValue(payload.unidade, "unidade", PRODUCT_UNITS);
+  const presentation = requiredText(payload.apresentacao, "apresentacao", 1, 160);
+  const ean = normalizeEan(payload.ean);
   const referenceCost =
     payload.custo_referencia === undefined || payload.custo_referencia === null ||
       payload.custo_referencia === ""
@@ -2294,6 +3057,8 @@ async function handleCreateProduct(
       name,
       product_type: type,
       unit,
+      presentation,
+      ean,
       reference_cost: referenceCost,
       sale_price: salePrice,
       anvisa_registration: anvisa,
@@ -2304,26 +3069,394 @@ async function handleCreateProduct(
     },
     (row) =>
       row.brand_id === brandId && row.name === name && row.product_type === type &&
-      row.unit === unit && nullableDecimalEqual(row.reference_cost, referenceCost) &&
+      row.unit === unit && row.presentation === presentation && row.ean === ean &&
+      nullableDecimalEqual(row.reference_cost, referenceCost) &&
       nullableDecimalEqual(row.sale_price, salePrice) && row.anvisa_registration === anvisa &&
       row.stock_control === stockControl,
   );
   return success(req, context, {
-    produto: {
-      id: created.row.id,
-      marca_id: created.row.brand_id,
-      nome: created.row.name,
-      tipo: created.row.product_type,
-      unidade: created.row.unit,
-      custo_referencia: created.row.reference_cost === null
-        ? null
-        : numberFrom(created.row.reference_cost),
-      preco_venda: created.row.sale_price === null ? null : numberFrom(created.row.sale_price),
-      registro_anvisa: created.row.anvisa_registration,
-      controla_estoque: created.row.stock_control,
-    },
+    produto: presentProduct(created.row),
     idempotente: created.idempotent,
   }, created.idempotent ? 200 : 201);
+}
+
+type CatalogKind = "fornecedor" | "marca" | "produto";
+
+const CATALOG_READ_CONFIG: Record<
+  CatalogKind,
+  { table: string; select: string; responseKey: string }
+> = {
+  fornecedor: {
+    table: "financeiro_fornecedores",
+    select: "id,name,document,phone,email,active,archived_at,version,created_at,updated_at",
+    responseKey: "fornecedor",
+  },
+  marca: {
+    table: "financeiro_marcas",
+    select: "id,name,active,archived_at,version,created_at,updated_at",
+    responseKey: "marca",
+  },
+  produto: {
+    table: "financeiro_produtos",
+    select:
+      "id,brand_id,name,product_type,unit,presentation,ean,reference_cost,sale_price,anvisa_registration," +
+      "stock_control,active,archived_at,version,created_at,updated_at",
+    responseKey: "produto",
+  },
+};
+
+async function getCatalogRow(
+  clinicId: string,
+  kind: CatalogKind,
+  id: string,
+): Promise<JsonRecord | null> {
+  const config = CATALOG_READ_CONFIG[kind];
+  const result = await admin(
+    `/rest/v1/${config.table}?select=${config.select}&clinic_id=eq.${encode(clinicId)}` +
+      `&id=eq.${encode(id)}&limit=1`,
+  );
+  if (!result.response.ok) {
+    throw new ApiError(502, `${kind}_read_failed`, "Não foi possível ler o cadastro.");
+  }
+  return rows(result.data)[0] || null;
+}
+
+function presentCatalog(kind: CatalogKind, row: JsonRecord): JsonRecord {
+  if (kind === "fornecedor") return presentSupplier(row);
+  if (kind === "marca") return presentBrand(row);
+  return presentProduct(row);
+}
+
+async function handleGetCatalog(
+  req: Request,
+  context: DualAuthContext,
+  payload: JsonRecord,
+  kind: CatalogKind,
+): Promise<Response> {
+  const { clinicId } = tenant(context);
+  const id = requiredUuid(
+    payload.id ?? payload[`${kind}_id`],
+    `${kind}_id`,
+  );
+  const row = await getCatalogRow(clinicId, kind, id);
+  if (!row) throw new ApiError(404, `${kind}_not_found`, "Cadastro não encontrado.");
+  return success(req, context, {
+    [CATALOG_READ_CONFIG[kind].responseKey]: presentCatalog(kind, row),
+  });
+}
+
+async function handleEditSupplier(
+  req: Request,
+  context: DualAuthContext,
+  payload: JsonRecord,
+): Promise<Response> {
+  const { clinicId, userId } = tenant(context);
+  const result = await rpc("financeiro_editar_fornecedor", {
+    p_clinic_id: clinicId,
+    p_user_id: userId,
+    p_supplier_id: requiredUuid(payload.id ?? payload.fornecedor_id, "fornecedor_id"),
+    p_expected_version: expectedVersion(payload),
+    p_name: requiredText(payload.nome, "nome", 2, 160),
+    p_document: normalizeDocument(payload.documento),
+    p_phone: normalizePhone(payload.telefone),
+    p_email: normalizeEmail(payload.email),
+    p_reason: operationReason(payload),
+    p_request_id: operationId(payload),
+  });
+  if (!isRecord(result)) {
+    throw new ApiError(502, "supplier_update_failed", "Não foi possível atualizar o fornecedor.");
+  }
+  return success(req, context, { fornecedor: presentSupplier(result) });
+}
+
+async function handleEditBrand(
+  req: Request,
+  context: DualAuthContext,
+  payload: JsonRecord,
+): Promise<Response> {
+  const { clinicId, userId } = tenant(context);
+  const result = await rpc("financeiro_editar_marca", {
+    p_clinic_id: clinicId,
+    p_user_id: userId,
+    p_brand_id: requiredUuid(payload.id ?? payload.marca_id, "marca_id"),
+    p_expected_version: expectedVersion(payload),
+    p_name: requiredText(payload.nome, "nome", 2, 120),
+    p_reason: operationReason(payload),
+    p_request_id: operationId(payload),
+  });
+  if (!isRecord(result)) {
+    throw new ApiError(502, "brand_update_failed", "Não foi possível atualizar a marca.");
+  }
+  return success(req, context, { marca: presentBrand(result) });
+}
+
+async function handleEditProduct(
+  req: Request,
+  context: DualAuthContext,
+  payload: JsonRecord,
+): Promise<Response> {
+  const { clinicId, userId } = tenant(context);
+  const brandId = optionalUuid(payload.marca_id, "marca_id");
+  if (brandId) await assertParty(clinicId, "financeiro_marcas", brandId, "invalid_brand");
+  const result = await rpc("financeiro_editar_produto", {
+    p_clinic_id: clinicId,
+    p_user_id: userId,
+    p_product_id: requiredUuid(payload.id ?? payload.produto_id, "produto_id"),
+    p_expected_version: expectedVersion(payload),
+    p_brand_id: brandId,
+    p_name: requiredText(payload.nome, "nome", 2, 160),
+    p_product_type: enumValue(payload.tipo, "tipo", PRODUCT_TYPES),
+    p_unit: enumValue(payload.unidade, "unidade", PRODUCT_UNITS),
+    p_presentation: requiredText(payload.apresentacao, "apresentacao", 1, 160),
+    p_ean: normalizeEan(payload.ean),
+    p_reference_cost: optionalDecimal(payload.custo_referencia, "custo_referencia", 2),
+    p_sale_price: optionalDecimal(payload.preco_venda, "preco_venda", 2),
+    p_anvisa_registration: optionalText(payload.registro_anvisa, "registro_anvisa", 80),
+    p_stock_control: booleanValue(payload.controla_estoque, "controla_estoque", false),
+    p_reason: operationReason(payload),
+    p_request_id: operationId(payload),
+  });
+  if (!isRecord(result)) {
+    throw new ApiError(502, "product_update_failed", "Não foi possível atualizar o produto.");
+  }
+  return success(req, context, { produto: presentProduct(result) });
+}
+
+async function handleCatalogArchiveState(
+  req: Request,
+  context: DualAuthContext,
+  payload: JsonRecord,
+  kind: CatalogKind,
+  restore: boolean,
+): Promise<Response> {
+  const { clinicId, userId } = tenant(context);
+  const config = {
+    fornecedor: {
+      idKey: "fornecedor_id",
+      rpcArchive: "financeiro_arquivar_fornecedor",
+      rpcRestore: "financeiro_restaurar_fornecedor",
+      rpcId: "p_supplier_id",
+    },
+    marca: {
+      idKey: "marca_id",
+      rpcArchive: "financeiro_arquivar_marca",
+      rpcRestore: "financeiro_restaurar_marca",
+      rpcId: "p_brand_id",
+    },
+    produto: {
+      idKey: "produto_id",
+      rpcArchive: "financeiro_arquivar_produto",
+      rpcRestore: "financeiro_restaurar_produto",
+      rpcId: "p_product_id",
+    },
+  }[kind];
+  const id = requiredUuid(payload.id ?? payload[config.idKey], config.idKey);
+  const rpcPayload: JsonRecord = {
+    p_clinic_id: clinicId,
+    p_user_id: userId,
+    p_expected_version: expectedVersion(payload),
+    p_reason: operationReason(payload),
+    p_request_id: operationId(payload),
+    [config.rpcId]: id,
+  };
+  const result = await rpc(restore ? config.rpcRestore : config.rpcArchive, rpcPayload);
+  if (!isRecord(result)) {
+    throw new ApiError(502, `${kind}_archive_failed`, "Não foi possível alterar o cadastro.");
+  }
+  return success(req, context, {
+    [CATALOG_READ_CONFIG[kind].responseKey]: presentCatalog(kind, result),
+  });
+}
+
+function presentProductCost(
+  row: JsonRecord,
+  supplierName: string | null = null,
+  cancellation: JsonRecord | null = null,
+): JsonRecord {
+  return {
+    id: row.id,
+    produto_id: row.product_id,
+    fornecedor_id: row.supplier_id,
+    fornecedor_nome: supplierName,
+    fonte: row.source,
+    data_custo: row.cost_date,
+    condicao_pagamento: row.payment_condition,
+    quantidade_embalagem: numberFrom(row.package_quantity),
+    unidade_embalagem: row.package_unit,
+    custo_total: numberFrom(row.total_cost),
+    custo_unitario: numberFrom(row.unit_cost),
+    observacoes: row.notes,
+    atual: row.is_current,
+    operation_id: row.operation_id,
+    criado_em: row.created_at,
+    cancelado: cancellation !== null,
+    cancelamento: cancellation
+      ? {
+        id: cancellation.id,
+        motivo: cancellation.reason,
+        resultado: cancellation.result_status,
+        custo_substituto_id: cancellation.replacement_cost_id,
+        cancelado_em: cancellation.cancelled_at,
+      }
+      : null,
+  };
+}
+
+async function handleListProductCosts(
+  req: Request,
+  context: DualAuthContext,
+  payload: JsonRecord,
+): Promise<Response> {
+  const { clinicId } = tenant(context);
+  const productId = requiredUuid(payload.produto_id ?? payload.id, "produto_id");
+  const page = integerValue(payload.pagina, "pagina", 1, 1, 100_000);
+  const pageSize = integerValue(payload.por_pagina, "por_pagina", 50, 1, MAX_PAGE_SIZE);
+  const offset = (page - 1) * pageSize;
+  const result = await admin(
+    "/rest/v1/financeiro_produto_custos?select=id,product_id,supplier_id,source,cost_date," +
+      "payment_condition,package_quantity,package_unit,total_cost,unit_cost,notes,is_current," +
+      `operation_id,created_at&clinic_id=eq.${encode(clinicId)}` +
+      `&product_id=eq.${encode(productId)}&order=cost_date.desc,created_at.desc` +
+      `&limit=${pageSize + 1}&offset=${offset}`,
+  );
+  if (!result.response.ok) {
+    throw new ApiError(
+      502,
+      "product_costs_read_failed",
+      "Não foi possível ler os custos do produto.",
+    );
+  }
+  const costRows = rows(result.data);
+  const costIds = costRows.map((row) => row.id).filter(validUuid);
+  const cancellationByCost = new Map<string, JsonRecord>();
+  if (costIds.length) {
+    const cancellations = await admin(
+      "/rest/v1/financeiro_produto_custo_cancelamentos?select=id,cost_id," +
+        "replacement_cost_id,reason,result_status,operation_id,cancelled_at" +
+        `&clinic_id=eq.${encode(clinicId)}&cost_id=in.${inFilter(costIds)}` +
+        `&limit=${costIds.length}`,
+    );
+    if (!cancellations.response.ok) {
+      throw new ApiError(
+        502,
+        "product_cost_cancellations_read_failed",
+        "Não foi possível ler os cancelamentos de custos.",
+      );
+    }
+    for (const cancellation of rows(cancellations.data)) {
+      if (validUuid(cancellation.cost_id)) {
+        cancellationByCost.set(cancellation.cost_id, cancellation);
+      }
+    }
+  }
+  const supplierIds = [...new Set(costRows.map((row) => row.supplier_id).filter(validUuid))];
+  const supplierNames = new Map<string, string>();
+  if (supplierIds.length) {
+    const suppliers = await admin(
+      "/rest/v1/financeiro_fornecedores?select=id,name" +
+        `&clinic_id=eq.${encode(clinicId)}&id=in.${
+          inFilter(supplierIds)
+        }&limit=${supplierIds.length}`,
+    );
+    if (!suppliers.response.ok) {
+      throw new ApiError(502, "suppliers_read_failed", "Não foi possível ler os fornecedores.");
+    }
+    for (const row of rows(suppliers.data)) {
+      if (typeof row.id === "string" && typeof row.name === "string") {
+        supplierNames.set(row.id, row.name);
+      }
+    }
+  }
+  return success(req, context, {
+    custos: costRows.slice(0, pageSize).map((row) =>
+      presentProductCost(
+        row,
+        typeof row.supplier_id === "string" ? supplierNames.get(row.supplier_id) || null : null,
+        typeof row.id === "string" ? cancellationByCost.get(row.id) || null : null,
+      )
+    ),
+    paginacao: { pagina: page, por_pagina: pageSize, tem_mais: costRows.length > pageSize },
+  });
+}
+
+async function handleSaveProductCost(
+  req: Request,
+  context: DualAuthContext,
+  payload: JsonRecord,
+): Promise<Response> {
+  const { clinicId, userId } = tenant(context);
+  const productId = requiredUuid(payload.produto_id ?? payload.id, "produto_id");
+  const supplierId = optionalUuid(payload.fornecedor_id, "fornecedor_id");
+  if (supplierId) {
+    await assertParty(clinicId, "financeiro_fornecedores", supplierId, "invalid_supplier");
+  }
+  const result = await rpc("financeiro_salvar_custo_produto", {
+    p_clinic_id: clinicId,
+    p_user_id: userId,
+    p_product_id: productId,
+    p_expected_product_version: expectedVersion(payload),
+    p_supplier_id: supplierId,
+    p_source: requiredText(payload.fonte, "fonte", 2, 160),
+    p_cost_date: dateValue(payload.data_custo, "data_custo"),
+    p_payment_condition: optionalText(payload.condicao_pagamento, "condicao_pagamento", 80),
+    p_package_quantity: decimalValue(
+      payload.quantidade_embalagem,
+      "quantidade_embalagem",
+      4,
+    ),
+    p_package_unit: requiredText(payload.unidade_embalagem, "unidade_embalagem", 1, 40),
+    p_total_cost: decimalValue(payload.custo_total, "custo_total", 2),
+    p_unit_cost: decimalValue(payload.custo_unitario, "custo_unitario", 4),
+    p_notes: optionalText(payload.observacoes, "observacoes", 1000),
+    p_is_current: booleanValue(payload.atual, "atual", false),
+    p_operation_id: operationId(payload),
+    p_reason: operationReason(payload),
+    p_request_id: context.requestId,
+  });
+  if (!isRecord(result) || !isRecord(result.custo) || !isRecord(result.produto)) {
+    throw new ApiError(502, "product_cost_save_failed", "Não foi possível salvar o custo.");
+  }
+  return success(req, context, {
+    custo: presentProductCost(result.custo),
+    produto: presentProduct(result.produto),
+    idempotente: result.idempotente === true,
+  }, result.idempotente === true ? 200 : 201);
+}
+
+async function handleCancelProductCost(
+  req: Request,
+  context: DualAuthContext,
+  payload: JsonRecord,
+): Promise<Response> {
+  const { clinicId, userId } = tenant(context);
+  const costId = requiredUuid(payload.custo_id ?? payload.id, "custo_id");
+  const result = await rpc("financeiro_cancelar_custo_produto", {
+    p_clinic_id: clinicId,
+    p_user_id: userId,
+    p_cost_id: costId,
+    p_expected_product_version: expectedVersion(payload),
+    p_reason: operationReason(payload),
+    p_operation_id: operationId(payload),
+    p_request_id: context.requestId,
+  });
+  if (
+    !isRecord(result) || !isRecord(result.cancelamento) ||
+    !isRecord(result.custo) || !isRecord(result.produto)
+  ) {
+    throw new ApiError(
+      502,
+      "product_cost_cancel_failed",
+      "Não foi possível cancelar o custo.",
+    );
+  }
+  return success(req, context, {
+    custo: presentProductCost(result.custo, null, result.cancelamento),
+    custo_substituto: isRecord(result.custo_substituto)
+      ? presentProductCost(result.custo_substituto)
+      : null,
+    produto: presentProduct(result.produto),
+    idempotente: result.idempotente === true,
+  });
 }
 
 function normalizePurchaseItems(value: unknown): JsonRecord[] {
@@ -2332,12 +3465,166 @@ function normalizePurchaseItems(value: unknown): JsonRecord[] {
   }
   return value.map((item, index) => {
     if (!isRecord(item)) throw new ApiError(422, "invalid_items", "Item de compra inválido.");
+    const lot = optionalText(item.lote ?? item.lot, `lote_${index}`, 100);
+    const expiry = optionalDate(item.validade ?? item.expiry, `validade_${index}`);
+    if ((lot === null) !== (expiry === null)) {
+      throw new ApiError(
+        422,
+        "invalid_lot_expiry",
+        "Informe lote e validade juntos em cada item controlado.",
+      );
+    }
     return {
       produto_id: requiredUuid(item.produto_id, `produto_${index}`),
       quantidade: decimalValue(item.quantidade, `quantidade_${index}`, 4),
       valor_unitario: decimalValue(item.valor_unitario, `valor_unitario_${index}`, 4, true),
+      lote: lot,
+      validade: expiry,
+      posicao: index + 1,
     };
   });
+}
+
+function purchaseItemIdentity(item: JsonRecord): JsonRecord {
+  return {
+    produto_id: String(item.produto_id ?? item.product_id ?? ""),
+    quantidade: numberFrom(item.quantidade ?? item.quantity),
+    valor_unitario: numberFrom(item.valor_unitario ?? item.unit_cost),
+    lote: normalizeSearchName(String(item.lote ?? item.lot ?? "")),
+    validade: String(item.validade ?? item.expiry ?? ""),
+    posicao: numberFrom(item.posicao ?? item.position),
+  };
+}
+
+function purchaseItemsEqual(requested: JsonRecord[], stored: JsonRecord[]): boolean {
+  const normalize = (items: JsonRecord[]) =>
+    items.map(purchaseItemIdentity).sort((left, right) =>
+      Number(left.posicao) - Number(right.posicao)
+    );
+  return JSON.stringify(normalize(requested)) === JSON.stringify(normalize(stored));
+}
+
+async function purchaseDuplicateCandidate(
+  clinicId: string,
+  supplierId: string,
+  purchaseDate: string,
+  invoice: string | null,
+  condition: string,
+  installments: number,
+  freight: string,
+  items: JsonRecord[],
+): Promise<{ match: "exact" | "possible"; purchase: JsonRecord; candidate: JsonRecord } | null> {
+  const subtotal = items.reduce(
+    (sum, item) =>
+      sum + Math.round(numberFrom(item.quantidade) * numberFrom(item.valor_unitario) * 100),
+    0,
+  ) / 100;
+  const total = Math.round((subtotal + numberFrom(freight)) * 100) / 100;
+  let path = "/rest/v1/financeiro_compras?select=id,supplier_id,expense_entry_id,purchase_date," +
+    "invoice_number,payment_condition,installments,items_subtotal,freight_amount,total_amount," +
+    "state,created_at&clinic_id=eq." + encode(clinicId) + "&supplier_id=eq." + encode(supplierId);
+  if (invoice) {
+    path += "&invoice_number=not.is.null";
+  } else {
+    path += "&invoice_number=is.null&purchase_date=eq." + encode(purchaseDate) +
+      "&payment_condition=eq." + encode(condition) + "&installments=eq." + installments +
+      "&items_subtotal=eq." + encode(String(subtotal)) + "&freight_amount=eq." + encode(freight) +
+      "&total_amount=eq." + encode(String(total));
+  }
+  path += "&order=created_at.asc,id.asc&limit=500";
+  const result = await admin(path);
+  if (!result.response.ok) {
+    throw new ApiError(
+      502,
+      "purchase_duplicate_check_failed",
+      "Não foi possível conferir compras anteriores.",
+    );
+  }
+  let candidates = rows(result.data);
+  if (invoice) {
+    const normalizedInvoice = normalizeExactText(invoice);
+    candidates = candidates.filter((row) =>
+      normalizeExactText(String(row.invoice_number || "")) === normalizedInvoice
+    );
+  }
+  if (!candidates.length) return null;
+
+  const ids = candidates.map((row) => row.id).filter(validUuid);
+  const itemResult = await admin(
+    "/rest/v1/financeiro_compra_itens?select=purchase_id,product_id,quantity,unit_cost,position,lot,expiry" +
+      `&clinic_id=eq.${encode(clinicId)}&purchase_id=in.${inFilter(ids)}` +
+      "&order=purchase_id.asc,position.asc&limit=25000",
+  );
+  if (!itemResult.response.ok) {
+    throw new ApiError(
+      502,
+      "purchase_duplicate_items_failed",
+      "Não foi possível conferir os itens da compra.",
+    );
+  }
+  const grouped = new Map<string, JsonRecord[]>();
+  for (const row of rows(itemResult.data)) {
+    if (!validUuid(row.purchase_id)) continue;
+    const group = grouped.get(row.purchase_id) || [];
+    group.push(row);
+    grouped.set(row.purchase_id, group);
+  }
+  const purchase = invoice
+    ? candidates[0]
+    : candidates.find((row) =>
+      validUuid(row.id) && purchaseItemsEqual(items, grouped.get(row.id) || [])
+    );
+  if (!purchase || !validUuid(purchase.id)) return null;
+
+  const supplierResult = await admin(
+    "/rest/v1/financeiro_fornecedores?select=id,name&clinic_id=eq." + encode(clinicId) +
+      "&id=eq." + encode(supplierId) + "&limit=1",
+  );
+  const supplier = supplierResult.response.ok ? rows(supplierResult.data)[0] : null;
+  const storedItems = grouped.get(purchase.id) || [];
+  const productIds = storedItems.map((row) => row.product_id).filter(validUuid);
+  const productNames = new Map<string, string>();
+  if (productIds.length) {
+    const productResult = await admin(
+      "/rest/v1/financeiro_produtos?select=id,name&clinic_id=eq." + encode(clinicId) +
+        `&id=in.${inFilter([...new Set(productIds)])}`,
+    );
+    if (productResult.response.ok) {
+      for (const product of rows(productResult.data)) {
+        if (validUuid(product.id) && typeof product.name === "string") {
+          productNames.set(product.id, product.name);
+        }
+      }
+    }
+  }
+  return {
+    match: invoice ? "exact" : "possible",
+    purchase,
+    candidate: {
+      id: purchase.id,
+      lancamento_id: purchase.expense_entry_id,
+      fornecedor_id: purchase.supplier_id,
+      fornecedor: supplier && typeof supplier.name === "string" ? supplier.name : "Fornecedor",
+      data_compra: purchase.purchase_date,
+      numero_documento: purchase.invoice_number,
+      condicao_pagamento: purchase.payment_condition,
+      parcelas: purchase.installments,
+      subtotal_itens: numberFrom(purchase.items_subtotal),
+      valor_frete: numberFrom(purchase.freight_amount),
+      total: numberFrom(purchase.total_amount),
+      situacao: purchase.state,
+      itens: storedItems.map((row) => ({
+        produto_id: row.product_id,
+        produto: validUuid(row.product_id)
+          ? productNames.get(row.product_id) || "Produto"
+          : "Produto",
+        quantidade: numberFrom(row.quantity),
+        valor_unitario: numberFrom(row.unit_cost),
+        lote: row.lot,
+        validade: row.expiry,
+      })),
+    },
+  };
 }
 
 async function handleCreatePurchase(
@@ -2356,38 +3643,621 @@ async function handleCreatePurchase(
   );
   const condition = enumValue(payload.condicao_pagamento, "condicao_pagamento", PAYMENT_CONDITIONS);
   const installments = integerValue(payload.parcelas, "parcelas", 1, 1, 120);
+  if (
+    (condition === "avista" && installments !== 1) ||
+    (condition !== "avista" && installments < 2)
+  ) {
+    throw new ApiError(
+      422,
+      "invalid_purchase_installments",
+      condition === "avista"
+        ? "Compra a vista deve ter exatamente uma parcela."
+        : "Compra parcelada ou com entrada e saldo deve ter pelo menos duas parcelas.",
+    );
+  }
   const category = requiredText(payload.categoria, "categoria", 2, 100);
   const notes = optionalText(payload.observacoes, "observacoes", 1000);
+  const freight = decimalValue(
+    payload.valor_frete ?? payload.frete ?? 0,
+    "valor_frete",
+    2,
+    true,
+  );
   const items = normalizePurchaseItems(payload.itens);
   await assertParty(clinicId, "financeiro_fornecedores", supplierId, "invalid_supplier");
   for (const productId of [...new Set(items.map((item) => item.produto_id as string))]) {
     await assertParty(clinicId, "financeiro_produtos", productId, "invalid_product");
   }
-  const result = await rpc("financeiro_criar_compra", {
+  const confirmDistinct = booleanValue(
+    payload.confirmar_compra_distinta,
+    "confirmar_compra_distinta",
+    false,
+  );
+  const duplicate = await purchaseDuplicateCandidate(
+    clinicId,
+    supplierId,
+    purchaseDate,
+    invoice,
+    condition,
+    installments,
+    freight,
+    items,
+  );
+  if (duplicate?.match === "exact") {
+    throw new ApiError(
+      409,
+      "purchase_exact_duplicate",
+      "Esta compra já foi cadastrada. Abra o registro existente.",
+      {
+        tipo: "compra",
+        correspondencia: "exata",
+        existing_id: duplicate.purchase.id,
+        candidato: duplicate.candidate,
+      },
+    );
+  }
+  if (duplicate?.match === "possible" && !confirmDistinct) {
+    throw new ApiError(
+      409,
+      "purchase_possible_duplicate",
+      "Há uma compra muito parecida já cadastrada. Confira antes de continuar.",
+      {
+        tipo: "compra",
+        correspondencia: "possivel",
+        existing_id: duplicate.purchase.id,
+        candidato: duplicate.candidate,
+      },
+    );
+  }
+  const confirmedDuplicateId = confirmDistinct
+    ? requiredUuid(payload.compra_duplicada_id, "compra_duplicada_id")
+    : null;
+  if (confirmDistinct && (!duplicate || duplicate.purchase.id !== confirmedDuplicateId)) {
+    throw new ApiError(
+      409,
+      "purchase_duplicate_confirmation_stale",
+      "A compra parecida mudou. Confira novamente antes de continuar.",
+    );
+  }
+  let result: unknown;
+  try {
+    result = await rpc("financeiro_criar_compra", {
+      p_clinic_id: clinicId,
+      p_user_id: userId,
+      p_supplier_id: supplierId,
+      p_purchase_date: purchaseDate,
+      p_invoice_number: invoice,
+      p_payment_condition: condition,
+      p_installments: installments,
+      p_category: category,
+      p_notes: notes,
+      p_items: items,
+      p_idempotency_key: key,
+      p_request_id: context.requestId,
+      p_freight_amount: freight,
+      p_confirm_distinct: confirmDistinct,
+      p_duplicate_reason: confirmDistinct
+        ? requiredText(payload.motivo_duplicidade, "motivo_duplicidade", 3, 500)
+        : null,
+      p_duplicate_operation_id: confirmDistinct ? operationId(payload) : null,
+    });
+  } catch (error) {
+    if (
+      error instanceof ApiError &&
+      ["purchase_exact_duplicate", "purchase_possible_duplicate"].includes(error.code)
+    ) {
+      const concurrent = await purchaseDuplicateCandidate(
+        clinicId,
+        supplierId,
+        purchaseDate,
+        invoice,
+        condition,
+        installments,
+        freight,
+        items,
+      );
+      if (concurrent) {
+        throw new ApiError(error.status, error.code, error.publicMessage, {
+          tipo: "compra",
+          correspondencia: concurrent.match === "exact" ? "exata" : "possivel",
+          existing_id: concurrent.purchase.id,
+          candidato: concurrent.candidate,
+        });
+      }
+    }
+    throw error;
+  }
+  if (!isRecord(result)) {
+    throw new ApiError(502, "purchase_create_failed", "Não foi possível registrar a compra.");
+  }
+  const purchaseId = requiredUuid(result.compra_id, "compra_id");
+  const savedPurchase = await getPurchase(clinicId, purchaseId, null);
+  if (!savedPurchase) {
+    throw new ApiError(
+      502,
+      "purchase_read_failed",
+      "A compra foi salva, mas não pôde ser recarregada.",
+    );
+  }
+  return success(req, context, {
+    compra: presentPurchase(savedPurchase),
+    idempotente: result.idempotente === true,
+  }, result.idempotente === true ? 200 : 201);
+}
+
+function presentPurchase(row: JsonRecord): JsonRecord {
+  return {
+    id: row.id,
+    fornecedor_id: row.supplier_id,
+    lancamento_id: row.expense_entry_id,
+    data_compra: row.purchase_date,
+    numero_documento: row.invoice_number,
+    condicao_pagamento: row.payment_condition,
+    parcelas: row.installments,
+    subtotal_itens: numberFrom(row.items_subtotal),
+    valor_frete: numberFrom(row.freight_amount),
+    total: numberFrom(row.total_amount),
+    situacao: row.state,
+    observacoes: row.notes,
+    versao: row.version,
+    cancelada_em: row.cancelled_at,
+    motivo_cancelamento: row.cancellation_reason,
+    criado_em: row.created_at,
+    atualizado_em: row.updated_at,
+  };
+}
+
+async function getPurchase(
+  clinicId: string,
+  purchaseId: string | null,
+  entryId: string | null,
+): Promise<JsonRecord | null> {
+  const identity = purchaseId
+    ? `id=eq.${encode(purchaseId)}`
+    : `expense_entry_id=eq.${encode(entryId || "")}`;
+  const result = await admin(
+    "/rest/v1/financeiro_compras?select=id,supplier_id,expense_entry_id,purchase_date," +
+      "invoice_number,payment_condition,installments,items_subtotal,freight_amount," +
+      "total_amount,state,notes,version," +
+      "cancelled_at,cancellation_reason,created_at,updated_at" +
+      `&clinic_id=eq.${encode(clinicId)}&${identity}&limit=1`,
+  );
+  if (!result.response.ok) {
+    throw new ApiError(502, "purchase_read_failed", "Não foi possível ler a compra.");
+  }
+  return rows(result.data)[0] || null;
+}
+
+async function handleGetPurchase(
+  req: Request,
+  context: DualAuthContext,
+  payload: JsonRecord,
+): Promise<Response> {
+  const { clinicId } = tenant(context);
+  const purchaseId = optionalUuid(payload.id ?? payload.compra_id, "compra_id");
+  const entryId = purchaseId
+    ? null
+    : requiredUuid(payload.lancamento_id ?? payload.entry_id, "lancamento_id");
+  const purchase = await getPurchase(clinicId, purchaseId, entryId);
+  if (!purchase) throw new ApiError(404, "purchase_not_found", "Compra não encontrada.");
+  const itemsResult = await admin(
+    "/rest/v1/financeiro_compra_itens?select=id,product_id,quantity,unit_cost,total_amount," +
+      "position,lot,expiry,allocated_freight,landed_unit_cost," +
+      `created_at&clinic_id=eq.${encode(clinicId)}&purchase_id=eq.${encode(String(purchase.id))}` +
+      "&order=position.asc&limit=100",
+  );
+  if (!itemsResult.response.ok) {
+    throw new ApiError(
+      502,
+      "purchase_items_read_failed",
+      "Não foi possível ler os itens da compra.",
+    );
+  }
+  return success(req, context, {
+    compra: {
+      ...presentPurchase(purchase),
+      itens: rows(itemsResult.data).map((item) => ({
+        id: item.id,
+        produto_id: item.product_id,
+        quantidade: numberFrom(item.quantity),
+        custo_unitario: numberFrom(item.unit_cost),
+        total: numberFrom(item.total_amount),
+        posicao: numberFrom(item.position),
+        lote: item.lot,
+        validade: item.expiry,
+        frete_rateado: numberFrom(item.allocated_freight),
+        custo_unitario_efetivo: numberFrom(item.landed_unit_cost),
+      })),
+    },
+  });
+}
+
+async function handleListInventory(
+  req: Request,
+  context: DualAuthContext,
+  payload: JsonRecord,
+): Promise<Response> {
+  const { clinicId } = tenant(context);
+  const productId = optionalUuid(payload.produto_id, "produto_id");
+  const includeEmpty = booleanValue(payload.incluir_zerados, "incluir_zerados", false);
+  const pageSize = integerValue(payload.limite, "limite", 300, 1, 500);
+  let path = "/rest/v1/financeiro_estoque_saldos?select=product_id,lot_id,lot,expiry," +
+    "unit,quantity_balance,effective_value" +
+    `&clinic_id=eq.${encode(clinicId)}`;
+  if (productId) path += `&product_id=eq.${encode(productId)}`;
+  if (!includeEmpty) path += "&quantity_balance=gt.0";
+  path += `&order=expiry.asc,lot.asc&limit=${pageSize}`;
+  const result = await admin(path);
+  if (!result.response.ok) {
+    throw new ApiError(502, "inventory_read_failed", "Não foi possível ler o estoque.");
+  }
+  return success(req, context, {
+    estoque: rows(result.data).map((row) => ({
+      produto_id: row.product_id,
+      lote_id: row.lot_id,
+      lote: row.lot,
+      validade: row.expiry,
+      unidade: row.unit,
+      saldo: numberFrom(row.quantity_balance),
+      valor_efetivo: numberFrom(row.effective_value),
+    })),
+  });
+}
+
+async function handleListPendingStockRegularizations(
+  req: Request,
+  context: DualAuthContext,
+  payload: JsonRecord,
+): Promise<Response> {
+  const { clinicId } = tenant(context);
+  const pageSize = integerValue(payload.limite, "limite", 100, 1, 200);
+  const result = await admin(
+    "/rest/v1/financeiro_compras_itens_pendentes_estoque?select=" +
+      "purchase_item_id,purchase_id,supplier_id,supplier_name,purchase_date,invoice_number," +
+      "product_id,product_name,unit,quantity,unit_cost,total_amount" +
+      `&clinic_id=eq.${
+        encode(clinicId)
+      }&order=purchase_date.asc,purchase_item_id.asc&limit=${pageSize}`,
+  );
+  if (!result.response.ok) {
+    throw new ApiError(
+      502,
+      "pending_stock_read_failed",
+      "Não foi possível ler as compras antigas pendentes de lote.",
+    );
+  }
+  return success(req, context, {
+    pendencias: rows(result.data).map((row) => ({
+      item_compra_id: row.purchase_item_id,
+      compra_id: row.purchase_id,
+      fornecedor_id: row.supplier_id,
+      fornecedor: row.supplier_name,
+      data_compra: row.purchase_date,
+      documento: row.invoice_number,
+      produto_id: row.product_id,
+      produto: row.product_name,
+      unidade: row.unit,
+      quantidade: numberFrom(row.quantity),
+      custo_unitario_original: numberFrom(row.unit_cost),
+      custo_total_original: numberFrom(row.total_amount),
+    })),
+  });
+}
+
+async function handleRegularizePurchaseItemStock(
+  req: Request,
+  context: DualAuthContext,
+  payload: JsonRecord,
+): Promise<Response> {
+  const { clinicId, userId } = tenant(context);
+  const purchaseItemId = requiredUuid(
+    payload.item_compra_id ?? payload.purchase_item_id,
+    "item_compra_id",
+  );
+  const result = await rpc("financeiro_regularizar_item_compra_estoque", {
     p_clinic_id: clinicId,
     p_user_id: userId,
-    p_supplier_id: supplierId,
-    p_purchase_date: purchaseDate,
-    p_invoice_number: invoice,
-    p_payment_condition: condition,
-    p_installments: installments,
-    p_category: category,
-    p_notes: notes,
-    p_items: items,
-    p_idempotency_key: key,
+    p_purchase_item_id: purchaseItemId,
+    p_lot: requiredText(payload.lote, "lote", 1, 100),
+    p_expiry: dateValue(payload.validade, "validade"),
+    p_use_as_current_cost: booleanValue(
+      payload.usar_como_custo_atual,
+      "usar_como_custo_atual",
+      false,
+    ),
+    p_operation_id: operationId(payload),
+    p_reason: operationReason(payload),
     p_request_id: context.requestId,
   });
   if (!isRecord(result)) {
-    throw new ApiError(502, "purchase_create_failed", "Não foi possível registrar a compra.");
+    throw new ApiError(
+      502,
+      "stock_regularization_failed",
+      "Não foi possível regularizar o estoque deste item.",
+    );
+  }
+  return success(req, context, {
+    regularizacao: {
+      item_compra_id: result.purchase_item_id,
+      lote_id: result.lot_id,
+      movimento_id: result.movement_id,
+      custo_id: result.cost_id,
+      usado_como_custo_atual: result.used_as_current_cost === true,
+      idempotente: result.idempotent === true,
+    },
+  });
+}
+
+async function handleCancelPurchase(
+  req: Request,
+  context: DualAuthContext,
+  payload: JsonRecord,
+): Promise<Response> {
+  const { clinicId, userId } = tenant(context);
+  const suppliedPurchaseId = optionalUuid(payload.id ?? payload.compra_id, "compra_id");
+  const suppliedEntryId = suppliedPurchaseId
+    ? null
+    : requiredUuid(payload.lancamento_id ?? payload.entry_id, "lancamento_id");
+  const purchase = await getPurchase(clinicId, suppliedPurchaseId, suppliedEntryId);
+  if (!purchase || !validUuid(purchase.id)) {
+    throw new ApiError(404, "purchase_not_found", "Compra não encontrada.");
+  }
+  const result = await rpc("financeiro_cancelar_compra", {
+    p_clinic_id: clinicId,
+    p_user_id: userId,
+    p_purchase_id: purchase.id,
+    p_expected_version: expectedVersion(payload),
+    p_reason: operationReason(payload),
+    p_operation_id: operationId(payload),
+    p_request_id: context.requestId,
+  });
+  if (!isRecord(result)) {
+    throw new ApiError(502, "purchase_cancel_failed", "Não foi possível cancelar a compra.");
   }
   return success(req, context, {
     compra: {
       id: result.compra_id,
       lancamento_id: result.lancamento_id,
-      total: numberFrom(result.total),
+      versao: result.versao,
+      estornos_criados: result.estornos,
+      estornos_estoque: result.estornos_estoque,
+      parcelas_canceladas: result.parcelas_canceladas,
+      cancelada: true,
     },
     idempotente: result.idempotente === true,
-  }, result.idempotente === true ? 200 : 201);
+  });
+}
+
+function duplicateEntityQuery(
+  clinicId: string,
+  entityKind: string,
+  ids: string[],
+): string | null {
+  const filter = inFilter(ids);
+  const tenantFilter = `&clinic_id=eq.${encode(clinicId)}`;
+  switch (entityKind) {
+    case "cliente":
+      return `/rest/v1/patients?select=id,full_name${tenantFilter}&id=in.${filter}`;
+    case "fornecedor":
+      return `/rest/v1/financeiro_fornecedores?select=id,name${tenantFilter}&id=in.${filter}`;
+    case "marca":
+      return `/rest/v1/financeiro_marcas?select=id,name${tenantFilter}&id=in.${filter}`;
+    case "produto":
+      return `/rest/v1/financeiro_produtos?select=id,name,presentation,unit${tenantFilter}&id=in.${filter}`;
+    case "compra":
+      return "/rest/v1/financeiro_compras?select=id,purchase_date,invoice_number," +
+        `total_amount,freight_amount${tenantFilter}&id=in.${filter}`;
+    case "lancamento":
+      return "/rest/v1/financeiro_lancamentos?select=id,description,competence_date," +
+        `total_amount,entry_type${tenantFilter}&id=in.${filter}`;
+    case "pagamento":
+      return "/rest/v1/financeiro_pagamentos?select=id,paid_at,amount,payment_method" +
+        `${tenantFilter}&id=in.${filter}`;
+    case "custo_produto":
+      return "/rest/v1/financeiro_produto_custos?select=id,product_id,cost_date," +
+        `total_cost,unit_cost${tenantFilter}&id=in.${filter}`;
+    case "foto_clinica":
+      return "/rest/v1/protocol_photos?select=id,protocol_id,phase,taken_at," +
+        `protocols!inner(clinic_id)&id=in.${filter}&protocols.clinic_id=eq.${encode(clinicId)}`;
+    default:
+      return null;
+  }
+}
+
+function duplicateEntityDescriptor(
+  entityKind: string,
+  entityId: string,
+  row: JsonRecord | undefined,
+): JsonRecord {
+  const suffix = entityId.slice(0, 8);
+  if (!row) {
+    return { id: entityId, titulo: "Registro " + suffix, resumo: "Cadastro não localizado" };
+  }
+  switch (entityKind) {
+    case "cliente":
+      return { id: entityId, titulo: String(row.full_name || "Cliente"), resumo: "Cliente · " + suffix };
+    case "fornecedor":
+      return { id: entityId, titulo: String(row.name || "Fornecedor"), resumo: "Fornecedor · " + suffix };
+    case "marca":
+      return { id: entityId, titulo: String(row.name || "Marca"), resumo: "Marca · " + suffix };
+    case "produto": {
+      const presentation = typeof row.presentation === "string" && row.presentation.trim()
+        ? " · " + row.presentation.trim()
+        : "";
+      const unit = typeof row.unit === "string" && row.unit.trim() ? " · " + row.unit.trim() : "";
+      return {
+        id: entityId,
+        titulo: String(row.name || "Produto"),
+        resumo: "Produto" + presentation + unit + " · " + suffix,
+      };
+    }
+    case "compra":
+      return {
+        id: entityId,
+        titulo: "Compra de " + String(row.purchase_date || "data não informada"),
+        resumo: "Total " + numberFrom(row.total_amount).toFixed(2) +
+          " · frete " + numberFrom(row.freight_amount).toFixed(2) +
+          (row.invoice_number ? " · documento " + String(row.invoice_number).slice(0, 80) : "") +
+          " · " + suffix,
+      };
+    case "lancamento":
+      return {
+        id: entityId,
+        titulo: String(row.description || "Lançamento").slice(0, 200),
+        resumo: String(row.entry_type || "lançamento") + " · " +
+          String(row.competence_date || "sem data") + " · " +
+          numberFrom(row.total_amount).toFixed(2) + " · " + suffix,
+      };
+    case "pagamento":
+      return {
+        id: entityId,
+        titulo: "Pagamento · " + String(row.payment_method || "forma não informada"),
+        resumo: String(row.paid_at || "sem data") + " · " +
+          numberFrom(row.amount).toFixed(2) + " · " + suffix,
+      };
+    case "custo_produto":
+      return {
+        id: entityId,
+        titulo: "Custo de produto · " + String(row.cost_date || "sem data"),
+        resumo: "Total " + numberFrom(row.total_cost).toFixed(2) +
+          " · unitário " + numberFrom(row.unit_cost).toFixed(4) + " · " + suffix,
+      };
+    case "foto_clinica":
+      return {
+        id: entityId,
+        titulo: "Foto clínica · " + String(row.phase || "categoria não informada"),
+        resumo: String(row.taken_at || "sem data") + " · " + suffix,
+      };
+    default:
+      return { id: entityId, titulo: "Registro " + suffix, resumo: entityKind };
+  }
+}
+
+async function duplicateDescriptors(
+  clinicId: string,
+  reviewRows: JsonRecord[],
+): Promise<Map<string, JsonRecord>> {
+  const idsByKind = new Map<string, string[]>();
+  for (const review of reviewRows) {
+    const kind = String(review.entity_kind || "");
+    const ids = idsByKind.get(kind) || [];
+    if (validUuid(review.primary_id)) ids.push(review.primary_id);
+    if (validUuid(review.candidate_id)) ids.push(review.candidate_id);
+    idsByKind.set(kind, ids);
+  }
+  const output = new Map<string, JsonRecord>();
+  await Promise.all([...idsByKind.entries()].map(async ([kind, ids]) => {
+    const unique = [...new Set(ids)];
+    const path = duplicateEntityQuery(clinicId, kind, unique);
+    if (!path) return;
+    const result = await admin(path);
+    const byId = new Map<string, JsonRecord>();
+    if (result.response.ok) {
+      for (const row of rows(result.data)) {
+        if (validUuid(row.id)) byId.set(row.id, row);
+      }
+    }
+    for (const id of unique) {
+      output.set(kind + ":" + id, duplicateEntityDescriptor(kind, id, byId.get(id)));
+    }
+  }));
+  return output;
+}
+
+async function handleListDuplicateReviews(
+  req: Request,
+  context: DualAuthContext,
+  payload: JsonRecord,
+): Promise<Response> {
+  const { clinicId } = tenant(context);
+  const page = integerValue(payload.pagina, "pagina", 1, 1, 100_000);
+  const pageSize = integerValue(payload.por_pagina, "por_pagina", 50, 1, 100);
+  const requestedStatus = payload.status === undefined || payload.status === null || payload.status === ""
+    ? "pendente"
+    : requiredText(payload.status, "status", 3, 40).toLowerCase();
+  if (requestedStatus !== "todos" && !DUPLICATE_REVIEW_STATUSES.has(requestedStatus)) {
+    throw new ApiError(422, "invalid_duplicate_status", "Filtro de duplicidades inválido.");
+  }
+  const offset = (page - 1) * pageSize;
+  let path = "/rest/v1/clinic_duplicate_reviews?select=id,entity_kind,primary_id," +
+    "candidate_id,match_kind,reason_code,status,detected_at,reviewed_at,review_reason,version" +
+    `&clinic_id=eq.${encode(clinicId)}`;
+  if (requestedStatus !== "todos") path += `&status=eq.${encode(requestedStatus)}`;
+  path += `&order=detected_at.desc,id.desc&limit=${pageSize + 1}&offset=${offset}`;
+  const result = await admin(path);
+  if (!result.response.ok) {
+    throw new ApiError(502, "duplicate_reviews_read_failed", "Não foi possível ler a fila de duplicidades.");
+  }
+  const allRows = rows(result.data);
+  const visibleRows = allRows.slice(0, pageSize);
+  const descriptors = await duplicateDescriptors(clinicId, visibleRows);
+  return success(req, context, {
+    revisoes: visibleRows.map((review) => ({
+      id: review.id,
+      entidade: review.entity_kind,
+      tipo_correspondencia: review.match_kind,
+      motivo_tecnico: review.reason_code,
+      status: review.status,
+      versao: review.version,
+      detectado_em: review.detected_at,
+      revisado_em: review.reviewed_at,
+      motivo_revisao: review.review_reason,
+      principal: validUuid(review.primary_id)
+        ? descriptors.get(String(review.entity_kind) + ":" + review.primary_id) || null
+        : null,
+      candidato: validUuid(review.candidate_id)
+        ? descriptors.get(String(review.entity_kind) + ":" + review.candidate_id) || null
+        : null,
+    })),
+    paginacao: {
+      pagina: page,
+      por_pagina: pageSize,
+      tem_mais: allRows.length > pageSize,
+    },
+  });
+}
+
+async function handleResolveDuplicateReview(
+  req: Request,
+  context: DualAuthContext,
+  payload: JsonRecord,
+): Promise<Response> {
+  const { clinicId, userId } = tenant(context);
+  const domainOperationId = operationId(payload);
+  const reviewId = requiredUuid(
+    payload.revisao_id ?? payload.review_id ?? payload.id,
+    "revisao_id",
+  );
+  const resolution = enumValue(
+    payload.resolucao ?? payload.status,
+    "resolucao",
+    DUPLICATE_REVIEW_RESOLUTIONS,
+  );
+  const result = await rpc("financeiro_resolver_revisao_duplicidade", {
+    p_clinic_id: clinicId,
+    p_actor_id: userId,
+    p_review_id: reviewId,
+    p_expected_version: expectedVersion(payload),
+    p_resolution: resolution,
+    p_reason: requiredText(payload.motivo, "motivo", 10, 500),
+    p_operation_id: domainOperationId,
+    // A prova one-time audita com context.requestId. O evento de domínio usa a
+    // chave idempotente da própria decisão para não colidir nem perder trilha.
+    p_request_id: domainOperationId,
+  });
+  const resolved = rows(result)[0];
+  if (!resolved || !validUuid(resolved.review_id)) {
+    throw new ApiError(502, "duplicate_review_resolve_failed", "Não foi possível encerrar a revisão.");
+  }
+  return success(req, context, {
+    revisao: {
+      id: resolved.review_id,
+      status: resolved.status,
+      versao: resolved.version,
+      revisado_em: resolved.reviewed_at,
+    },
+    idempotente: resolved.idempotent === true,
+  });
 }
 
 async function handleListAudit(
@@ -2458,7 +4328,7 @@ export async function handleRequest(req: Request): Promise<Response> {
     headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
     headers.set(
       "Access-Control-Allow-Headers",
-      "authorization, apikey, content-type, x-client-info",
+      "authorization, apikey, content-type, x-client-info, x-amj-reauthentication",
     );
     headers.set("Access-Control-Max-Age", "600");
     return new Response(null, { status: 204, headers });
@@ -2498,6 +4368,22 @@ export async function handleRequest(req: Request): Promise<Response> {
   try {
     const payload = await readJsonBody(req);
     action = requiredText(payload.acao, "acao", 2, 80).toLowerCase();
+    if (RECENT_PASSWORD_ACTIONS.has(action)) {
+      const targetId = await protectedTargetForAction(action, payload, context);
+      await requireProtectedOperation(req, context, payload, action, targetId);
+    }
+    if (
+      action === "criar_compra" &&
+      booleanValue(payload.confirmar_compra_distinta, "confirmar_compra_distinta", false)
+    ) {
+      await requireProtectedOperation(
+        req,
+        context,
+        payload,
+        "confirmar_compra_distinta",
+        requiredUuid(payload.compra_duplicada_id, "compra_duplicada_id"),
+      );
+    }
     let response: Response;
     switch (action) {
       case "resumo":
@@ -2527,26 +4413,104 @@ export async function handleRequest(req: Request): Promise<Response> {
       case "listar_clientes":
         response = await handleListClients(req, context, payload);
         break;
+      case "obter_cliente":
+        response = await handleGetClient(req, context, payload);
+        break;
       case "sugerir_clientes":
         response = await handleSuggestClients(req, context, payload);
         break;
       case "criar_cliente":
         response = await handleCreateClient(req, context, payload);
         break;
+      case "editar_cliente":
+        response = await handleEditClient(req, context, payload);
+        break;
+      case "arquivar_cliente":
+        response = await handleClientArchiveState(req, context, payload, false);
+        break;
+      case "restaurar_cliente":
+        response = await handleClientArchiveState(req, context, payload, true);
+        break;
       case "listar_catalogos":
-        response = await handleListCatalogs(req, context);
+        response = await handleListCatalogs(req, context, payload);
         break;
       case "criar_marca":
         response = await handleCreateBrand(req, context, payload);
         break;
+      case "obter_marca":
+        response = await handleGetCatalog(req, context, payload, "marca");
+        break;
+      case "editar_marca":
+        response = await handleEditBrand(req, context, payload);
+        break;
+      case "arquivar_marca":
+        response = await handleCatalogArchiveState(req, context, payload, "marca", false);
+        break;
+      case "restaurar_marca":
+        response = await handleCatalogArchiveState(req, context, payload, "marca", true);
+        break;
       case "criar_produto":
         response = await handleCreateProduct(req, context, payload);
+        break;
+      case "obter_produto":
+        response = await handleGetCatalog(req, context, payload, "produto");
+        break;
+      case "editar_produto":
+        response = await handleEditProduct(req, context, payload);
+        break;
+      case "arquivar_produto":
+        response = await handleCatalogArchiveState(req, context, payload, "produto", false);
+        break;
+      case "restaurar_produto":
+        response = await handleCatalogArchiveState(req, context, payload, "produto", true);
+        break;
+      case "listar_custos_produto":
+        response = await handleListProductCosts(req, context, payload);
+        break;
+      case "salvar_custo_produto":
+        response = await handleSaveProductCost(req, context, payload);
+        break;
+      case "cancelar_custo_produto":
+        response = await handleCancelProductCost(req, context, payload);
         break;
       case "criar_fornecedor":
         response = await handleCreateSupplier(req, context, payload);
         break;
+      case "obter_fornecedor":
+        response = await handleGetCatalog(req, context, payload, "fornecedor");
+        break;
+      case "editar_fornecedor":
+        response = await handleEditSupplier(req, context, payload);
+        break;
+      case "arquivar_fornecedor":
+        response = await handleCatalogArchiveState(req, context, payload, "fornecedor", false);
+        break;
+      case "restaurar_fornecedor":
+        response = await handleCatalogArchiveState(req, context, payload, "fornecedor", true);
+        break;
       case "criar_compra":
         response = await handleCreatePurchase(req, context, payload);
+        break;
+      case "obter_compra":
+        response = await handleGetPurchase(req, context, payload);
+        break;
+      case "listar_estoque":
+        response = await handleListInventory(req, context, payload);
+        break;
+      case "listar_pendencias_estoque":
+        response = await handleListPendingStockRegularizations(req, context, payload);
+        break;
+      case "regularizar_item_compra_estoque":
+        response = await handleRegularizePurchaseItemStock(req, context, payload);
+        break;
+      case "cancelar_compra":
+        response = await handleCancelPurchase(req, context, payload);
+        break;
+      case "listar_revisoes_duplicidade":
+        response = await handleListDuplicateReviews(req, context, payload);
+        break;
+      case "resolver_revisao_duplicidade":
+        response = await handleResolveDuplicateReview(req, context, payload);
         break;
       case "listar_auditoria":
         response = await handleListAudit(req, context, payload);
@@ -2573,7 +4537,7 @@ export async function handleRequest(req: Request): Promise<Response> {
           status_code: error.status,
         },
       });
-      return fail(req, error.publicMessage, error.status, error.code);
+      return fail(req, error.publicMessage, error.status, error.code, error.details);
     }
     console.error("Financial request failed");
     await writeClinicAudit(AUTH_CONFIG, context, {

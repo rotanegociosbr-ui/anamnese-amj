@@ -319,11 +319,13 @@ function staticAndAccessibilityTests() {
   referencedIds.forEach(id => assert(idSet.has(id), `Referência el('${id}') não existe no DOM.`));
   const labels = new Set([...html.matchAll(/<label[^>]*\sfor="([^"]+)"/g)].map(match => match[1]));
   [
-    'auth-email', 'auth-senha', 'senha', 'auth-nova-senha', 'auth-confirma-senha',
+    'auth-email', 'auth-senha', 'auth-nova-senha', 'auth-confirma-senha',
     'mfa-cadastro-codigo', 'mfa-desafio-codigo'
   ].forEach(id => assert(labels.has(id), `Campo ${id} precisa de label.`));
 
-  assert(html.includes('role="tablist" aria-label="Escolha o modo de acesso"'));
+  assert(!html.includes('Escolha o modo de acesso'));
+  assert(!html.includes('Acesso temporário'));
+  assert(!html.includes('Senha temporária'));
   assert(html.includes('role="alert" aria-live="assertive"'));
   const referrerPolicy = '<meta name="referrer" content="no-referrer">';
   const referrerPolicyPosition = html.indexOf(referrerPolicy);
@@ -344,9 +346,11 @@ function staticAndAccessibilityTests() {
   assert(!authSource.includes('.signUp('));
   assert(!html.includes('.signUp('));
   assert(html.includes("headers.Authorization = 'Bearer ' + session.access_token"));
-  assert(html.includes("headers['x-senha'] = hashSenha"));
+  assert(!html.includes('x-senha'));
+  assert(!html.includes('hashSenha'));
+  assert(!html.includes("sessionStorage.setItem('amj_s'"));
   assert(html.includes("if (modoAcesso === 'auth')"));
-  assert(html.includes("if (modoAcesso === 'legacy' && hashSenha)"));
+  assert(!html.includes("modoAcesso === 'legacy'"));
 
   assert(html.includes('let aplicativoLiberado = false;'));
   const sessionActiveStart = inlineSource.indexOf('function sessaoAplicativoAtiva');
@@ -356,7 +360,7 @@ function staticAndAccessibilityTests() {
     'Uma sessão AAL1 em cadastro MFA não pode liberar o aplicativo.');
 
   const authStepStart = inlineSource.indexOf('async function processarEtapaAuth');
-  const authStepEnd = inlineSource.indexOf('async function entrarTemporariamente', authStepStart);
+  const authStepEnd = inlineSource.indexOf("el('form-login-individual')", authStepStart);
   const authStepSource = inlineSource.slice(authStepStart, authStepEnd);
   const appLockPosition = authStepSource.indexOf('aplicativoLiberado = false;');
   const clockPosition = authStepSource.indexOf('iniciarRelogioSessao(restaurando);');
@@ -387,21 +391,19 @@ function staticAndAccessibilityTests() {
   const carregarAgendaSource = inlineSource.slice(carregarAgendaStart, carregarAgendaEnd);
   assert(carregarAgendaStart >= 0 && carregarAgendaEnd > carregarAgendaStart);
   assert(carregarAgendaSource.includes('if (!sessaoAplicativoAtiva() || agendaCarregando) return;'));
-  assert(!carregarAgendaSource.includes('hashSenha'),
-    'carregarAgenda não pode depender da senha legada no modo individual.');
+  assert(!carregarAgendaSource.includes('x-senha'),
+    'carregarAgenda deve usar somente a sessão individual.');
 
   const pollingStart = inlineSource.indexOf('function agendaIniciarPolling');
   const pollingEnd = inlineSource.indexOf('function agendaAtivarAba', pollingStart);
   const pollingSource = inlineSource.slice(pollingStart, pollingEnd);
   assert(pollingStart >= 0 && pollingEnd > pollingStart);
   assert(pollingSource.includes('if (!sessaoAplicativoAtiva() || document.hidden) return;'));
-  assert(!pollingSource.includes('hashSenha'),
-    'O polling da agenda não pode depender da senha legada no modo individual.');
+  assert(!pollingSource.includes('x-senha'),
+    'O polling da agenda deve usar somente a sessão individual.');
 
-  assert(!/if\s*\(\s*!hashSenha/.test(inlineSource),
-    'Gates gerais de sessão devem aceitar Auth e legado.');
-  assert(!/if\s*\(\s*hashSenha\s*&&/.test(inlineSource),
-    'Gates gerais de sessão devem usar sessaoAplicativoAtiva().');
+  assert(!/legacy_shared_secret|x-senha|hashSenha|amj_s/.test(inlineSource),
+    'O painel privado não pode manter autenticação por senha compartilhada.');
 }
 
 (async () => {

@@ -3,8 +3,8 @@ import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import type { PDFFont, PDFPage } from "pdf-lib";
 
 const TYPE = "tcle_toxina_botulinica";
-const TERM_VERSION = "2026-08-11-v1";
-const TERM_SHA256 = "5b40612ee3ea8cdef9811b9f966558073aa37c6aa386364b35e71b5419f77858";
+const TERM_VERSION = "2026-08-18-v1";
+const TERM_SHA256 = "c4c21544a3e0b7ad9d020ca4e36437dbf7424ff808c1dee7d61542283d33bbf8";
 const BUCKET = "documentos-clinicos";
 const MAX_BODY_BYTES = 1_500_000;
 const MAX_PDF_BYTES = 4_000_000;
