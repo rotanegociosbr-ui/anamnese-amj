@@ -551,13 +551,61 @@ body.app-shell-authenticated #tela-lista {
   font-size: 10px;
 }
 
+.app-fluxo-conectado {
+  padding: clamp(18px, 2.5vw, 28px);
+  border: 1px solid var(--app-line);
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: var(--app-shadow);
+}
+
+.app-fluxo-etapas {
+  display: grid;
+  align-items: center;
+  grid-template-columns: repeat(4, minmax(0, 1fr) auto) minmax(0, 1fr);
+  gap: 8px;
+}
+
+.app-fluxo-etapas button {
+  display: grid;
+  gap: 3px;
+  min-height: 94px;
+  padding: 13px;
+  border: 1px solid var(--app-line);
+  border-radius: 13px;
+  background: var(--app-surface-soft);
+  color: var(--app-ink);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.app-fluxo-etapas button:hover,
+.app-fluxo-etapas button:focus-visible {
+  border-color: #c8ad72;
+  background: #fffaf1;
+  transform: translateY(-1px);
+}
+
+.app-fluxo-etapas button > span {
+  color: var(--app-gold);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.app-fluxo-etapas button > strong { font-size: 12.5px; }
+.app-fluxo-etapas button > small { color: var(--app-muted); font-size: 9.5px; }
+.app-fluxo-etapas > i { color: var(--app-gold); font-size: 18px; font-style: normal; text-align: center; }
+
 .app-fluxo-seguro {
+  margin: 16px 0 0;
   padding: 17px 18px;
   border: 1px solid #d7c398;
   border-left: 4px solid var(--app-gold);
   border-radius: 5px 14px 14px 5px;
   background: #fffaf0;
   color: var(--app-ink);
+  font-size: 10.5px;
 }
 
 .app-fluxo-seguro strong {
@@ -632,6 +680,22 @@ body.app-shell-authenticated #tela-lista {
   color: var(--app-gold);
 }
 
+.app-context-actions .app-procedure-photo-shortcut {
+  min-height: 50px;
+  padding-inline: 18px;
+  border-color: #825a35;
+  background: linear-gradient(135deg, #9b7149, #704828);
+  box-shadow: 0 10px 24px rgba(107, 73, 42, .18);
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+.app-context-actions .app-procedure-photo-shortcut:hover,
+.app-context-actions .app-procedure-photo-shortcut:focus-visible {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+}
+
 /* Visões simples: a mesma fonte de dados financeira, sem páginas duplicadas. */
 #aba-financeiro[data-app-finance-view] > .financeiro-cabecalho,
 .app-shell-procedure-view .operacao-cabecalho {
@@ -641,10 +705,62 @@ body.app-shell-authenticated #tela-lista {
 #aba-financeiro[data-app-finance-view="clientes"] .financeiro-kpis,
 #aba-financeiro[data-app-finance-view="clientes"] .financeiro-grafico-card,
 #aba-financeiro[data-app-finance-view="clientes"] .financeiro-atalhos,
-#aba-financeiro[data-app-finance-view="clientes"] .financeiro-editor:not(#financeiro-editor-cliente):not(#financeiro-editor-catalogo),
+#aba-financeiro[data-app-finance-view="clientes"] .financeiro-editor:not(#financeiro-editor-cliente),
 #aba-financeiro[data-app-finance-view="clientes"] .financeiro-lista-card,
 #aba-financeiro[data-app-finance-view="clientes"] #financeiro-editor-auditoria {
   display: none;
+}
+
+#aba-financeiro[data-app-finance-view="clientes"] [data-financeiro-cadastro-tipo]:not([data-financeiro-cadastro-tipo="clientes"]),
+#aba-financeiro[data-app-finance-view="produtos"] [data-financeiro-cadastro-tipo]:not([data-financeiro-cadastro-tipo="produtos"]),
+#aba-financeiro[data-app-finance-view="marcas"] [data-financeiro-cadastro-tipo]:not([data-financeiro-cadastro-tipo="marcas"]),
+#aba-financeiro[data-app-finance-view="fornecedores"] [data-financeiro-cadastro-tipo]:not([data-financeiro-cadastro-tipo="fornecedores"]) {
+  display: none;
+}
+
+#aba-financeiro[data-app-finance-view="produtos"] .financeiro-kpis,
+#aba-financeiro[data-app-finance-view="produtos"] .financeiro-grafico-card,
+#aba-financeiro[data-app-finance-view="produtos"] .financeiro-atalhos,
+#aba-financeiro[data-app-finance-view="produtos"] .financeiro-editor:not(#financeiro-editor-catalogo),
+#aba-financeiro[data-app-finance-view="produtos"] .financeiro-lista-card,
+#aba-financeiro[data-app-finance-view="produtos"] #financeiro-editor-auditoria,
+#aba-financeiro[data-app-finance-view="marcas"] .financeiro-kpis,
+#aba-financeiro[data-app-finance-view="marcas"] .financeiro-grafico-card,
+#aba-financeiro[data-app-finance-view="marcas"] .financeiro-atalhos,
+#aba-financeiro[data-app-finance-view="marcas"] .financeiro-editor:not(#financeiro-editor-catalogo),
+#aba-financeiro[data-app-finance-view="marcas"] .financeiro-lista-card,
+#aba-financeiro[data-app-finance-view="marcas"] #financeiro-editor-auditoria,
+#aba-financeiro[data-app-finance-view="fornecedores"] .financeiro-kpis,
+#aba-financeiro[data-app-finance-view="fornecedores"] .financeiro-grafico-card,
+#aba-financeiro[data-app-finance-view="fornecedores"] .financeiro-atalhos,
+#aba-financeiro[data-app-finance-view="fornecedores"] .financeiro-editor:not(#financeiro-editor-catalogo),
+#aba-financeiro[data-app-finance-view="fornecedores"] .financeiro-lista-card,
+#aba-financeiro[data-app-finance-view="fornecedores"] #financeiro-editor-auditoria {
+  display: none;
+}
+
+#aba-financeiro[data-app-finance-view="produtos"] #financeiro-form-fornecedor,
+#aba-financeiro[data-app-finance-view="produtos"] #financeiro-form-marca,
+#aba-financeiro[data-app-finance-view="marcas"] #financeiro-form-fornecedor,
+#aba-financeiro[data-app-finance-view="marcas"] #financeiro-form-produto,
+#aba-financeiro[data-app-finance-view="marcas"] #financeiro-form-custo-produto,
+#aba-financeiro[data-app-finance-view="fornecedores"] #financeiro-form-marca,
+#aba-financeiro[data-app-finance-view="fornecedores"] #financeiro-form-produto,
+#aba-financeiro[data-app-finance-view="fornecedores"] #financeiro-form-custo-produto {
+  display: none;
+}
+
+#aba-financeiro[data-app-finance-view="clientes"] .financeiro-cadastros-grid,
+#aba-financeiro[data-app-finance-view="produtos"] .financeiro-cadastros-grid,
+#aba-financeiro[data-app-finance-view="marcas"] .financeiro-cadastros-grid,
+#aba-financeiro[data-app-finance-view="fornecedores"] .financeiro-cadastros-grid,
+#aba-financeiro[data-app-finance-view="marcas"] .financeiro-subformularios,
+#aba-financeiro[data-app-finance-view="fornecedores"] .financeiro-subformularios {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+#aba-financeiro[data-app-finance-view="produtos"] .financeiro-subformularios {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 #aba-financeiro[data-app-finance-view="estoque"] .financeiro-kpis,
@@ -779,6 +895,14 @@ body.app-shell-authenticated #tela-lista {
   .app-shell-layout {
     display: block;
   }
+
+  #aba-financeiro[data-app-finance-view="produtos"] .financeiro-subformularios {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .app-fluxo-etapas { grid-template-columns: 1fr; }
+  .app-fluxo-etapas > i { transform: rotate(90deg); }
+  .app-fluxo-etapas button { min-height: 76px; }
 
   .app-shell-sidebar {
     position: fixed;

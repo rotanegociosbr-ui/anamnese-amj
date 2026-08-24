@@ -16,10 +16,10 @@
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
 <link href="./financeiro.css?v=20260824-2" rel="stylesheet">
 <link href="./prontuario.css?v=20260824-4" rel="stylesheet">
-<link href="./operacao.css?v=20260824-4" rel="stylesheet">
+<link href="./operacao.css?v=20260824-5" rel="stylesheet">
 <link href="./gestao.css?v=20260824-2" rel="stylesheet">
 <link href="./cotacoes.css?v=20260824-2" rel="stylesheet">
-<link href="./app-shell.css?v=20260824-2" rel="stylesheet">
+<link href="./app-shell.css?v=20260824-4" rel="stylesheet">
 <style>
 :root{
   --gelo:#FDFBF8;--dourado:#85611D;--linha:#E7D8BE;--tinta:#1B1917;
@@ -423,6 +423,7 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
         </div>
         <div class="app-atalhos-grid">
           <button type="button" data-shell-route="procedimentos" data-shell-action="novo-procedimento"><strong>Novo procedimento</strong><span>Paciente, itens, produtos, fotos e retorno</span></button>
+          <button type="button" data-shell-route="procedimentos" data-shell-action="fotos-atendimento"><strong>Adicionar ou tirar fotos</strong><span>Escolha a paciente e a consulta certa</span></button>
           <button type="button" data-shell-route="clientes" data-shell-action="novo-cliente"><strong>Cadastrar cliente</strong><span>Pesquise antes e abra um cadastro existente</span></button>
           <button type="button" data-shell-route="agenda" data-shell-action="novo-agendamento"><strong>Novo agendamento</strong><span>Horário, confirmação e retorno</span></button>
           <button type="button" data-shell-route="estoque" data-shell-action="nova-compra"><strong>Registrar compra</strong><span>Fornecedor, vários produtos, lotes e frete</span></button>
@@ -431,10 +432,22 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
         </div>
       </section>
 
-      <aside class="app-fluxo-seguro" aria-label="Fluxo de trabalho recomendado">
-        <strong>Um cadastro, todo o histórico conectado</strong>
-        <p>Localize a pessoa antes de criar, registre o atendimento dentro do cadastro e vincule pagamentos, produtos, fotos e retorno. Correspondências devem ser confirmadas; o sistema nunca deve unir duas pessoas apenas pelo nome.</p>
-      </aside>
+      <section class="app-fluxo-conectado" aria-labelledby="app-fluxo-conectado-titulo">
+        <div class="app-secao-titulo"><div><p>Fluxo conectado</p><h3 id="app-fluxo-conectado-titulo">Uma paciente, toda a jornada</h3></div>
+          <span>Cada etapa abre a área certa sem perder o vínculo</span></div>
+        <div class="app-fluxo-etapas">
+          <button type="button" data-shell-route="clientes"><span>1</span><strong>Paciente</strong><small>Localizar cadastro</small></button>
+          <i aria-hidden="true">→</i>
+          <button type="button" data-shell-route="procedimentos" data-shell-action="novo-procedimento"><span>2</span><strong>Procedimento</strong><small>Registrar a consulta</small></button>
+          <i aria-hidden="true">→</i>
+          <button type="button" data-shell-route="procedimentos" data-shell-action="fotos-atendimento"><span>3</span><strong>Fotos</strong><small>Antes, durante e depois</small></button>
+          <i aria-hidden="true">→</i>
+          <button type="button" data-shell-route="procedimentos"><span>4</span><strong>Cobrança</strong><small>Conferir vínculo e saldo da consulta</small></button>
+          <i aria-hidden="true">→</i>
+          <button type="button" data-shell-route="agenda" data-shell-agenda-filter="retornos"><span>5</span><strong>Retorno</strong><small>Acompanhar a paciente</small></button>
+        </div>
+        <p class="app-fluxo-seguro">Localize a pessoa antes de criar. O sistema nunca une duas pacientes apenas pelo nome, e as fotos ficam privadas dentro da consulta selecionada.</p>
+      </section>
     </section>
 
     <section class="painel-aba oculto" id="aba-fichas" role="tabpanel" aria-labelledby="aba-bt-fichas" hidden>
@@ -685,20 +698,25 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
             <label class="financeiro-check"><input id="financeiro-mostrar-arquivados" type="checkbox"><span>Mostrar arquivados</span></label>
           </div>
           <div class="financeiro-cadastros-grid">
-            <article class="financeiro-cadastro-coluna">
+            <article class="financeiro-cadastro-coluna" data-financeiro-cadastro-tipo="clientes">
               <div class="financeiro-cadastro-cabecalho"><h4>Clientes</h4><strong id="financeiro-clientes-contagem">0</strong></div>
               <label class="financeiro-busca"><span class="sr-only">Buscar cliente cadastrado</span><input id="financeiro-clientes-busca" type="search" maxlength="80" placeholder="Buscar cliente"></label>
               <div class="financeiro-cadastro-lista" id="financeiro-clientes-lista" aria-live="polite"></div>
             </article>
-            <article class="financeiro-cadastro-coluna">
+            <article class="financeiro-cadastro-coluna" data-financeiro-cadastro-tipo="fornecedores">
               <div class="financeiro-cadastro-cabecalho"><h4>Fornecedores</h4><strong id="financeiro-fornecedores-contagem">0</strong></div>
               <label class="financeiro-busca"><span class="sr-only">Buscar fornecedor cadastrado</span><input id="financeiro-fornecedores-busca" type="search" maxlength="80" placeholder="Buscar fornecedor"></label>
               <div class="financeiro-cadastro-lista" id="financeiro-fornecedores-lista" aria-live="polite"></div>
             </article>
-            <article class="financeiro-cadastro-coluna">
-              <div class="financeiro-cadastro-cabecalho"><h4>Produtos e marcas</h4><strong id="financeiro-produtos-contagem">0</strong></div>
-              <label class="financeiro-busca"><span class="sr-only">Buscar produto ou marca</span><input id="financeiro-produtos-busca" type="search" maxlength="80" placeholder="Buscar produto ou marca"></label>
+            <article class="financeiro-cadastro-coluna" data-financeiro-cadastro-tipo="produtos">
+              <div class="financeiro-cadastro-cabecalho"><h4>Produtos</h4><strong id="financeiro-produtos-contagem">0</strong></div>
+              <label class="financeiro-busca"><span class="sr-only">Buscar produto cadastrado</span><input id="financeiro-produtos-busca" type="search" maxlength="80" placeholder="Buscar produto"></label>
               <div class="financeiro-cadastro-lista" id="financeiro-produtos-lista" aria-live="polite"></div>
+            </article>
+            <article class="financeiro-cadastro-coluna" data-financeiro-cadastro-tipo="marcas">
+              <div class="financeiro-cadastro-cabecalho"><h4>Marcas</h4><strong id="financeiro-marcas-contagem">0</strong></div>
+              <label class="financeiro-busca"><span class="sr-only">Buscar marca cadastrada</span><input id="financeiro-marcas-busca" type="search" maxlength="80" placeholder="Buscar marca"></label>
+              <div class="financeiro-cadastro-lista" id="financeiro-marcas-lista" aria-live="polite"></div>
             </article>
           </div>
         </section>
@@ -992,9 +1010,9 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
 
 <script src="./vendor/supabase-js-2.112.3.min.js"></script>
 <script src="./auth-mfa.js?v=20260819-3"></script>
-<script src="./financeiro.js?v=20260824-1"></script>
+<script src="./financeiro.js?v=20260824-2"></script>
 <script src="./prontuario.js?v=20260824-3"></script>
-<script src="./app-shell.js?v=20260824-6"></script>
+<script src="./app-shell.js?v=20260824-8"></script>
 <script>
 const SUPABASE_URL = 'https://rjxtxoqprnumouqakxbc.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_Ip14p4tUfYFjwUYaWinMlw_Gf9v0YwT';

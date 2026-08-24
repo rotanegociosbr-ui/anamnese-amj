@@ -101,6 +101,13 @@ function optionalText(value: unknown, max: number): string | null {
   return text || null;
 }
 
+function containsControlCharacter(value: string): boolean {
+  return Array.from(value).some((character) => {
+    const codePoint = character.codePointAt(0);
+    return codePoint !== undefined && (codePoint <= 0x1f || codePoint === 0x7f);
+  });
+}
+
 function validUuid(value: unknown): value is string {
   return typeof value === "string" && UUID_PATTERN.test(value);
 }
@@ -1239,7 +1246,7 @@ async function handleAddPhoto(
     (procedureItemId !== null && !validUuid(procedureItemId)) ||
     (procedureItemId !== null && attendanceId === null) ||
     (lotSnapshot !== null &&
-      (lotSnapshot.length > 100 || /[\u0000-\u001f\u007f]/.test(lotSnapshot))) ||
+      (lotSnapshot.length > 100 || containsControlCharacter(lotSnapshot))) ||
     (phase !== "products_used" && (productId !== null || lotSnapshot !== null))
   ) {
     throw new ApiError(

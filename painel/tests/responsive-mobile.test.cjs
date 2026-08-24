@@ -76,6 +76,18 @@ assert.match(operationCss,
   'ações operacionais devem ocupar a largura disponível no celular');
 assert.match(operationCss, /@media \(max-width: 430\.98px\)[\s\S]*?\.operacao-foto-contagens \{ grid-template-columns: 1fr; \}/,
   'contadores da galeria devem respeitar 430 px exatos');
+assert.match(operationCss,
+  /@media \(max-width: 840px\)[\s\S]*?\.operacao-fotos-atalho-controles select \{ font-size: 16px; min-height: 46px; \}/,
+  'seletor do atalho de fotos deve evitar zoom e continuar tocável no celular');
+assert.match(operationCss,
+  /@media \(max-width: 900px\)[\s\S]*?\.operacao-fotos-atalho-controles \{ align-items: stretch; grid-template-columns: 1fr; \}/,
+  'atalho de fotos deve empilhar seletor e ação em telas estreitas');
+assert.match(shellCss,
+  /@media \(max-width: 840px\)[\s\S]*?\.app-fluxo-etapas \{ grid-template-columns: 1fr; \}/,
+  'jornada interativa do início deve empilhar no celular');
+assert.match(shellCss,
+  /@media \(max-width: 840px\)[\s\S]*?#aba-financeiro\[data-app-finance-view="produtos"\] \.financeiro-subformularios \{[\s\S]*?grid-template-columns: minmax\(0, 1fr\)/,
+  'cadastro e custo de produtos não podem permanecer em duas colunas no celular');
 
 assert.match(recordCss,
   /@media\(max-width:840px\)\{[\s\S]*?\.prontuario-form select,[\s\S]*?min-height:44px;font-size:16px[\s\S]*?\.prontuario-foto-original,[\s\S]*?min-height:44px/,

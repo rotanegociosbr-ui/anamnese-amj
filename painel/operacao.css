@@ -25,6 +25,17 @@
 .operacao-resumo span { color: var(--op-muted); font-size: .82rem; }
 .operacao-resumo strong { font-family: Georgia, 'Times New Roman', serif; font-size: 1.5rem; }
 
+.operacao-fotos-atalho { background: linear-gradient(125deg, #fff 0%, #fff7ee 58%, #f7e9df 100%); border: 1px solid rgba(154,113,73,.38); border-left: 5px solid var(--op-gold); border-radius: 18px; box-shadow: 0 14px 34px rgba(82,54,43,.09); display: grid; gap: .85rem; padding: 1rem 1.1rem; scroll-margin-top: 88px; }
+.operacao-fotos-atalho-cabecalho { align-items: flex-start; display: flex; gap: 1rem; justify-content: space-between; }
+.operacao-fotos-atalho-cabecalho h3 { font-family: Georgia, 'Times New Roman', serif; font-size: clamp(1.25rem, 2.5vw, 1.7rem); margin: .08rem 0 .25rem; }
+.operacao-fotos-atalho-cabecalho p { color: var(--op-muted); margin: 0; }
+.operacao-fotos-atalho-controles { align-items: end; display: grid; gap: .75rem; grid-template-columns: minmax(0, 1fr) auto; }
+.operacao-fotos-atalho-controles label { color: var(--op-muted); display: grid; font-size: .83rem; font-weight: 700; gap: .35rem; }
+.operacao-fotos-atalho-controles select { background: #fff; border: 1px solid var(--op-line); border-radius: 10px; color: var(--op-ink); font: inherit; min-height: 46px; padding: .62rem .72rem; width: 100%; }
+.operacao-fotos-atalho-controles select:focus { border-color: var(--op-gold); box-shadow: 0 0 0 3px rgba(154,113,73,.13); outline: 0; }
+.operacao-fotos-atalho-controles .operacao-botao { min-height: 46px; white-space: nowrap; }
+.operacao-fotos-atalho-orientacao { color: var(--op-muted); font-size: .82rem; margin: 0; }
+
 .operacao-grade { display: grid; gap: 1rem; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .operacao-card { display: grid; gap: .85rem; padding: 1.15rem; }
 .operacao-card h3 { font-family: Georgia, 'Times New Roman', serif; font-size: 1.25rem; margin: 0; }
@@ -152,6 +163,7 @@
   .operacao-acoes select,
   .operacao-adicionar-procedimento input,
   .operacao-adicionar-procedimento select { min-height: 44px; }
+  .operacao-fotos-atalho-controles select { font-size: 16px; min-height: 46px; }
   .operacao-tabela-wrap { overscroll-behavior-inline: contain; }
 }
 
@@ -168,6 +180,8 @@
   .operacao-foto-upload [data-foto-produto-campos],
   .operacao-foto-fontes { grid-template-columns: 1fr; }
   .operacao-foto-contagens { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .operacao-fotos-atalho-controles { align-items: stretch; grid-template-columns: 1fr; }
+  .operacao-fotos-atalho-controles .operacao-botao { white-space: normal; width: 100%; }
   .operacao-fotos-fluxo { grid-template-columns: 1fr; }
   .operacao-item-custo > span { padding-bottom: 0; }
 }
@@ -178,6 +192,7 @@
 
 @media (max-width: 560px) {
   .operacao-cabecalho { align-items: stretch; flex-direction: column; }
+  .operacao-fotos-atalho-cabecalho { align-items: stretch; flex-direction: column; }
   .operacao-acoes { align-items: stretch; display: grid; grid-template-columns: 1fr; }
   .operacao-acoes select,
   .operacao-acoes .operacao-botao { max-width: none; width: 100%; }

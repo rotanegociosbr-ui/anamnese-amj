@@ -91,12 +91,14 @@ acesso para `public`, `anon` ou `authenticated` e não armazenam a senha. Dados 
 agenda e credenciais também não devem ser gravados em `localStorage`, exibidos
 em notificações ou registrados em logs.
 
-## Financeiro — Fase 1
+## Financeiro, estoque e operação clínica
 
-A terceira aba do `/painel/` registra clientes reaproveitáveis, receitas,
+O `/painel/` registra clientes reaproveitáveis, procedimentos, receitas avulsas,
 despesas, recebimentos e pagamentos manuais, fornecedores, marcas, produtos e
-compras. Ela também mostra valores recebidos, pagos, em aberto e a evolução dos
-últimos seis meses. Fluxo de caixa não é apresentado como lucro contábil.
+compras. Produtos, marcas e fornecedores possuem áreas próprias no menu, mas
+continuam usando um único cadastro canônico, sem duplicação. O sistema também
+mostra valores recebidos, pagos, em aberto e a evolução dos últimos seis meses.
+Fluxo de caixa não é apresentado como lucro contábil.
 
 O Financeiro exige conta individual `owner` e MFA `aal2`. A senha compartilhada
 de transição não autoriza nem revela a aba. Ana Maria Costa Jacob e Rodney Neri
@@ -117,9 +119,11 @@ Arquivos principais:
 - `supabase/functions/financeiro-fichas/` — API owner-only, com MFA, filtro por
   clínica, validação, idempotência e auditoria nominal.
 
-Produtos e compras nesta fase não constituem controle completo de estoque. Lote,
-validade, recebimento físico, FEFO e consumo por atendimento permanecem para a
-fase sanitária posterior do projeto.
+Compras podem reunir vários produtos do mesmo fornecedor, incluir frete e gerar
+lotes com validade. O estoque registra entradas, saídas, estornos, perdas,
+desperdícios e devoluções, com rastreabilidade por atendimento. Cada atendimento
+pode reunir vários procedimentos, prontuário, produtos e lotes, fotos privadas
+de antes/durante/depois e fotos dos produtos utilizados.
 
 ## Fluxo do TCLE
 
@@ -150,15 +154,18 @@ existentes.
 ## Arquivamento das fichas
 
 O app Fichas permite retirar uma anamnese ou um documento clínico da lista
-principal por meio de **Arquivar ficha**. A operação exige confirmação digitada
-e motivo, é reversível pela área **Arquivadas** e gera registro em
+principal por meio de **Arquivar ficha**. A operação exige confirmação e motivo,
+é reversível pela área **Arquivadas** e gera registro em
 `fichas_acoes_auditoria`. O PDF, a assinatura e o registro clínico não são
-apagados.
+apagados pelo arquivamento.
 
-Não existe exclusão definitiva no painel: a Lei 13.787/2018 estabelece guarda
-mínima de 20 anos a partir do último registro. A autenticação atual ainda usa
-senha compartilhada; auditoria nominal e eventual fluxo futuro de eliminação
-dependem de usuários individuais com autenticação reforçada.
+A exclusão definitiva existe somente para fichas independentes consideradas
+elegíveis pelo servidor. Ela exige usuário individual `owner`, MFA, senha atual,
+motivo e confirmação explícita. O sistema recusa a exclusão quando encontra
+paciente, agenda, atendimento, prontuário, financeiro, pagamento, termo,
+consentimento ou qualquer vínculo que precise ser preservado. Operações
+financeiras e clínicas relacionadas usam cancelamento, estorno ou arquivamento
+auditado, preservando a rastreabilidade legal e administrativa.
 
 ## Arquivos do TCLE
 

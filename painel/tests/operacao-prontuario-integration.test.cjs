@@ -26,6 +26,18 @@ const migration = fs.readFileSync(
 );
 
 assert.match(ui, /Preparar prontuário e fotos/);
+assert.match(ui, /data-fotos-atalho[^>]*aria-labelledby="operacao-fotos-atalho-titulo"/,
+  'atalho direto deve ficar no topo de Procedimentos e possuir nome acessível');
+assert.match(ui, /data-fotos-atalho-atendimento[^>]*aria-label="Paciente e atendimento para adicionar fotos"/,
+  'atalho deve exigir a consulta exata antes de abrir a galeria');
+assert.match(ui, /function updatePhotoShortcut\(\)[\s\S]*?clinical_photography_consented === true/,
+  'atalho deve explicar prontuário, consentimento e galeria sem pular etapas');
+assert.match(ui, /function openPhotoShortcutFlow\(id\)[\s\S]*?prepareAttendanceProtocol\(visit\.id, visit\.version\)/,
+  'preparo iniciado pelo atalho deve usar a versão e proteção canônicas');
+assert.match(ui, /function openPhotoShortcutFlow\(id\)[\s\S]*?AMJProntuario\.abrirProtocolo\(visit\.protocol_id\)/,
+  'sem autorização, o atalho deve conduzir ao prontuário correto');
+assert.match(ui, /function openPhotoShortcutFlow\(id\)[\s\S]*?openAttendancePhotos\(attendanceId\)/,
+  'com autorização, o atalho deve abrir a única galeria canônica da consulta');
 assert.match(ui, /Fotos da consulta/,
   'cada atendimento deve expor o acesso direto às fotos da consulta');
 assert.match(ui, /data-fotos-abrir/);
@@ -181,11 +193,11 @@ const finalizeArchivedCheck = finalizeMigration.indexOf('if v_protocol.archived_
 const finalizeSignedCheck = finalizeMigration.indexOf("if v_protocol.status = 'signed' then");
 assert(finalizeArchivedCheck >= 0 && finalizeArchivedCheck < finalizeSignedCheck,
   'protocolo arquivado deve ser rejeitado antes do retorno signed idempotente');
-assert.match(shell, /operacao\.js\?v=20260824-3/,
+assert.match(shell, /operacao\.js\?v=20260824-5/,
   'cache-bust deve entregar o JavaScript atualizado da Operação');
-assert.match(html, /operacao\.css\?v=20260824-4/,
+assert.match(html, /operacao\.css\?v=20260824-5/,
   'cache-bust deve entregar o CSS atualizado da Operação');
-assert.match(html, /app-shell\.js\?v=20260824-6/,
+assert.match(html, /app-shell\.js\?v=20260824-8/,
   'cache-bust do shell deve entregar a referência atualizada da Operação');
 assert.match(html, /id="prontuario-busca"[^>]+aria-label="[^"]+"/,
   'busca do prontuário deve ter nome acessível');

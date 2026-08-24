@@ -571,6 +571,7 @@
     const clientQuery = normalizeSearch(byId('financeiro-clientes-busca').value);
     const supplierQuery = normalizeSearch(byId('financeiro-fornecedores-busca').value);
     const productQuery = normalizeSearch(byId('financeiro-produtos-busca').value);
+    const brandQuery = normalizeSearch(byId('financeiro-marcas-busca').value);
     const showArchived = byId('financeiro-mostrar-arquivados').checked;
     const clients = state.clients.filter(function (item) {
       return (showArchived || !isArchived(item)) && normalizeSearch(
@@ -588,12 +589,12 @@
         normalizeSearch([item.nome, item.tipo, brand && brand.nome].join(' ')).includes(productQuery);
     });
     const brands = state.catalogs.marcas.filter(function (item) {
-      return (showArchived || !isArchived(item)) && normalizeSearch([item.nome, 'marca'].join(' ')).includes(productQuery);
+      return (showArchived || !isArchived(item)) && normalizeSearch([item.nome, 'marca'].join(' ')).includes(brandQuery);
     });
     byId('financeiro-clientes-contagem').textContent = String(activeRows(state.clients).length);
     byId('financeiro-fornecedores-contagem').textContent = String(activeRows(state.catalogs.fornecedores).length);
-    byId('financeiro-produtos-contagem').textContent = String(activeRows(state.catalogs.produtos).length) + ' + ' +
-      String(activeRows(state.catalogs.marcas).length) + ' marcas';
+    byId('financeiro-produtos-contagem').textContent = String(activeRows(state.catalogs.produtos).length);
+    byId('financeiro-marcas-contagem').textContent = String(activeRows(state.catalogs.marcas).length);
     byId('financeiro-clientes-lista').innerHTML = clients.length ? clients.map(function (item) {
       const contact = [item.telefone, item.email].filter(Boolean).join(' · ');
       const details = [contact, item.cpf_mascarado, item.data_nascimento ? 'Nasc. ' + safeDate(item.data_nascimento) : '']
@@ -647,9 +648,10 @@
         (archived ? 'restaurar' : 'arquivar') + '" data-financeiro-entidade="produto" data-financeiro-id="' +
         escapeHtml(item.id) + '">' + (archived ? 'Restaurar' : 'Apagar/Arquivar') + '</button></div></article>';
     }).join('');
-    byId('financeiro-produtos-lista').innerHTML = brandHtml || productHtml
-      ? brandHtml + productHtml
-      : '<p class="financeiro-vazio">Nenhum produto ou marca encontrado.</p>';
+    byId('financeiro-produtos-lista').innerHTML = productHtml ||
+      '<p class="financeiro-vazio">Nenhum produto encontrado.</p>';
+    byId('financeiro-marcas-lista').innerHTML = brandHtml ||
+      '<p class="financeiro-vazio">Nenhuma marca encontrada.</p>';
   }
 
   function showClientsRegistry(query, message) {
@@ -1254,7 +1256,7 @@
       });
       ['financeiro-lista', 'financeiro-auditoria', 'financeiro-cliente-candidatos',
         'financeiro-compra-itens', 'financeiro-clientes-lista', 'financeiro-fornecedores-lista',
-        'financeiro-produtos-lista', 'financeiro-pendencias-estoque', 'financeiro-atendimento-parcelas-lista',
+        'financeiro-produtos-lista', 'financeiro-marcas-lista', 'financeiro-pendencias-estoque', 'financeiro-atendimento-parcelas-lista',
         'financeiro-parcelas-lista', 'financeiro-duplicidades-lista'].forEach(function (id) {
         const node = byId(id);
         if (node) node.innerHTML = '';
@@ -1270,9 +1272,11 @@
       byId('financeiro-clientes-contagem').textContent = '0';
       byId('financeiro-fornecedores-contagem').textContent = '0';
       byId('financeiro-produtos-contagem').textContent = '0';
+      byId('financeiro-marcas-contagem').textContent = '0';
       byId('financeiro-clientes-busca').value = '';
       byId('financeiro-fornecedores-busca').value = '';
       byId('financeiro-produtos-busca').value = '';
+      byId('financeiro-marcas-busca').value = '';
       byId('financeiro-status').textContent = '';
       byId('financeiro-lista').setAttribute('aria-busy', 'false');
       setInitialDates();
@@ -2430,7 +2434,8 @@
         markCandidateForReconfirmation();
       });
     });
-    ['financeiro-clientes-busca', 'financeiro-fornecedores-busca', 'financeiro-produtos-busca']
+    ['financeiro-clientes-busca', 'financeiro-fornecedores-busca', 'financeiro-produtos-busca',
+      'financeiro-marcas-busca']
       .forEach(function (id) { byId(id).addEventListener('input', renderRegistries); });
     byId('financeiro-mostrar-arquivados').addEventListener('change', renderRegistries);
     byId('financeiro-cadastros-titulo').closest('.financeiro-cadastros-card').addEventListener('click', function (event) {

@@ -20,9 +20,20 @@ assert.doesNotMatch(html, /<script[^>]+src=["']\.\/operacao\.js/i,
 assert.doesNotMatch(html, /<script[^>]+src=["']\.\/gestao\.js/i,
   'Gestão deve ser carregada sob demanda pelo shell');
 
-for (const route of ['inicio', 'procedimentos', 'clientes', 'agenda', 'receitas', 'despesas', 'estoque', 'fichas', 'gestao']) {
+for (const route of ['inicio', 'procedimentos', 'clientes', 'produtos', 'marcas', 'fornecedores', 'agenda',
+  'receitas', 'despesas', 'estoque', 'fichas', 'gestao']) {
   assert.match(js, new RegExp('\\b' + route + ': Object\\.freeze'), 'rota principal ausente: ' + route);
 }
+for (const route of ['produtos', 'marcas', 'fornecedores']) {
+  assert.match(js, new RegExp(route + ": Object\\.freeze\\(\\{[^}]*financeView: '" + route + "'"),
+    'rota de catálogo deve reutilizar a visão financeira canônica: ' + route);
+  assert.match(css, new RegExp('data-app-finance-view="' + route + '"'),
+    'CSS deve isolar a área visível do catálogo: ' + route);
+  assert.match(html, new RegExp('data-financeiro-cadastro-tipo="' + route + '"'),
+    'lista própria deve existir sem duplicar a fonte: ' + route);
+}
+assert.match(js, /fornecedor: 'fornecedores', marca: 'marcas', produto: 'produtos'/,
+  'Abrir existente deve levar cada catálogo à sua área própria');
 assert.match(js, /navigateEvent:\s*'amj:navigate'/, 'contrato de navegação deve ser público');
 assert.match(js, /routeEvent:\s*'amj:shell-route'/, 'evento de rota deve ser documentado');
 assert.match(js, /openExistingEvent:\s*'amj:open-existing'/, 'contrato Abrir existente deve existir');
@@ -42,6 +53,10 @@ assert.match(js, /AMJFinanceiro\.abrirCadastro\(type, id\)/,
   'cadastros existentes devem abrir pela fonte financeira canônica');
 assert.match(js, /AMJOperacaoClinica\.abrirAtendimento\(id\)/,
   'atendimentos existentes devem abrir pela fonte operacional canônica');
+assert.match(js, /app-procedure-photo-shortcut[^>]*data-app-action="fotos-atendimento"[^>]*>Adicionar ou tirar fotos/,
+  'Procedimentos deve destacar a ação direta de fotos');
+assert.match(js, /AMJOperacaoClinica\.abrirAtalhoFotos\(\)/,
+  'o shell deve levar o atalho à seleção canônica da consulta');
 assert.match(js, /new-revenue[\s\S]*?financeiro-lancamento-tipo', 'receita'[\s\S]*?financeiro-lancamento-origem', 'operacional'/,
   'receita avulsa nunca pode nascer com origem atendimento');
 
@@ -59,5 +74,11 @@ assert.match(html, /const abas = \['inicio', 'fichas', 'agenda'/,
 assert.match(html, /id="aba-inicio"/, 'painel Início deve existir no HTML');
 assert.match(html, /data-shell-route="estoque" data-shell-action="nova-compra"/,
   'atalho de compra/frete deve abrir Estoque');
+assert.match(html, /data-shell-route="procedimentos" data-shell-action="fotos-atendimento"[^>]*><strong>Adicionar ou tirar fotos<\/strong>/,
+  'Início deve oferecer acesso direto às fotos do atendimento');
+assert.match(html, /app-fluxo-etapas[\s\S]*?Paciente[\s\S]*?Procedimento[\s\S]*?Fotos[\s\S]*?Cobrança[\s\S]*?Retorno/,
+  'Início deve conectar visualmente a jornada operacional completa');
+assert.doesNotMatch(html, /app-fluxo-etapas[\s\S]*?data-shell-route="receitas"[\s\S]*?Recebimento/,
+  'jornada da paciente não pode transformar pagamento de procedimento em receita avulsa');
 
 console.log('app-shell static: OK');

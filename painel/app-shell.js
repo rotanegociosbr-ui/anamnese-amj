@@ -5,6 +5,9 @@
     inicio: Object.freeze({ title: 'Início', legacy: 'inicio', group: 'principal' }),
     procedimentos: Object.freeze({ title: 'Procedimentos', legacy: 'operacao', owner: true, group: 'principal' }),
     clientes: Object.freeze({ title: 'Clientes', legacy: 'financeiro', owner: true, financeView: 'clientes', group: 'principal' }),
+    produtos: Object.freeze({ title: 'Produtos', legacy: 'financeiro', owner: true, financeView: 'produtos', group: 'principal' }),
+    marcas: Object.freeze({ title: 'Marcas', legacy: 'financeiro', owner: true, financeView: 'marcas', group: 'principal' }),
+    fornecedores: Object.freeze({ title: 'Fornecedores', legacy: 'financeiro', owner: true, financeView: 'fornecedores', group: 'principal' }),
     agenda: Object.freeze({ title: 'Agenda', legacy: 'agenda', group: 'principal' }),
     receitas: Object.freeze({ title: 'Receitas avulsas', legacy: 'financeiro', owner: true, financeView: 'receitas', entryView: 'receitas_avulsas', group: 'principal' }),
     despesas: Object.freeze({ title: 'Despesas', legacy: 'financeiro', owner: true, financeView: 'despesas', entryView: 'despesas', group: 'principal' }),
@@ -15,13 +18,14 @@
     prontuarios: Object.freeze({ title: 'Fotos e prontuários', legacy: 'prontuarios', owner: true, group: 'secondary' })
   });
 
-  const PRIMARY_ORDER = ['inicio', 'procedimentos', 'clientes', 'agenda', 'receitas', 'despesas', 'estoque', 'cotacoes', 'fichas', 'gestao'];
+  const PRIMARY_ORDER = ['inicio', 'procedimentos', 'clientes', 'agenda', 'receitas', 'despesas', 'produtos', 'marcas',
+    'fornecedores', 'estoque', 'cotacoes', 'fichas', 'gestao'];
   const SECONDARY_ORDER = ['prontuarios'];
   const STORAGE_ROUTE = 'amj_shell_route';
   const MODULES = Object.freeze({
     operacao: Object.freeze({
       global: 'AMJOperacaoClinica',
-      src: './operacao.js?v=20260824-3',
+      src: './operacao.js?v=20260824-5',
       root: 'operacao-clinica-root'
     }),
     gestao: Object.freeze({
@@ -40,6 +44,9 @@
     inicio: '<path d="M3 10.5 10 4l7 6.5v6.2a1.3 1.3 0 0 1-1.3 1.3H4.3A1.3 1.3 0 0 1 3 16.7Z"/><path d="M7.5 18v-5h5v5"/>',
     procedimentos: '<path d="M6.5 4.5h7v12h-7z"/><path d="M8.5 2.5h3v3h-3zM8.5 9.5h3M10 8v3M14 7h2.5M14 10h2.5M14 13h2.5"/>',
     clientes: '<circle cx="8" cy="7" r="3"/><path d="M2.8 17c.6-3 2.3-4.5 5.2-4.5s4.6 1.5 5.2 4.5M14 7.5a2.5 2.5 0 0 1 0 5M14.5 13.5c1.5.5 2.4 1.6 2.7 3.5"/>',
+    produtos: '<path d="M5 3.5h10v13H5zM7.5 1.8h5v3.5h-5zM7.5 9h5M10 6.5v5"/>',
+    marcas: '<path d="M3 4h8l6 6-7 7-7-7Z"/><circle cx="7" cy="8" r="1.2"/>',
+    fornecedores: '<path d="M2.5 5.5h10v8h-10zM12.5 8h2.5l2.5 3v2.5h-5z"/><circle cx="6" cy="15" r="1.5"/><circle cx="14.5" cy="15" r="1.5"/>',
     agenda: '<rect x="3" y="4.5" width="14" height="13" rx="2"/><path d="M6.5 2.5v4M13.5 2.5v4M3 8h14M6.5 11.5h.01M10 11.5h.01M13.5 11.5h.01M6.5 14.5h.01M10 14.5h.01"/>',
     receitas: '<path d="M3 6h14v10H3zM3 9h14M6 13h3"/><path d="m13.5 3 2 2 2-2"/>',
     despesas: '<path d="M3 6h14v10H3zM3 9h14M6 13h3"/><path d="m13.5 3 2-2 2 2"/>',
@@ -277,6 +284,9 @@
   function financeContextCopy(routeName) {
     const copies = {
       clientes: ['Clientes', 'Cadastros reaproveitáveis, pesquisáveis e ligados ao histórico da paciente.'],
+      produtos: ['Produtos', 'Catálogo único de produtos, custos, estoque e utilização clínica.'],
+      marcas: ['Marcas', 'Marcas cadastradas uma única vez e reutilizadas em todos os produtos.'],
+      fornecedores: ['Fornecedores', 'Fornecedores pesquisáveis, editáveis e vinculados às compras da clínica.'],
       receitas: ['Receitas avulsas', 'Entradas que não nasceram de um procedimento. Procedimentos permanecem na área própria.'],
       despesas: ['Despesas', 'Contas, compras e pagamentos com saldo, datas e histórico auditável.'],
       estoque: ['Estoque', 'Produtos, compras, lotes, validades, consumo e frete no custo real.']
@@ -289,6 +299,18 @@
     if (routeName === 'clientes') {
       return refresh + '<button type="button" data-app-action="focus-client-search" class="secundario">Buscar cliente</button>' +
         '<button type="button" data-app-action="new-client">Novo cliente</button>';
+    }
+    if (routeName === 'produtos') {
+      return refresh + '<button type="button" data-app-action="focus-product-search" class="secundario">Buscar produto</button>' +
+        '<button type="button" data-app-action="new-product">Novo produto</button>';
+    }
+    if (routeName === 'marcas') {
+      return refresh + '<button type="button" data-app-action="focus-brand-search" class="secundario">Buscar marca</button>' +
+        '<button type="button" data-app-action="new-brand">Nova marca</button>';
+    }
+    if (routeName === 'fornecedores') {
+      return refresh + '<button type="button" data-app-action="focus-supplier-search" class="secundario">Buscar fornecedor</button>' +
+        '<button type="button" data-app-action="new-supplier">Novo fornecedor</button>';
     }
     if (routeName === 'receitas') {
       return refresh + '<button type="button" data-app-action="view-finance-list" class="secundario">Ver registros</button>' +
@@ -317,6 +339,14 @@
     const copy = financeContextCopy(routeName);
     context.innerHTML = '<div><h2>' + escapeHtml(copy[0]) + '</h2><p>' + escapeHtml(copy[1]) +
       '</p></div><div class="app-context-actions">' + financeContextActions(routeName) + '</div>';
+    const registryTitles = { clientes: 'Clientes cadastrados', produtos: 'Produtos cadastrados',
+      marcas: 'Marcas cadastradas', fornecedores: 'Fornecedores cadastrados' };
+    const registryTitle = byId('financeiro-cadastros-titulo');
+    if (registryTitle && registryTitles[routeName]) registryTitle.textContent = registryTitles[routeName];
+    const catalogSummary = document.querySelector('#financeiro-editor-catalogo > summary');
+    const catalogTitles = { produtos: 'Cadastrar ou editar produto', marcas: 'Cadastrar ou editar marca',
+      fornecedores: 'Cadastrar ou editar fornecedor', estoque: 'Fornecedores, marcas e produtos' };
+    if (catalogSummary && catalogTitles[routeName]) catalogSummary.textContent = catalogTitles[routeName];
     applyFinanceEntryView(routeName);
   }
 
@@ -380,7 +410,8 @@
     state.openingExisting.add(key);
     try {
       if (['cliente', 'fornecedor', 'marca', 'produto'].includes(type)) {
-        await navigate(type === 'produto' ? 'estoque' : 'clientes', { source: 'open-existing', focus: false });
+        const registryRoute = { cliente: 'clientes', fornecedor: 'fornecedores', marca: 'marcas', produto: 'produtos' }[type];
+        await navigate(registryRoute, { source: 'open-existing', focus: false });
         if (window.AMJFinanceiro && typeof window.AMJFinanceiro.abrirCadastro === 'function') {
           await window.AMJFinanceiro.abrirCadastro(type, id);
           return true;
@@ -416,6 +447,15 @@
     else if (action === 'focus-client-search') {
       const search = byId('financeiro-clientes-busca');
       if (search) { search.scrollIntoView({ behavior: 'smooth', block: 'center' }); search.focus({ preventScroll: true }); }
+    } else if (action === 'focus-product-search') {
+      const search = byId('financeiro-produtos-busca');
+      if (search) { search.scrollIntoView({ behavior: 'smooth', block: 'center' }); search.focus({ preventScroll: true }); }
+    } else if (action === 'focus-brand-search') {
+      const search = byId('financeiro-marcas-busca');
+      if (search) { search.scrollIntoView({ behavior: 'smooth', block: 'center' }); search.focus({ preventScroll: true }); }
+    } else if (action === 'focus-supplier-search') {
+      const search = byId('financeiro-fornecedores-busca');
+      if (search) { search.scrollIntoView({ behavior: 'smooth', block: 'center' }); search.focus({ preventScroll: true }); }
     } else if (action === 'new-revenue') {
       openDetails('financeiro-editor-lancamento', '#financeiro-lancamento-tipo');
       selectValue('financeiro-lancamento-tipo', 'receita');
@@ -427,6 +467,8 @@
       const list = byId('financeiro-lista-titulo');
       if (list) list.scrollIntoView({ behavior: 'smooth', block: 'start' });
     } else if (action === 'new-product') openDetails('financeiro-editor-catalogo', '#financeiro-produto-nome');
+    else if (action === 'new-brand') openDetails('financeiro-editor-catalogo', '#financeiro-marca-nome');
+    else if (action === 'new-supplier') openDetails('financeiro-editor-catalogo', '#financeiro-fornecedor-nome');
     else if (action === 'new-purchase') openDetails('financeiro-editor-compra', '#financeiro-compra-fornecedor');
   }
 
@@ -439,7 +481,8 @@
     context.className = 'app-procedure-context';
     context.innerHTML = '<div><h2>Procedimentos por paciente e data</h2>' +
       '<p>Registre a visita, os itens realizados, produtos, fotos antes/depois, cobrança e retorno no mesmo histórico.</p></div>' +
-      '<div class="app-context-actions"><button type="button" class="secundario" data-app-action="refresh-procedures">Atualizar</button>' +
+      '<div class="app-context-actions"><button type="button" class="app-procedure-photo-shortcut" data-app-action="fotos-atendimento">Adicionar ou tirar fotos</button>' +
+      '<button type="button" class="secundario" data-app-action="refresh-procedures">Atualizar</button>' +
       '<button type="button" class="secundario" data-shell-route="prontuarios">Fotos e prontuários</button>' +
       '<button type="button" data-app-action="new-procedure">Novo procedimento</button></div>';
     root.insertBefore(context, root.firstChild);
@@ -472,6 +515,10 @@
     else if (routeName === 'procedimentos') {
       decorateProcedures();
       if (action === 'novo-procedimento') focusNewProcedure();
+      else if (action === 'fotos-atendimento' && window.AMJOperacaoClinica &&
+          typeof window.AMJOperacaoClinica.abrirAtalhoFotos === 'function') {
+        void window.AMJOperacaoClinica.abrirAtalhoFotos();
+      }
     }
   }
 
@@ -518,7 +565,8 @@
     let routeName = visible;
     const legacy = ROUTES[visible].legacy;
     if (legacy === 'financeiro') {
-      routeName = ['clientes', 'receitas', 'despesas', 'estoque'].includes(state.currentRoute) ? state.currentRoute : 'receitas';
+      routeName = ['clientes', 'produtos', 'marcas', 'fornecedores', 'receitas', 'despesas', 'estoque'].includes(state.currentRoute)
+        ? state.currentRoute : 'receitas';
     }
     if (routeName !== state.currentRoute) updateRouteChrome(routeName);
   }
@@ -660,6 +708,10 @@
         event.preventDefault();
         const action = appAction.dataset.appAction;
         if (action === 'new-procedure') focusNewProcedure();
+        else if (action === 'fotos-atendimento' && window.AMJOperacaoClinica &&
+            typeof window.AMJOperacaoClinica.abrirAtalhoFotos === 'function') {
+          void window.AMJOperacaoClinica.abrirAtalhoFotos();
+        }
         else if (action === 'refresh-procedures') {
           const refresh = document.querySelector('#operacao-clinica-root [data-operacao-recarregar]');
           if (refresh) refresh.click();

@@ -50,6 +50,16 @@ Deno.test("RPC é Edge-only, preparado para os dois papéis clínicos", () => {
   );
 });
 
+Deno.test("lote de produto rejeita toda a faixa ASCII de controle", () => {
+  assertIncludes(edge, "function containsControlCharacter", "validador explícito");
+  assertIncludes(edge, "codePoint <= 0x1f || codePoint === 0x7f", "faixa de controle");
+  assertIncludes(
+    edge,
+    "lotSnapshot.length > 100 || containsControlCharacter(lotSnapshot)",
+    "validação do lote",
+  );
+});
+
 Deno.test("finalização exige versão, consentimento atual e foto clínica ativa", () => {
   const finalize = functionBody(
     "create or replace function public.prontuario_finalizar(",

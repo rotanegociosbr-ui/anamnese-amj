@@ -14,6 +14,16 @@ assert.match(ui, /regiao_procedimento/, 'procedimento deve expor região/local e
 assert.match(ui, /procedimento_em/, 'procedimento deve expor horário estruturado');
 assert.match(ui, /showDuplicateAlert/, 'duplicata deve usar o alerta compartilhado');
 assert.match(ui, /abrirAtendimento:\s*openAttendance/, 'Abrir existente deve chegar ao atendimento');
+assert.match(ui, /abrirAtalhoFotos:\s*focusPhotoShortcut/,
+  'Procedimentos deve expor um atalho direto e visível para fotos');
+assert.match(ui, /data-fotos-atalho-atendimento/,
+  'atalho de fotos deve exigir a seleção explícita do atendimento');
+assert.match(ui, /Adicionar ou tirar fotos/,
+  'ação de câmera e seleção de arquivos deve ser nomeada de forma direta');
+assert.match(ui, /if \(state\.loadPromise\) return await state\.loadPromise/,
+  'atalhos devem aguardar a carga operacional já em andamento antes de mover o foco');
+assert.match(ui, /function focusPhotoShortcut\(\)[\s\S]*?if \(!state\.loaded\) await load\(\);[\s\S]*?if \(!state\.loaded\) return false/,
+  'atalho de fotos só pode focar a consulta depois que os dados estiverem prontos');
 assert.match(ui, /abrirFoto:\s*openPhoto/, 'Abrir existente deve chegar à foto clínica');
 assert.match(ui, /data\.append\('atendimento_id', form\.dataset\.atendimentoId\)/,
   'upload deve gravar diretamente o vínculo canônico do atendimento');
@@ -27,6 +37,14 @@ assert.match(ui, /photo_exact_duplicate/, 'SHA exato deve abrir o fluxo explíci
 assert.match(ui, /confirmar_arquivo_distinto/, 'exceção de foto distinta deve ser visível e protegida');
 assert.match(ui, /data-procedimento-arquivar/, 'procedimento deve ter Apagar\/Arquivar visível');
 assert.match(ui, /data-procedimento-restaurar/, 'procedimento arquivado deve ser restaurável');
+assert.match(ui, /data-operacao-preferencias-contato/, 'preferências carregadas devem possuir histórico visível');
+assert.match(ui, /function renderContactPreferences\(\)[\s\S]*?state\.data\.preferencias_contato/,
+  'preferências de contato devem ser renderizadas da fonte operacional canônica');
+assert.match(ui, /data-operacao-eventos-consumo/, 'perdas, desperdícios e devoluções devem possuir histórico visível');
+assert.match(ui, /function renderConsumptionEvents\(\)[\s\S]*?state\.data\.eventos_consumo/,
+  'eventos de consumo devem ser renderizados da fonte operacional canônica');
+assert.match(ui, /renderContactPreferences\(\);[\s\S]*?renderConsumptionEvents\(\);/,
+  'os dois históricos devem atualizar junto com a tela de Operações');
 
 // Simula timeout depois do commit: a segunda tentativa materialmente idêntica
 // precisa reutilizar a chave do formulário, independentemente da nova prova.
