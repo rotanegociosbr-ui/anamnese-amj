@@ -1,6 +1,7 @@
 import "@supabase/functions-js/edge-runtime.d.ts";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import type { PDFFont, PDFImage, PDFPage } from "pdf-lib";
+import { consumePublicFormRateLimit } from "../_shared/public-form-rate-limit.ts";
 
 const FORM_VERSION = "2026-08-19-v1";
 const FORM_SHA256 =
@@ -136,6 +137,8 @@ const SUNSCREEN = new Set(["", "Sim", "Às vezes", "Não"]);
 
 const URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const DRY_RUN_ENABLED = Deno.env.get("ANAMNESE_ENABLE_DRY_RUN") === "true" &&
+  /^http:\/\/(?:127\.0\.0\.1|localhost)(?::\d+)?(?:\/|$)/.test(URL);
 
 type JsonRecord = Record<string, unknown>;
 type YesNo = "sim" | "nao";
@@ -992,6 +995,30 @@ Deno.serve(async (req: Request) => {
     );
   }
 
+  try {
+    const rateLimit = await consumePublicFormRateLimit(req, {
+      supabaseUrl: URL,
+      serviceRoleKey: SERVICE,
+      scope: "anamnese-submit",
+    });
+    if (!rateLimit.allowed) {
+      return fail(
+        origin,
+        "rate_limited",
+        "Muitas tentativas foram feitas. Aguarde e tente novamente.",
+        429,
+      );
+    }
+  } catch (error) {
+    console.error("Anamnese rate limiter unavailable", String(error));
+    return fail(
+      origin,
+      "temporary_error",
+      "O serviço está temporariamente indisponível. Tente novamente.",
+      503,
+    );
+  }
+
   const ip = text(
     req.headers.get("cf-connecting-ip") ||
       (req.headers.get("x-forwarded-for") || "").split(",")[0] ||
@@ -1032,6 +1059,18 @@ Deno.serve(async (req: Request) => {
         "invalid_json",
         "Não foi possível ler o formulário.",
         400,
+      );
+    }
+
+    if (
+      payload.dry_run === true &&
+      (!DRY_RUN_ENABLED || !LOCAL_TEST_ORIGINS.has(origin))
+    ) {
+      return fail(
+        origin,
+        "dry_run_not_allowed",
+        "Modo de teste não permitido neste ambiente.",
+        403,
       );
     }
 
@@ -1166,14 +1205,6 @@ Deno.serve(async (req: Request) => {
     const pdfHash = await sha256(pdf);
 
     if (payload.dry_run === true) {
-      if (!LOCAL_TEST_ORIGINS.has(origin)) {
-        return fail(
-          origin,
-          "dry_run_not_allowed",
-          "Modo de teste não permitido nesta origem.",
-          403,
-        );
-      }
       clearFailures(originHash);
       return json(origin, {
         ok: true,

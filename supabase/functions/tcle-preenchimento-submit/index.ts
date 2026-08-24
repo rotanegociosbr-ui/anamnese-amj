@@ -1,6 +1,7 @@
-import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import "@supabase/functions-js/edge-runtime.d.ts";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import type { PDFFont, PDFPage } from "pdf-lib";
+import { consumePublicFormRateLimit } from "../_shared/public-form-rate-limit.ts";
 
 const TYPE = "tcle_preenchimento_facial";
 const TERM_VERSION = "2026-08-18-v1";
@@ -149,7 +150,7 @@ async function admin(path: string, init: RequestInit = {}): Promise<Response> {
 
 async function sha256(value: string | Uint8Array): Promise<string> {
   const bytes = typeof value === "string" ? new TextEncoder().encode(value) : value;
-  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  const digest = await crypto.subtle.digest("SHA-256", Uint8Array.from(bytes).buffer);
   return [...new Uint8Array(digest)]
     .map((byte) => byte.toString(16).padStart(2, "0"))
     .join("");
@@ -784,7 +785,7 @@ async function upload(path: string, bytes: Uint8Array, contentType: string): Pro
       "Content-Type": contentType,
       "x-upsert": "false",
     },
-    body: bytes,
+    body: Uint8Array.from(bytes).buffer,
   });
   if (!response.ok) throw new Error("storage_upload_failed_" + response.status);
 }
@@ -815,6 +816,20 @@ Deno.serve(async (req: Request) => {
   }
   const length = Number(req.headers.get("content-length") || "0");
   if (length > MAX_BODY_BYTES) return fail(req, "payload_too_large", "O documento excedeu o limite permitido.", 413);
+
+  try {
+    const rateLimit = await consumePublicFormRateLimit(req, {
+      supabaseUrl: URL,
+      serviceRoleKey: SERVICE,
+      scope: "tcle-submit",
+    });
+    if (!rateLimit.allowed) {
+      return fail(req, "rate_limited", "Muitas tentativas foram feitas. Aguarde e tente novamente.", 429);
+    }
+  } catch (error) {
+    console.error("TCLE rate limiter unavailable", String(error));
+    return fail(req, "temporary_error", "O serviço está temporariamente indisponível. Tente novamente.", 503);
+  }
 
   let payload: JsonRecord;
   try {

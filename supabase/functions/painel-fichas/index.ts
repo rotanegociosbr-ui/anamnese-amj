@@ -76,6 +76,25 @@ class StorageDeletionError extends Error {
   }
 }
 
+type AdminRequest = (path: string, init?: RequestInit) => Promise<Response>;
+
+const LEGACY_CLINICAL_SCOPE = Symbol("legacy-clinical-scope");
+
+export interface LegacyClinicalScope {
+  readonly clinicId: string;
+  readonly [LEGACY_CLINICAL_SCOPE]: true;
+}
+
+export class LegacyClinicalScopeError extends Error {
+  readonly code = "legacy_clinical_scope_unavailable";
+  readonly status = 503;
+
+  constructor() {
+    super("legacy_clinical_scope_unavailable");
+    this.name = "LegacyClinicalScopeError";
+  }
+}
+
 const attempts = new Map<string, { count: number; resetAt: number }>();
 const requestAuth = new WeakMap<Request, DualAuthContext>();
 
@@ -121,13 +140,52 @@ async function admin(path: string, init: RequestInit = {}): Promise<Response> {
   });
 }
 
-async function signedLinks(
+export async function requireLegacyClinicalScope(
+  clinicId: string | null,
+  requestAdmin: AdminRequest = admin,
+): Promise<LegacyClinicalScope> {
+  if (!clinicId || !validUuid(clinicId)) throw new LegacyClinicalScopeError();
+
+  let response: Response;
+  try {
+    response = await requestAdmin(
+      "/rest/v1/rpc/painel_validar_escopo_clinico_legado",
+      {
+        method: "POST",
+        body: JSON.stringify({ p_clinic_id: clinicId }),
+      },
+    );
+  } catch {
+    throw new LegacyClinicalScopeError();
+  }
+
+  if (!response.ok) throw new LegacyClinicalScopeError();
+
+  try {
+    if (await response.json() !== true) throw new LegacyClinicalScopeError();
+  } catch (error) {
+    if (error instanceof LegacyClinicalScopeError) throw error;
+    throw new LegacyClinicalScopeError();
+  }
+
+  return Object.freeze({
+    clinicId,
+    [LEGACY_CLINICAL_SCOPE]: true as const,
+  });
+}
+
+export async function signedLinks(
+  scope: LegacyClinicalScope,
   bucket: string,
   paths: string[],
+  requestAdmin: AdminRequest = admin,
 ): Promise<Record<string, string>> {
+  if (!scope || scope[LEGACY_CLINICAL_SCOPE] !== true) {
+    throw new LegacyClinicalScopeError();
+  }
   const result: Record<string, string> = {};
   if (!paths.length) return result;
-  const response = await admin("/storage/v1/object/sign/" + bucket, {
+  const response = await requestAdmin("/storage/v1/object/sign/" + bucket, {
     method: "POST",
     body: JSON.stringify({ expiresIn: 900, paths }),
   });
@@ -259,7 +317,7 @@ function findLegacyPdf(
     matches[0];
 }
 
-Deno.serve(async (req: Request) => {
+export async function handleRequest(req: Request): Promise<Response> {
   const origin = req.headers.get("origin") || "";
   if (req.method === "OPTIONS") {
     if (origin && !ALLOWED_ORIGINS.has(origin)) {
@@ -356,6 +414,7 @@ Deno.serve(async (req: Request) => {
 
     const action = safeText(payload.acao, 30);
     if (action === "arquivar" || action === "restaurar") {
+      const legacyScope = await requireLegacyClinicalScope(authContext.clinicId);
       const source = safeText(payload.origem, 30);
       const documentId = safeText(payload.documento_id, 40);
       const operationId = safeText(payload.operation_id, 40);
@@ -415,6 +474,7 @@ Deno.serve(async (req: Request) => {
         {
           method: "POST",
           body: JSON.stringify({
+            p_clinic_id: legacyScope.clinicId,
             p_origem: source,
             p_documento_id: documentId,
             p_acao: action,
@@ -711,6 +771,8 @@ Deno.serve(async (req: Request) => {
       return json(req, { erro: "Ação inválida" }, 422);
     }
 
+    const legacyScope = await requireLegacyClinicalScope(authContext.clinicId);
+
     // Resposta original da anamnese, preservada integralmente.
     const formsResponse = await admin("/rest/v1/anamneses_resumo?select=*");
     if (!formsResponse.ok) {
@@ -777,6 +839,7 @@ Deno.serve(async (req: Request) => {
       form.arquivado_motivo = metadata?.archiveReason || null;
     }
     const formLinks = await signedLinks(
+      legacyScope,
       "fichas-pdf",
       [...new Set(Object.values(formPdfPaths))],
     );
@@ -798,6 +861,7 @@ Deno.serve(async (req: Request) => {
       Boolean,
     );
     const documentLinks = await signedLinks(
+      legacyScope,
       "documentos-clinicos",
       documentPaths,
     );
@@ -895,6 +959,26 @@ Deno.serve(async (req: Request) => {
       },
     });
   } catch (error) {
+    if (error instanceof LegacyClinicalScopeError) {
+      console.error("Legacy clinical tenant scope is unavailable");
+      await writeClinicAudit(AUTH_CONFIG, authContext, {
+        entity: "clinical_records",
+        action: "validate_tenant_scope",
+        outcome: "denied",
+        details: {
+          endpoint: "painel-fichas",
+          reason_code: error.code,
+        },
+      });
+      return json(
+        req,
+        {
+          erro: "Registros clínicos temporariamente indisponíveis.",
+          codigo: error.code,
+        },
+        error.status,
+      );
+    }
     console.error("Painel loading failed", String(error));
     await writeClinicAudit(AUTH_CONFIG, authContext, {
       entity: "clinical_records",
@@ -908,4 +992,6 @@ Deno.serve(async (req: Request) => {
       500,
     );
   }
-});
+}
+
+if (import.meta.main) Deno.serve(handleRequest);

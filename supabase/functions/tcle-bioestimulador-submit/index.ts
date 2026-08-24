@@ -1,6 +1,7 @@
 import "@supabase/functions-js/edge-runtime.d.ts";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import type { PDFFont, PDFPage } from "pdf-lib";
+import { consumePublicFormRateLimit } from "../_shared/public-form-rate-limit.ts";
 
 const TYPE = "tcle_bioestimulador_colageno";
 const TERM_VERSION = "2026-08-18-v1";
@@ -1137,6 +1138,30 @@ Deno.serve(async (req: Request) => {
       "payload_too_large",
       "O documento excedeu o limite permitido.",
       413,
+    );
+  }
+
+  try {
+    const rateLimit = await consumePublicFormRateLimit(req, {
+      supabaseUrl: URL,
+      serviceRoleKey: SERVICE,
+      scope: "tcle-submit",
+    });
+    if (!rateLimit.allowed) {
+      return fail(
+        req,
+        "rate_limited",
+        "Muitas tentativas foram feitas. Aguarde e tente novamente.",
+        429,
+      );
+    }
+  } catch (error) {
+    console.error("TCLE rate limiter unavailable", String(error));
+    return fail(
+      req,
+      "temporary_error",
+      "O serviço está temporariamente indisponível. Tente novamente.",
+      503,
     );
   }
 

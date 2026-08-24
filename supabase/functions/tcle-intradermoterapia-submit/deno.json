@@ -1,6 +1,11 @@
 {
   "imports": {
-    "@supabase/functions-js": "jsr:@supabase/functions-js@2.5.1",
+    "@supabase/functions-js": "jsr:@supabase/functions-js@2.112.3",
     "pdf-lib": "npm:pdf-lib@1.17.1"
+  },
+  "lint": {
+    "rules": {
+      "exclude": ["no-control-regex"]
+    }
   }
 }
