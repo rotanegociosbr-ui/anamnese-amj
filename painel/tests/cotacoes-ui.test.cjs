@@ -38,11 +38,21 @@ assert.match(ui, /alteraEstoque:\s*false/);
 assert.match(ui, /aceitaLegacy:\s*false/);
 assert.match(ui, /const payload = filterPayload\(\);[\s\S]{0,120}setBusy\(true\)/,
   'filtros devem ser lidos antes de desabilitar os controles');
-assert.match(css, /@media \(max-width: 780px\)/, 'layout deve se adaptar ao celular');
+assert.match(css, /@media \(max-width: 900px\)/, 'layout deve se adaptar a celular e tablet estreito');
 assert.match(css, /@media \(max-width: 520px\)[\s\S]*\.cotacoes-estatisticas\s*\{\s*grid-template-columns:\s*1fr/,
   'cards estatísticos devem usar uma coluna em telefones estreitos');
 assert.match(css, /@media \(max-width: 520px\)[\s\S]*\.cotacoes-estatistica dl\s*\{\s*grid-template-columns:\s*1fr/,
   'métricas de cada cotação devem usar uma coluna em telefones estreitos');
+assert.match(css, /\.cotacoes-shell input, \.cotacoes-shell select[^}]*font-size:\s*0\.875rem[^}]*min-height:\s*44px/,
+  'campos devem ser legíveis e ter alvo de toque suficiente');
+assert.match(css, /@media \(max-width: 520px\)[\s\S]*\.cotacoes-shell input, \.cotacoes-shell select\s*\{\s*font-size:\s*1rem/,
+  'campos não devem provocar zoom automático em telefones');
+assert.match(css, /button\.cotacoes-revisao[^}]*min-height:\s*44px/,
+  'ações administrativas devem manter alvo de toque mínimo');
+assert.match(css, /@container cotacoes \(max-width: 900px\)[\s\S]*\.cotacoes-shell table[^}]*display:\s*block/,
+  'tabela deve virar cartões quando a área útil do módulo ficar estreita');
+assert.match(css, /\.cotacoes-shell td\s*\{[^}]*overflow-wrap:\s*anywhere/,
+  'códigos e descrições extensos não podem criar overflow horizontal');
 
 assert.match(html, /id="aba-bt-cotacoes"/);
 assert.match(html, /id="cotacoes-root"/);

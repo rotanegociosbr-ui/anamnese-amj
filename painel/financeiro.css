@@ -195,6 +195,27 @@
 .financeiro-duplicidade-acoes button.secundario{border-color:var(--linha);color:var(--cinza)}
 .financeiro-duplicidade-acoes button:disabled{opacity:.55;cursor:wait}
 
+@media(max-width:840px){
+  .financeiro-busca input,
+  .financeiro-filtros select{font-size:16px;min-height:44px}
+  .financeiro-item,
+  .financeiro-pendencia-estoque{grid-template-columns:1fr 1fr}
+  .financeiro-item label:first-child,
+  .financeiro-item-estoque,
+  .financeiro-pendencia-descricao,
+  .financeiro-pendencia-estoque .financeiro-check{grid-column:1/-1}
+  .financeiro-botao,
+  .financeiro-cadastro-item button,
+  .financeiro-candidato button,
+  .financeiro-custo-item button,
+  .financeiro-visoes-lancamentos button,
+  .financeiro-filtros select,
+  .financeiro-lancamento-acoes button,
+  .financeiro-parcela-registro button,
+  .financeiro-duplicidade-parte button,
+  .financeiro-duplicidade-acoes button{min-height:44px}
+}
+
 @media(max-width:720px){
   .financeiro-atalhos{grid-template-columns:repeat(2,minmax(0,1fr))}
   .financeiro-cadastros-grid{grid-template-columns:1fr}
@@ -227,7 +248,24 @@
   .financeiro-duplicidade-topo{flex-direction:column}
 }
 
-@media(max-width:390px){
+@media(max-width:430.98px){
+  .financeiro-cadastro-item,
+  .financeiro-candidato,
+  .financeiro-custo-item,
+  .financeiro-estoque-produto>div,
+  .financeiro-estoque-produto li{align-items:stretch;flex-direction:column}
+  .financeiro-cadastro-acoes,
+  .financeiro-lancamento-acoes,
+  .financeiro-duplicidade-acoes{display:grid;grid-template-columns:1fr;width:100%}
+  .financeiro-cadastro-acoes button,
+  .financeiro-candidato button,
+  .financeiro-custo-item button,
+  .financeiro-lancamento-acoes button,
+  .financeiro-duplicidade-acoes button{width:100%}
+  .financeiro-custo-item em{align-self:flex-start}
+}
+
+@media(max-width:390.98px){
   .financeiro-kpis{grid-template-columns:1fr}
   .financeiro-atalhos{grid-template-columns:1fr}
   .financeiro-item{grid-template-columns:1fr}

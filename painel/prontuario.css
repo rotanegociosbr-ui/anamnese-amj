@@ -124,6 +124,26 @@
 .prontuario-fotos-vazio{margin-top:8px!important;padding:9px;border:1px dashed var(--linha);border-radius:8px;text-align:center}
 .prontuario-vazio{padding:28px 10px;text-align:center;color:var(--cinza);font-size:11px}
 
+@media(max-width:840px){
+  .prontuario-form input:not([type=checkbox]):not([type=hidden]),
+  .prontuario-form select,
+  .prontuario-form textarea,
+  .prontuario-fotos-editor input,
+  .prontuario-fotos-editor select,
+  .prontuario-filtros input[type=search]{min-height:44px;font-size:16px}
+  .prontuario-botao,
+  .prontuario-produto-linha button,
+  .prontuario-consulta-acoes button,
+  .prontuario-consulta-fotos-topo button,
+  .prontuario-galeria-espera button,
+  .prontuario-foto-card button,
+  .prontuario-foto-original,
+  .prontuario-fotos-controles button,
+  .prontuario-foto-duplicada .botao,
+  .prontuario-foto-duplicada button{min-height:44px}
+  .prontuario-filtros label{min-height:44px;padding:8px 0}
+}
+
 @media(max-width:720px){
   .prontuario-produto-linha{grid-template-columns:1fr 1fr}
   .prontuario-produto-linha label:first-child{grid-column:1/-1}
@@ -144,14 +164,18 @@
   .prontuario-consulta-acoes{display:grid;grid-template-columns:1fr 1fr}
   .prontuario-consulta-acoes button{width:100%}
 }
-@media(max-width:430px){
+@media(max-width:430.98px){
   .prontuario-produto-linha{grid-template-columns:1fr}
   .prontuario-produto-linha label:first-child,.prontuario-produto-linha button{grid-column:auto}
+  .prontuario-produtos-topo{align-items:stretch;flex-direction:column}
+  .prontuario-produtos-topo .prontuario-botao{width:100%}
   .prontuario-paciente-topo,.prontuario-consulta-fotos-topo,.prontuario-galeria-espera{align-items:stretch;flex-direction:column}
   .prontuario-consulta-acoes{grid-template-columns:1fr}
   .prontuario-consulta-fotos-topo button,.prontuario-galeria-espera button{width:100%}
-  .prontuario-fotos-grade{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .prontuario-fotos-grade{grid-template-columns:1fr}
+  .prontuario-foto-acoes{display:grid;grid-template-columns:1fr}
+  .prontuario-foto-acoes>*{width:100%}
 }
-@media(max-width:360px){
+@media(max-width:360.98px){
   .prontuario-fotos-grade{grid-template-columns:1fr}
 }

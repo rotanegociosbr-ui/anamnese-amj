@@ -143,6 +143,18 @@
 .operacao-selo { background: #e7f4eb; border-radius: 999px; color: #245f37; display: inline-block; font-size: .72rem; font-weight: 800; padding: .28rem .5rem; }
 .operacao-selo.alerta { background: #fff0db; color: #85510e; }
 
+@media (max-width: 840px) {
+  .operacao-card input:not([type="checkbox"]),
+  .operacao-card select,
+  .operacao-card textarea { font-size: 16px; min-height: 44px; }
+  .operacao-botao,
+  .operacao-botao.pequeno,
+  .operacao-acoes select,
+  .operacao-adicionar-procedimento input,
+  .operacao-adicionar-procedimento select { min-height: 44px; }
+  .operacao-tabela-wrap { overscroll-behavior-inline: contain; }
+}
+
 @media (max-width: 900px) {
   .operacao-resumo { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .operacao-grade { grid-template-columns: 1fr; }
@@ -166,6 +178,9 @@
 
 @media (max-width: 560px) {
   .operacao-cabecalho { align-items: stretch; flex-direction: column; }
+  .operacao-acoes { align-items: stretch; display: grid; grid-template-columns: 1fr; }
+  .operacao-acoes select,
+  .operacao-acoes .operacao-botao { max-width: none; width: 100%; }
   .operacao-fotos-cabecalho,
   .operacao-foto-produto-orientacao { align-items: stretch; flex-direction: column; }
   .operacao-fotos-acoes > .operacao-botao { flex: 1 1 100%; }
@@ -175,7 +190,7 @@
   .operacao-antes-depois { grid-template-columns: 1fr; }
 }
 
-@media (max-width: 430px) {
+@media (max-width: 430.98px) {
   .operacao-foto-contagens { grid-template-columns: 1fr; }
   .operacao-galeria > summary { align-items: flex-start; flex-direction: column; }
 }

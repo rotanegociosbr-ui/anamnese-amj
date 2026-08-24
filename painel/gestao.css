@@ -107,6 +107,15 @@
 .gestao-resumo-grid strong { font-family: Georgia, 'Times New Roman', serif; font-size: 1.25rem; }
 .gestao-resumo-grid span { color: var(--gestao-muted); font-size: 0.8rem; }
 
+@media (max-width: 840px) {
+  .gestao-shell input,
+  .gestao-shell select,
+  .gestao-shell textarea { font-size: 16px; min-height: 44px; }
+  .gestao-shell button { min-height: 44px; }
+  .gestao-tabela-wrap,
+  .gestao-nav { overscroll-behavior-inline: contain; }
+}
+
 @media (max-width: 960px) {
   .gestao-kpis, .gestao-resumo-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .gestao-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -117,6 +126,8 @@
   .gestao-filtros > label { flex: 1 1 8rem; }
   .gestao-kpis, .gestao-resumo-grid, .gestao-form { grid-template-columns: 1fr; }
   .gestao-form-largo, .gestao-form-acoes { grid-column: 1; }
+  .gestao-form-inline { align-items: stretch; display: grid; grid-template-columns: 1fr; }
+  .gestao-form-inline button { width: 100%; }
   .gestao-shell th, .gestao-shell td { padding: 0.65rem 0.75rem; }
 }
 

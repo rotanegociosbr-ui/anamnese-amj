@@ -95,7 +95,7 @@ assert.match(css, /operacao-antes-depois[\s\S]*repeat\(3,/,
   'Antes, Durante e Depois devem ter colunas próprias');
 assert.match(css, /\.operacao-foto-contagens[^{]*\{[^}]*repeat\(5,/,
   'desktop deve exibir as cinco contagens da galeria');
-assert.match(css, /@media \(max-width: 430px\)[\s\S]*operacao-foto-contagens[\s\S]*grid-template-columns: 1fr/,
+assert.match(css, /@media \(max-width: 430\.98px\)[\s\S]*operacao-foto-contagens[\s\S]*grid-template-columns: 1fr/,
   'contagens devem empilhar em celular estreito');
 assert.match(css, /\.operacao-fotos-consulta[^{]*\{[^}]*scroll-margin-top: 88px/,
   'atalho de fotos não deve parar sob a barra fixa');
@@ -183,9 +183,9 @@ assert(finalizeArchivedCheck >= 0 && finalizeArchivedCheck < finalizeSignedCheck
   'protocolo arquivado deve ser rejeitado antes do retorno signed idempotente');
 assert.match(shell, /operacao\.js\?v=20260824-3/,
   'cache-bust deve entregar o JavaScript atualizado da Operação');
-assert.match(html, /operacao\.css\?v=20260824-3/,
+assert.match(html, /operacao\.css\?v=20260824-4/,
   'cache-bust deve entregar o CSS atualizado da Operação');
-assert.match(html, /app-shell\.js\?v=20260824-5/,
+assert.match(html, /app-shell\.js\?v=20260824-6/,
   'cache-bust do shell deve entregar a referência atualizada da Operação');
 assert.match(html, /id="prontuario-busca"[^>]+aria-label="[^"]+"/,
   'busca do prontuário deve ter nome acessível');

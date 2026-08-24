@@ -135,7 +135,7 @@
         '<div class="app-shell-content" id="app-shell-content"></div></div>' +
       '<nav class="app-shell-mobile-bar" aria-label="Atalhos no celular">' +
         navButton('inicio', true) + navButton('procedimentos', true) + navButton('agenda', true) +
-        '<button class="app-mobile-action" type="button" data-shell-open-menu>' + icon('mais') + '<span>Mais</span></button>' +
+        '<button class="app-mobile-action" type="button" data-shell-open-menu aria-expanded="false" aria-controls="app-shell-sidebar">' + icon('mais') + '<span>Mais</span></button>' +
       '</nav><p class="app-shell-route-status" role="status" aria-live="polite"></p>';
 
     const sessionSlot = layout.querySelector('.app-shell-session');
@@ -158,17 +158,21 @@
     state.lastFocused = document.activeElement;
     document.body.classList.add('app-shell-drawer-open');
     updateDrawerAccessibility();
-    const button = document.querySelector('.app-shell-menu-button');
-    if (button) button.setAttribute('aria-expanded', 'true');
+    setDrawerTriggersExpanded(true);
     const first = document.querySelector('.app-shell-sidebar .app-shell-nav-button:not([hidden])');
     if (first) window.setTimeout(function () { first.focus(); }, 20);
   }
   function closeDrawer(restoreFocus) {
     document.body.classList.remove('app-shell-drawer-open');
-    const button = document.querySelector('.app-shell-menu-button');
-    if (button) button.setAttribute('aria-expanded', 'false');
+    setDrawerTriggersExpanded(false);
     if (restoreFocus && state.lastFocused && typeof state.lastFocused.focus === 'function') state.lastFocused.focus();
     updateDrawerAccessibility();
+  }
+
+  function setDrawerTriggersExpanded(expanded) {
+    document.querySelectorAll('.app-shell-menu-button,[data-shell-open-menu]').forEach(function (button) {
+      button.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+    });
   }
 
   function updateDrawerAccessibility() {
@@ -764,8 +768,8 @@
     state.mobileMedia = window.matchMedia('(max-width: 840px)');
     if (typeof state.mobileMedia.addEventListener === 'function') {
       state.mobileMedia.addEventListener('change', function () {
-        if (!state.mobileMedia.matches) document.body.classList.remove('app-shell-drawer-open');
-        updateDrawerAccessibility();
+        if (!state.mobileMedia.matches) closeDrawer(false);
+        else updateDrawerAccessibility();
       });
     }
     updateDrawerAccessibility();
