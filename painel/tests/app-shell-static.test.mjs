@@ -34,6 +34,10 @@ assert.match(js, /showDuplicateAlert:[\s\S]*?clearDuplicateAlert:/,
   'módulos devem poder exibir e limpar o estado compartilhado de duplicidade');
 assert.match(js, /addEventListener\('amj:open-existing'[\s\S]*?openExisting\(event\.detail/,
   'Abrir existente precisa ter consumidor real no shell');
+assert.match(js, /function setControlAccess\(button, allowed\)[\s\S]*?button\.hidden !== blocked[\s\S]*?button\.disabled !== blocked/,
+  'controle observado deve alterar hidden/disabled apenas quando o valor realmente mudar');
+assert.doesNotMatch(js, /button\.hidden = !allowed;\s*button\.disabled = !allowed;/,
+  'syncAccess não pode realimentar o próprio MutationObserver');
 assert.match(js, /AMJFinanceiro\.abrirCadastro\(type, id\)/,
   'cadastros existentes devem abrir pela fonte financeira canônica');
 assert.match(js, /AMJOperacaoClinica\.abrirAtendimento\(id\)/,

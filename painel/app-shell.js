@@ -181,22 +181,28 @@
     else sidebar.removeAttribute('aria-hidden');
   }
 
+  function setControlAccess(button, allowed) {
+    const blocked = !allowed;
+    // O observador de acesso também acompanha estes atributos. Reescrevê-los
+    // sem mudança real cria um ciclo infinito de MutationObserver no navegador.
+    if (button.hidden !== blocked) button.hidden = blocked;
+    if (button.disabled !== blocked) button.disabled = blocked;
+  }
+
   function syncAccess() {
     const owner = isOwner();
     document.querySelectorAll('[data-shell-route]').forEach(function (button) {
       const route = ROUTES[button.dataset.shellRoute];
       if (!route) return;
       const allowed = routeAllowed(route);
-      button.hidden = !allowed;
-      button.disabled = !allowed;
+      setControlAccess(button, allowed);
     });
 
     ['operacao', 'gestao', 'cotacoes'].forEach(function (legacy) {
       const button = byId('aba-bt-' + legacy);
       if (!button) return;
       const allowed = owner;
-      button.hidden = !allowed;
-      button.disabled = !allowed;
+      setControlAccess(button, allowed);
     });
 
     const mobile = document.querySelector('.app-shell-mobile-bar');
