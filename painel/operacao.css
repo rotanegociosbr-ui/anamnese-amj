@@ -33,6 +33,7 @@
 .operacao-card input,
 .operacao-card select,
 .operacao-card textarea { background: #fff; border: 1px solid var(--op-line); border-radius: 10px; color: var(--op-ink); font: inherit; min-height: 42px; padding: .62rem .72rem; }
+.operacao-card input:not([type="checkbox"]):not([type="file"]) { letter-spacing: normal; text-align: left; text-transform: none; }
 .operacao-card textarea { min-height: 74px; resize: vertical; }
 .operacao-card input:focus,
 .operacao-card select:focus,
@@ -80,11 +81,15 @@
 .operacao-adicionar-procedimento select { min-height: 38px; }
 .operacao-vinculos { background: #f8f1eb; border-radius: 10px; display: flex; flex-wrap: wrap; gap: .55rem 1rem; padding: .65rem; }
 .operacao-vinculos span { color: var(--op-muted); font-size: .78rem; overflow-wrap: anywhere; }
+.operacao-vinculos .operacao-selo { color: #245f37; }
+.operacao-vinculos .operacao-selo.alerta { color: #85510e; }
+.operacao-nota-documental { background: #fff8ed; border-left: 3px solid #c8985c; border-radius: 8px; padding: .6rem .7rem; }
 .operacao-galeria { border: 1px solid var(--op-line) !important; border-radius: 12px; padding: .75rem !important; }
 .operacao-galeria h6 { color: var(--op-rose); font-size: .84rem; margin: .35rem 0; }
-.operacao-antes-depois { display: grid; gap: .8rem; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.operacao-galeria-carregando { background: #f8f1eb; border-radius: 10px; color: var(--op-muted); margin: .7rem 0 0; padding: .8rem; }
+.operacao-antes-depois { display: grid; gap: .8rem; grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .operacao-galeria-coluna { min-width: 0; }
-.operacao-fotos-lista { display: grid; gap: .65rem; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
+.operacao-fotos-lista { display: grid; gap: .65rem; grid-template-columns: repeat(auto-fill, minmax(min(180px, 100%), 1fr)); }
 .operacao-foto-card { background: #fff; border: 1px solid var(--op-line); border-radius: 12px; min-width: 0; overflow: hidden; }
 .operacao-foto-card.em-destaque { outline: 3px solid rgba(164,117,77,.48); outline-offset: 3px; box-shadow: 0 10px 28px rgba(92,62,42,.2); }
 .operacao-foto-card > a { background: #eee7e1; display: block; }
@@ -122,6 +127,10 @@
   .operacao-foto-metadados,
   .operacao-foto-upload [data-foto-produto-campos] { grid-template-columns: 1fr; }
   .operacao-item-custo > span { padding-bottom: 0; }
+}
+
+@media (max-width: 760px) {
+  .operacao-antes-depois { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 560px) {

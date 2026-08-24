@@ -1,4 +1,4 @@
-import "@supabase/functions-js/edge-runtime.d.ts";
+import "jsr:@supabase/functions-js@2.112.3/edge-runtime.d.ts";
 import {
   authenticateDual,
   authResponseFields,
@@ -211,7 +211,11 @@ const DATABASE_ERROR_MESSAGES: Record<string, string> = {
   marketing_requires_clinical_photography_consent:
     "Uso em divulgação exige também o consentimento de fotografia clínica.",
   clinical_photography_consent_required:
-    "Registre o consentimento de fotografia clínica antes de anexar imagens.",
+    "Registre o consentimento atual de fotografia clínica para continuar.",
+  clinical_photo_required:
+    "Adicione ao menos uma foto clínica de antes, durante ou depois para finalizar.",
+  last_clinical_photo_required:
+    "O prontuário finalizado deve manter ao menos uma foto clínica ativa.",
   archive_reason_invalid: "Informe o motivo do arquivamento.",
   restore_reason_invalid: "Informe o motivo da restauração.",
   photo_removal_reason_invalid: "Informe o motivo da remoção da foto.",
@@ -258,7 +262,9 @@ function statusForDatabaseError(code: string): number {
     code === "22023" || code === "23514" || code.includes("invalid") ||
     code === "required_parameter_missing" ||
     code === "patient_consent_requires_signed_term" ||
-    code === "marketing_requires_clinical_photography_consent"
+    code === "marketing_requires_clinical_photography_consent" ||
+    code === "clinical_photo_required" ||
+    code === "last_clinical_photo_required"
   ) return 422;
   return 409;
 }
@@ -294,6 +300,47 @@ async function serviceJson(path: string): Promise<JsonRecord[]> {
   }
   const data = await response.json();
   return Array.isArray(data) ? data : [];
+}
+
+async function assertPhotoUploadPreflight(
+  clinicId: string,
+  protocolId: string,
+): Promise<void> {
+  const protocols = await serviceJson(
+    "/rest/v1/protocols?select=id,status,archived_at" +
+      "&clinic_id=eq." + encodeURIComponent(clinicId) +
+      "&id=eq." + encodeURIComponent(protocolId) +
+      "&limit=1",
+  );
+  const protocol = protocols[0];
+  if (!protocol) {
+    throw new ApiError(
+      404,
+      "protocol_not_found_or_locked",
+      DATABASE_ERROR_MESSAGES.protocol_not_found_or_locked,
+    );
+  }
+  if (protocol.archived_at) {
+    throw new ApiError(403, "protocol_archived", DATABASE_ERROR_MESSAGES.protocol_archived);
+  }
+  if (!["draft", "signed"].includes(safeText(protocol.status, 20))) {
+    throw new ApiError(403, "protocol_locked", DATABASE_ERROR_MESSAGES.protocol_locked);
+  }
+
+  // O protocolo foi confirmado no tenant antes de consultar a view por ID.
+  const currentConsent = await serviceJson(
+    "/rest/v1/protocol_consent_current?select=accepted,revoked_at" +
+      "&protocol_id=eq." + encodeURIComponent(protocolId) +
+      "&kind=eq.clinical_photography&limit=1",
+  );
+  const consent = currentConsent[0];
+  if (!consent || consent.accepted !== true || Boolean(consent.revoked_at)) {
+    throw new ApiError(
+      403,
+      "clinical_photography_consent_required",
+      DATABASE_ERROR_MESSAGES.clinical_photography_consent_required,
+    );
+  }
 }
 
 async function signedLinks(paths: string[]): Promise<Record<string, string>> {
@@ -347,12 +394,19 @@ async function handleList(
     throw new ApiError(422, "invalid_patient", "Cliente inválido.");
   }
   const includeArchived = payload.incluir_arquivados === true;
-  const limit = positiveInteger(payload.limite, 100, 100);
+  const page = positiveInteger(payload.pagina, 1, 100_000);
+  const pageSize = positiveInteger(
+    payload.por_pagina === undefined ? payload.limite : payload.por_pagina,
+    100,
+    100,
+  );
+  const offset = (page - 1) * pageSize;
 
   const filters = [
     "clinic_id=eq." + clinicId,
-    "order=updated_at.desc",
-    "limit=" + limit,
+    "order=updated_at.desc,id.desc",
+    "limit=" + (pageSize + 1),
+    "offset=" + offset,
   ];
   if (!includeArchived) filters.push("archived_at=is.null");
   if (protocolId) filters.push("id=eq." + protocolId);
@@ -377,9 +431,11 @@ async function handleList(
     "created_at",
     "updated_at",
   ].join(",");
-  const protocols = await serviceJson(
+  const protocolRows = await serviceJson(
     "/rest/v1/protocols?select=" + select + "&" + filters.join("&"),
   );
+  const hasMore = protocolRows.length > pageSize;
+  const protocols = protocolRows.slice(0, pageSize);
   const ids = protocols.map((item) => safeText(item.id, 40)).filter(validUuid);
   if (!ids.length) {
     await writeClinicAudit(AUTH_CONFIG, context, {
@@ -388,7 +444,11 @@ async function handleList(
       outcome: "success",
       details: { endpoint: "prontuario-fichas", result_count: 0 },
     });
-    return json(req, { ok: true, protocolos: [], total: 0 });
+    return json(req, {
+      ok: true,
+      protocolos: [],
+      paginacao: { pagina: page, por_pagina: pageSize, tem_mais: false },
+    });
   }
 
   const protocolFilter = encodeURIComponent("in.(" + ids.join(",") + ")");
@@ -477,7 +537,11 @@ async function handleList(
     outcome: "success",
     details: { endpoint: "prontuario-fichas", result_count: result.length },
   });
-  return json(req, { ok: true, protocolos: result, total: result.length });
+  return json(req, {
+    ok: true,
+    protocolos: result,
+    paginacao: { pagina: page, por_pagina: pageSize, tem_mais: hasMore },
+  });
 }
 
 async function handleListPhotos(
@@ -559,6 +623,7 @@ function normalizeProducts(value: unknown): JsonRecord[] {
     "canula",
     "kit",
     "dose",
+    "aplicacao",
   ]);
   return value.map((raw, index) => {
     if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
@@ -688,7 +753,16 @@ async function handleSaveDraft(
   if (appointmentId !== null && !validUuid(appointmentId)) {
     throw new ApiError(422, "invalid_appointment", "Agendamento inválido.");
   }
-  const procedureKind = safeText(payload.tipo_procedimento, 60);
+  const procedureKind = typeof payload.tipo_procedimento === "string"
+    ? payload.tipo_procedimento.trim()
+    : "";
+  if (!procedureKind || procedureKind.length > 120) {
+    throw new ApiError(
+      422,
+      "procedure_kind_invalid",
+      DATABASE_ERROR_MESSAGES.procedure_kind_invalid,
+    );
+  }
   const anamnesis = payload.anamnese === undefined ? {} : payload.anamnese;
   if (!anamnesis || typeof anamnesis !== "object" || Array.isArray(anamnesis)) {
     throw new ApiError(422, "anamnesis_invalid", "Revise os dados clínicos.");
@@ -778,6 +852,85 @@ async function handleReplaceProducts(
   });
 }
 
+async function handleFinalize(
+  req: Request,
+  context: DualAuthContext,
+  payload: JsonRecord,
+): Promise<Response> {
+  const { clinicId, userId } = tenant(context);
+  const protocolId = safeText(payload.protocolo_id, 40);
+  if (!validUuid(protocolId)) {
+    throw new ApiError(422, "invalid_protocol", "Prontuário inválido.");
+  }
+  const expectedVersion = requiredVersion(payload.versao_esperada);
+  const operationId = await requireProtectedOperation(
+    req,
+    context,
+    payload,
+    "prontuario.finalize",
+    protocolId,
+  );
+  const result = await rpc("prontuario_finalizar", {
+    p_clinic_id: clinicId,
+    p_user_id: userId,
+    p_actor_role: context.role,
+    p_auth_method: context.authMethod,
+    p_protocol_id: protocolId,
+    p_expected_version: expectedVersion,
+    p_request_id: operationId,
+  }) as JsonRecord;
+
+  return json(req, {
+    ok: true,
+    protocolo_id: result.id,
+    status: "signed",
+    versao: result.version,
+    finalizado: true,
+    idempotente: result.idempotent === true,
+  });
+}
+
+async function handlePhotographyConsent(
+  req: Request,
+  context: DualAuthContext,
+  payload: JsonRecord,
+): Promise<Response> {
+  const { clinicId, userId } = tenant(context);
+  const protocolId = safeText(payload.protocolo_id, 40);
+  if (!validUuid(protocolId)) {
+    throw new ApiError(422, "invalid_protocol", "Prontuário inválido.");
+  }
+  if (typeof payload.aceito !== "boolean") {
+    throw new ApiError(422, "consent_item_invalid", "Informe a decisão sobre as fotografias.");
+  }
+  const operationId = await requireProtectedOperation(
+    req,
+    context,
+    payload,
+    "prontuario.consent.clinical_photography",
+    protocolId,
+  );
+  const result = await rpc("prontuario_alterar_consentimento_fotografia", {
+    p_clinic_id: clinicId,
+    p_user_id: userId,
+    p_actor_role: context.role,
+    p_auth_method: context.authMethod,
+    p_protocol_id: protocolId,
+    p_accepted: payload.aceito,
+    p_request_id: operationId,
+  }) as JsonRecord;
+
+  return json(req, {
+    ok: true,
+    protocolo_id: result.id || protocolId,
+    consentimento: "clinical_photography",
+    aceito: result.accepted === true,
+    alterado: result.changed === true,
+    versao: result.version,
+    idempotente: result.idempotent === true,
+  });
+}
+
 async function handleArchiveRestore(
   req: Request,
   context: DualAuthContext,
@@ -860,7 +1013,8 @@ async function findExistingPhoto(
       "mime_type,size_bytes,sha256,original_name,thumbnail_storage_path," +
       "thumbnail_mime_type,thumbnail_size_bytes,thumbnail_sha256,product_id," +
       "lot_snapshot,attendance_id,procedure_item_id,duplicate_of_photo_id," +
-      "duplicate_reason,duplicate_confirmed_at,archived_at,protocols!inner(clinic_id)" +
+      "duplicate_confirmed_at,archived_at," +
+      "protocols!inner(clinic_id)" +
       "&protocol_id=eq." + protocolId +
       "&idempotency_key=eq." + idempotencyKey +
       "&protocols.clinic_id=eq." + clinicId + "&limit=1",
@@ -892,7 +1046,7 @@ async function findDuplicatePhoto(
   return photo;
 }
 
-async function presentDuplicatePhoto(photo: JsonRecord): Promise<JsonRecord> {
+async function presentStoredPhoto(photo: JsonRecord): Promise<JsonRecord> {
   const originalPath = safeText(photo.storage_path, 600);
   const thumbnailPath = safeText(photo.thumbnail_storage_path, 600);
   const archived = Boolean(photo.archived_at);
@@ -902,11 +1056,17 @@ async function presentDuplicatePhoto(photo: JsonRecord): Promise<JsonRecord> {
     protocolo_id: photo.protocol_id,
     fase: photo.phase,
     tirada_em: photo.taken_at,
+    mime_type: photo.mime_type,
+    size_bytes: photo.size_bytes,
+    sha256: photo.sha256,
     original_name: photo.original_name,
     produto_id: photo.product_id,
     lote: photo.lot_snapshot,
     atendimento_id: photo.attendance_id,
     item_procedimento_id: photo.procedure_item_id,
+    duplicate_of_photo_id: photo.duplicate_of_photo_id || null,
+    duplicidade_confirmada: photo.duplicate_confirmed === true ||
+      Boolean(photo.duplicate_confirmed_at),
     arquivada: archived,
     url_assinada: archived ? null : links[originalPath] || null,
     miniatura_url: archived ? null : links[thumbnailPath] || links[originalPath] || null,
@@ -926,33 +1086,71 @@ async function uploadPrivateImage(path: string, file: File): Promise<Response> {
   });
 }
 
-async function deletePrivateImage(path: string): Promise<boolean> {
+async function privateImageMatches(
+  path: string,
+  file: File,
+  sha256: string,
+): Promise<"match" | "missing" | "mismatch"> {
   const response = await serviceFetch(
-    "/storage/v1/object/" + BUCKET,
-    {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prefixes: [path] }),
-    },
+    "/storage/v1/object/authenticated/" + BUCKET + "/" + encodePath(path),
+    { method: "GET", headers: { Accept: file.type } },
   );
-  return response.ok || response.status === 404;
+  if (response.status === 404) return "missing";
+  if (!response.ok) {
+    console.error("Clinical photo reconciliation read failed", response.status);
+    throw new ApiError(
+      503,
+      "photo_reconciliation_unavailable",
+      "Não foi possível confirmar uma imagem já enviada. Tente novamente.",
+    );
+  }
+  const storedType = (response.headers.get("content-type") || "").split(";", 1)[0].trim();
+  const storedBytes = new Uint8Array(await response.arrayBuffer());
+  if (storedType !== file.type || storedBytes.byteLength !== file.size) return "mismatch";
+  return await sha256Hex(storedBytes) === sha256 ? "match" : "mismatch";
 }
+
+type PhotoIdempotencyExpectation = {
+  phase: string;
+  storagePath: string;
+  mimeType: string;
+  sizeBytes: number;
+  sha256: string;
+  thumbnailStoragePath: string | null;
+  thumbnailMimeType: string | null;
+  thumbnailSizeBytes: number | null;
+  thumbnailSha256: string | null;
+  productId: string | null;
+  lotSnapshot: string | null;
+  attendanceId: string | null;
+  procedureItemId: string | null;
+  confirmDistinct: boolean;
+};
 
 function assertPhotoIdempotencyMatch(
   existing: JsonRecord,
-  phase: string,
-  file: File,
-  sha256: string,
-  productId: string | null,
-  lotSnapshot: string | null,
+  expected: PhotoIdempotencyExpectation,
 ): void {
+  const existingThumbnailSize = existing.thumbnail_size_bytes == null
+    ? null
+    : Number(existing.thumbnail_size_bytes);
   if (
-    safeText(existing.phase, 20) !== phase ||
-    safeText(existing.mime_type, 80) !== file.type ||
-    Number(existing.size_bytes) !== file.size ||
-    safeText(existing.sha256, 64).toLowerCase() !== sha256 ||
-    (safeText(existing.product_id, 40) || null) !== productId ||
-    (safeText(existing.lot_snapshot, 100) || null) !== lotSnapshot
+    safeText(existing.phase, 20) !== expected.phase ||
+    safeText(existing.storage_path, 600) !== expected.storagePath ||
+    safeText(existing.mime_type, 80) !== expected.mimeType ||
+    Number(existing.size_bytes) !== expected.sizeBytes ||
+    safeText(existing.sha256, 64).toLowerCase() !== expected.sha256 ||
+    (safeText(existing.thumbnail_storage_path, 600) || null) !==
+      expected.thumbnailStoragePath ||
+    (safeText(existing.thumbnail_mime_type, 80) || null) !== expected.thumbnailMimeType ||
+    existingThumbnailSize !== expected.thumbnailSizeBytes ||
+    (safeText(existing.thumbnail_sha256, 64).toLowerCase() || null) !==
+      expected.thumbnailSha256 ||
+    (safeText(existing.product_id, 40) || null) !== expected.productId ||
+    (safeText(existing.lot_snapshot, 100) || null) !== expected.lotSnapshot ||
+    (safeText(existing.attendance_id, 40) || null) !== expected.attendanceId ||
+    (safeText(existing.procedure_item_id, 40) || null) !== expected.procedureItemId ||
+    Boolean(existing.duplicate_confirmed_at) !== expected.confirmDistinct
   ) {
     throw new ApiError(
       409,
@@ -1033,6 +1231,10 @@ async function handleAddPhoto(
     throw new ApiError(422, "invalid_taken_at", "Informe a data da foto corretamente.");
   }
 
+  // Evita gravar até 25 MB no Storage quando o protocolo não está ativo ou a
+  // autorização atual foi revogada. O RPC repete a validação sob concorrência.
+  await assertPhotoUploadPreflight(clinicId, protocolId);
+
   const bytes = new Uint8Array(await file.arrayBuffer());
   if (!validImageMagic(bytes, file.type)) {
     throw new ApiError(415, "invalid_image_signature", "O arquivo não é uma imagem válida.");
@@ -1047,24 +1249,36 @@ async function handleAddPhoto(
     thumbnailHash = await sha256Hex(thumbnailBytes);
   }
 
+  const extension = EXTENSION_BY_MIME[file.type];
+  const photoId = idempotencyKey;
+  const storagePath = `${clinicId}/${protocolId}/${photoId}.${extension}`;
+  const thumbnailPath = thumbnail
+    ? `${clinicId}/${protocolId}/${photoId}.thumb.${EXTENSION_BY_MIME[thumbnail.type]}`
+    : null;
+  const originalName = sanitizeOriginalName(file.name);
+  const idempotencyExpectation: PhotoIdempotencyExpectation = {
+    phase,
+    storagePath,
+    mimeType: file.type,
+    sizeBytes: file.size,
+    sha256: hash,
+    thumbnailStoragePath: thumbnailPath,
+    thumbnailMimeType: thumbnail?.type || null,
+    thumbnailSizeBytes: thumbnail?.size || null,
+    thumbnailSha256: thumbnailHash,
+    productId,
+    lotSnapshot,
+    attendanceId,
+    procedureItemId,
+    confirmDistinct,
+  };
+
   const existing = await findExistingPhoto(clinicId, protocolId, idempotencyKey);
   if (existing) {
-    assertPhotoIdempotencyMatch(existing, phase, file, hash, productId, lotSnapshot);
-    const existingOriginalPath = safeText(existing.storage_path, 600);
-    const existingThumbnailPath = safeText(existing.thumbnail_storage_path, 600);
-    const links = existing.archived_at
-      ? {}
-      : await signedLinks([existingOriginalPath, existingThumbnailPath]);
+    assertPhotoIdempotencyMatch(existing, idempotencyExpectation);
     return json(req, {
       ok: true,
-      foto: {
-        ...existing,
-        url_assinada: existing.archived_at ? null : links[existingOriginalPath] || null,
-        miniatura_url: existing.archived_at
-          ? null
-          : links[existingThumbnailPath] || links[existingOriginalPath] || null,
-        expira_em_segundos: existing.archived_at ? null : SIGNED_URL_SECONDS,
-      },
+      foto: await presentStoredPhoto(existing),
       idempotente: true,
     });
   }
@@ -1078,7 +1292,7 @@ async function handleAddPhoto(
       {
         correspondencia: "exata",
         existing_id: duplicate.id,
-        candidato: await presentDuplicatePhoto(duplicate),
+        candidato: await presentStoredPhoto(duplicate),
       },
     );
   }
@@ -1109,48 +1323,60 @@ async function handleAddPhoto(
     );
   }
 
-  const extension = EXTENSION_BY_MIME[file.type];
-  const photoId = idempotencyKey;
-  const storagePath = `${clinicId}/${protocolId}/${photoId}.${extension}`;
-  const thumbnailPath = thumbnail
-    ? `${clinicId}/${protocolId}/${photoId}.thumb.${EXTENSION_BY_MIME[thumbnail.type]}`
-    : null;
-  const originalName = sanitizeOriginalName(file.name);
-
   const uploadResponse = await uploadPrivateImage(storagePath, file);
   if (!uploadResponse.ok) {
     const concurrent = uploadResponse.status === 400 || uploadResponse.status === 409
       ? await findExistingPhoto(clinicId, protocolId, idempotencyKey)
       : null;
     if (concurrent) {
-      assertPhotoIdempotencyMatch(concurrent, phase, file, hash, productId, lotSnapshot);
-      const concurrentOriginalPath = safeText(concurrent.storage_path, 600);
-      const concurrentThumbnailPath = safeText(concurrent.thumbnail_storage_path, 600);
-      const links = concurrent.archived_at
-        ? {}
-        : await signedLinks([concurrentOriginalPath, concurrentThumbnailPath]);
+      assertPhotoIdempotencyMatch(concurrent, idempotencyExpectation);
       return json(req, {
         ok: true,
-        foto: {
-          ...concurrent,
-          url_assinada: concurrent.archived_at ? null : links[concurrentOriginalPath] || null,
-          miniatura_url: concurrent.archived_at
-            ? null
-            : links[concurrentThumbnailPath] || links[concurrentOriginalPath] || null,
-          expira_em_segundos: concurrent.archived_at ? null : SIGNED_URL_SECONDS,
-        },
+        foto: await presentStoredPhoto(concurrent),
         idempotente: true,
       });
     }
-    console.error("Clinical photo upload failed", uploadResponse.status);
-    throw new ApiError(503, "photo_upload_failed", "Não foi possível guardar a imagem agora.");
+    if (uploadResponse.status === 400 || uploadResponse.status === 409) {
+      const objectState = await privateImageMatches(storagePath, file, hash);
+      if (objectState === "match") {
+        // Queda anterior entre Storage e RPC: o objeto exato e adotado e o
+        // mesmo RPC idempotente conclui o registro sem sobrescrever bytes.
+      } else if (objectState === "mismatch") {
+        throw new ApiError(
+          409,
+          "idempotency_key_reused",
+          DATABASE_ERROR_MESSAGES.idempotency_key_reused,
+        );
+      } else {
+        console.error("Clinical photo upload conflict without stored object");
+        throw new ApiError(503, "photo_upload_failed", "Não foi possível guardar a imagem agora.");
+      }
+    } else {
+      console.error("Clinical photo upload failed", uploadResponse.status);
+      throw new ApiError(503, "photo_upload_failed", "Não foi possível guardar a imagem agora.");
+    }
   }
 
   if (thumbnail && thumbnailPath) {
     const thumbnailUpload = await uploadPrivateImage(thumbnailPath, thumbnail);
     if (!thumbnailUpload.ok) {
-      await deletePrivateImage(storagePath);
-      throw new ApiError(503, "photo_upload_failed", "Não foi possível guardar a miniatura agora.");
+      const thumbnailState = thumbnailUpload.status === 400 || thumbnailUpload.status === 409
+        ? await privateImageMatches(thumbnailPath, thumbnail, thumbnailHash || "")
+        : "missing";
+      if (thumbnailState !== "match") {
+        if (thumbnailState === "mismatch") {
+          throw new ApiError(
+            409,
+            "idempotency_key_reused",
+            DATABASE_ERROR_MESSAGES.idempotency_key_reused,
+          );
+        }
+        throw new ApiError(
+          503,
+          "photo_upload_failed",
+          "Não foi possível guardar a miniatura agora.",
+        );
+      }
     }
   }
 
@@ -1185,36 +1411,77 @@ async function handleAddPhoto(
       p_request_id: idempotencyKey,
     }) as JsonRecord;
   } catch (error) {
-    const removed = await deletePrivateImage(storagePath);
-    const thumbnailRemoved = thumbnailPath ? await deletePrivateImage(thumbnailPath) : true;
-    if (!removed || !thumbnailRemoved) console.error("Orphan clinical photo cleanup failed");
+    const uncertainResult = !(error instanceof ApiError) ||
+      error.code === "backend_error" || error.status >= 500;
+    const retryDelays = uncertainResult ? [0, 100, 300, 700] : [0];
+    let committedPhoto: JsonRecord | null = null;
+    let lookupConclusive = false;
+    for (const delay of retryDelays) {
+      if (delay > 0) {
+        await new Promise<void>((resolve) => setTimeout(resolve, delay));
+      }
+      try {
+        committedPhoto = await findExistingPhoto(clinicId, protocolId, idempotencyKey);
+        lookupConclusive = true;
+        if (committedPhoto) break;
+      } catch {
+        lookupConclusive = false;
+      }
+    }
+    if (committedPhoto) {
+      assertPhotoIdempotencyMatch(committedPhoto, idempotencyExpectation);
+      return json(req, {
+        ok: true,
+        foto: await presentStoredPhoto(committedPhoto),
+        idempotente: true,
+      });
+    }
+
+    if (uncertainResult || !lookupConclusive) {
+      // Falha de transporte/parse não prova rollback: a transação pode ainda
+      // confirmar. Preserva os objetos; o próximo retry valida bytes+SHA e
+      // conclui o mesmo RPC idempotente.
+      console.error("Clinical photo registration result is uncertain");
+      throw new ApiError(
+        503,
+        "photo_registration_uncertain",
+        "A confirmação da imagem está em andamento. Tente novamente.",
+      );
+    }
+
+    // Mesmo um erro SQL definitivo pode concorrer com outra requisição que já
+    // adotou este path idempotente. Nunca removemos o objeto publicado aqui:
+    // o próximo retry reconcilia MIME/tamanho/SHA; órfãos privados exigem um GC
+    // futuro com prova de ownership/lock, fora do caminho clínico concorrente.
     throw error;
   }
 
-  const links = await signedLinks([storagePath, thumbnailPath || ""]);
+  const registeredPhoto: JsonRecord = {
+    id: result.id,
+    protocol_id: protocolId,
+    phase,
+    storage_path: result.storage_path || storagePath,
+    taken_at: takenAt.toISOString(),
+    mime_type: file.type,
+    size_bytes: file.size,
+    sha256: hash,
+    original_name: originalName,
+    thumbnail_storage_path: result.thumbnail_storage_path || thumbnailPath,
+    thumbnail_mime_type: thumbnail?.type || null,
+    thumbnail_size_bytes: thumbnail?.size || null,
+    thumbnail_sha256: thumbnailHash,
+    product_id: productId,
+    lot_snapshot: lotSnapshot,
+    attendance_id: attendanceId,
+    procedure_item_id: procedureItemId,
+    duplicate_of_photo_id: confirmDistinct ? duplicate?.id || null : null,
+    duplicate_confirmed: confirmDistinct,
+    duplicate_confirmed_at: null,
+    archived_at: null,
+  };
   return json(req, {
     ok: true,
-    foto: {
-      id: result.id,
-      protocolo_id: protocolId,
-      fase: phase,
-      tirada_em: takenAt.toISOString(),
-      mime_type: file.type,
-      size_bytes: file.size,
-      sha256: hash,
-      original_name: originalName,
-      produto_id: productId,
-      lote: lotSnapshot,
-      atendimento_id: attendanceId,
-      item_procedimento_id: procedureItemId,
-      duplicate_of_photo_id: confirmDistinct ? duplicate?.id || null : null,
-      duplicidade_confirmada: confirmDistinct,
-      url_assinada: links[storagePath] || null,
-      miniatura_url: thumbnailPath
-        ? links[thumbnailPath] || links[storagePath] || null
-        : links[storagePath] || null,
-      expira_em_segundos: SIGNED_URL_SECONDS,
-    },
+    foto: await presentStoredPhoto(registeredPhoto),
     idempotente: result.idempotent === true,
   });
 }
@@ -1477,6 +1744,10 @@ Deno.serve(async (req: Request) => {
         return await handleSaveDraft(req, context, payload);
       case "substituir_produtos":
         return await handleReplaceProducts(req, context, payload);
+      case "finalizar":
+        return await handleFinalize(req, context, payload);
+      case "alterar_consentimento_fotografia":
+        return await handlePhotographyConsent(req, context, payload);
       case "remover_foto":
         return await handleRemovePhoto(req, context, payload);
       case "restaurar_foto":

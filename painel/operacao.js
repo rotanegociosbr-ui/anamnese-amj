@@ -17,13 +17,19 @@
   const photoUploadDuplicates = new WeakMap();
   const photoMetadataKeys = new WeakMap();
   const formIntentKeys = new WeakMap();
+  const protocolPrepareKeys = new Map();
+  const loadedPhotoAttendances = new Map();
+  const loadingPhotoAttendances = new Map();
+  const PHOTO_LINK_REFRESH_MS = 4 * 60 * 1000;
+  let photoLoadEpoch = 0;
 
   function emptyData() {
     return { clientes: [], atendimentos: [], procedimentos_atendimento: [], perfis_operacionais: [], preferencias_contato: [],
       recomendacoes_retorno: [], fila_retorno: [], tentativas_retorno: [], fichas_custo: [],
       itens_ficha_custo: [], rentabilidade_atendimentos: [], rentabilidade_mensal: [],
       resumo_retornos: [], produtos: [], estoque_lotes: [], protocolos: [], lancamentos_receita: [],
-      pagamentos: [], taxas_pagamento: [], fotos_atendimento: [], eventos_consumo: [],
+      pagamentos: [], taxas_pagamento: [], fotos_atendimento: [], indice_fotos_atendimento: [],
+      resumos_prontuario_atendimento: [], eventos_consumo: [],
       responsaveis: [], vinculos_agenda: [], agendamentos: [] };
   }
   function uuid() {
@@ -55,6 +61,25 @@
   function confirmFormIntent(form, key) {
     const remembered = formIntentKeys.get(form);
     if (remembered && remembered.key === key) formIntentKeys.delete(form);
+  }
+  function protocolPrepareKey(attendanceId) {
+    const id = String(attendanceId || '');
+    if (!protocolPrepareKeys.has(id)) protocolPrepareKeys.set(id, uuid());
+    return protocolPrepareKeys.get(id);
+  }
+  function confirmProtocolPrepare(attendanceId, key) {
+    const id = String(attendanceId || '');
+    if (protocolPrepareKeys.get(id) === key) protocolPrepareKeys.delete(id);
+  }
+  function clinicalPhotoPending(summary) {
+    return !summary || num(summary.active_clinical_count) < 1;
+  }
+  function attendancePhotosAreFresh(attendanceId) {
+    const id = String(attendanceId || '');
+    const loadedAt = loadedPhotoAttendances.get(id);
+    if (Number.isFinite(loadedAt) && Date.now() - loadedAt < PHOTO_LINK_REFRESH_MS) return true;
+    loadedPhotoAttendances.delete(id);
+    return false;
   }
   function escapeHtml(value) {
     return String(value == null ? '' : value).replace(/&/g, '&amp;').replace(/</g, '&lt;')
@@ -161,7 +186,7 @@
     try {
       proof = await window.AMJProtecao.solicitarSenhaRecente({
         titulo: 'Confirmar operação clínica',
-        motivoPadrao: reason || 'Alteração operacional confirmada pela gestão',
+        motivo: reason || 'Alteração operacional confirmada pela gestão',
         motivoObrigatorio: true
       });
       return await jsonRequest(action, Object.assign({}, payload || {}, {
@@ -186,7 +211,9 @@
     try { data = await response.json(); } catch (_) { data = {}; }
     if (generation !== state.generation) throw new Error('Sessão operacional encerrada.');
     if (!response.ok || data.ok === false || data.erro) {
-      throw new Error(data.erro || 'Não foi possível atualizar a foto clínica.');
+      const error = new Error(data.erro || 'Não foi possível atualizar o prontuário clínico.');
+      error.code = data.codigo || String(response.status);
+      throw error;
     }
     if (data.identity && typeof atualizarIdentidade === 'function') atualizarIdentidade(data);
     return data;
@@ -201,7 +228,8 @@
       proof = await window.AMJProtecao.solicitarSenhaRecente(options || {});
       return await prontuarioJsonRequest(action, Object.assign({}, payload || {}, {
         operation_id: proof.operation_id,
-        motivo: proof.motivo || 'Alteração da foto clínica confirmada pela gestão'
+        motivo: proof.motivo || (options && options.motivo) ||
+          'Alteração do prontuário clínico confirmada pela gestão'
       }), proof);
     } finally {
       if (proof && typeof proof.encerrar === 'function') await proof.encerrar();
@@ -581,11 +609,12 @@
     const preview = photo.miniatura_url || photo.url_assinada;
     const media = archived || !preview
       ? '<div class="operacao-foto-indisponivel">' + (archived ? 'Foto arquivada' : 'Prévia temporariamente indisponível') + '</div>'
-      : '<a href="' + escapeHtml(photo.url_assinada || preview) + '" target="_blank" rel="noopener noreferrer">' +
-        '<img src="' + escapeHtml(preview) + '" alt="Foto clínica ' + escapeHtml(photo.category) + '" loading="lazy" decoding="async"></a>';
+      : '<a href="' + escapeHtml(photo.url_assinada || preview) + '" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">' +
+        '<img src="' + escapeHtml(preview) + '" alt="Foto clínica ' + escapeHtml(photo.category) +
+        '" loading="lazy" decoding="async" referrerpolicy="no-referrer"></a>';
     const details = [photo.caption, product && product.name, photo.lot_snapshot && 'Lote ' + photo.lot_snapshot]
       .filter(Boolean).map(escapeHtml).join(' · ');
-    const archiveAction = archived
+    const archiveAction = visitArchived ? '' : archived
       ? '<button type="button" class="operacao-botao pequeno" data-foto-restaurar="' +
         escapeHtml(photo.photo_id) + '">Restaurar foto</button>'
       : '<button type="button" class="operacao-botao pequeno perigo" data-foto-arquivar="' +
@@ -611,26 +640,108 @@
       metadataForm + '</article>';
   }
 
+  function protocolForVisit(visit) {
+    return state.data.protocolos.find(function (protocol) {
+      return protocol.id === visit.protocol_id;
+    }) || null;
+  }
+
+  function protocolSummaryForVisit(visit) {
+    return state.data.resumos_prontuario_atendimento.find(function (summary) {
+      return summary.attendance_id === visit.id;
+    }) || null;
+  }
+
+  function protocolStatusLabel(protocol) {
+    if (!protocol) return 'não vinculado';
+    if (protocol.archived_at) return 'arquivado';
+    return ({ draft: 'rascunho', signed: 'finalizado' })[protocol.status] || protocol.status || 'desconhecido';
+  }
+
+  async function loadAttendancePhotos(attendanceId) {
+    const id = String(attendanceId || '');
+    if (!id || attendancePhotosAreFresh(id)) return true;
+    if (loadingPhotoAttendances.has(id)) return await loadingPhotoAttendances.get(id);
+    const epoch = photoLoadEpoch;
+    const task = (async function () {
+      status('Carregando fotos clínicas privadas…');
+      const data = await jsonRequest('listar_fotos_atendimento', { atendimento_id: id });
+      if (epoch !== photoLoadEpoch) return false;
+      const rows = Array.isArray(data.fotos_atendimento) ? data.fotos_atendimento : [];
+      state.data.fotos_atendimento = state.data.fotos_atendimento.filter(function (photo) {
+        return photo.attendance_id !== id;
+      }).concat(rows);
+      loadedPhotoAttendances.set(id, Date.now());
+      const visit = state.data.atendimentos.find(function (item) { return item.id === id; });
+      const currentGallery = bySelector('[data-galeria-atendimento="' + CSS.escape(id) + '"]');
+      let restoreSummaryFocus = false;
+      if (visit && currentGallery) {
+        restoreSummaryFocus = currentGallery.contains(document.activeElement);
+        const items = state.data.procedimentos_atendimento.filter(function (item) {
+          return item.attendance_id === id;
+        });
+        const holder = document.createElement('div');
+        holder.innerHTML = renderAttendanceGallery(visit, items, Boolean(visit.archived_at));
+        if (holder.firstElementChild) currentGallery.replaceWith(holder.firstElementChild);
+      }
+      const gallery = bySelector('[data-galeria-atendimento="' + CSS.escape(id) + '"]');
+      if (gallery) {
+        gallery.open = true;
+        if (restoreSummaryFocus) {
+          const summary = gallery.querySelector('summary');
+          if (summary) summary.focus({ preventScroll: true });
+        }
+      }
+      status(rows.length ? 'Fotos clínicas carregadas com acesso temporário.' : 'Galeria pronta para receber fotos clínicas.');
+      return true;
+    })().catch(function (error) {
+      status(error.message || 'Não foi possível carregar as fotos clínicas.', true);
+      return false;
+    }).finally(function () {
+      if (loadingPhotoAttendances.get(id) === task) loadingPhotoAttendances.delete(id);
+    });
+    loadingPhotoAttendances.set(id, task);
+    return await task;
+  }
+
   function renderAttendanceGallery(visit, items, visitArchived) {
+    const protocol = protocolForVisit(visit);
+    const galleryReadOnly = visitArchived || Boolean(protocol && protocol.archived_at);
     const photos = state.data.fotos_atendimento.filter(function (photo) {
       return photo.attendance_id === visit.id;
     });
+    const summary = protocolSummaryForVisit(visit);
+    const photographyConsent = Boolean(summary && summary.clinical_photography_consented === true);
+    const photoCount = summary ? num(summary.active_photo_count) + num(summary.archived_photo_count) : photos.length;
+    const galleryStart = '<details class="operacao-galeria" data-galeria-atendimento="' +
+      escapeHtml(visit.id) + '"><summary>Fotos clínicas (' + escapeHtml(photoCount) + ')</summary>' +
+      '<p class="operacao-nota">Uso clínico privado. Não autoriza marketing nem publicação.</p>';
+    if (visit.protocol_id && !attendancePhotosAreFresh(visit.id)) {
+      return galleryStart + '<p class="operacao-galeria-carregando">Abra esta seção para carregar as fotos privadas sob demanda.</p></details>';
+    }
     const renderCategory = function (category, title) {
       const rows = photos.filter(function (photo) { return photo.category === category; });
       return '<section class="operacao-galeria-coluna"><h6>' + title + '</h6><div class="operacao-fotos-lista">' +
         (rows.length ? rows.map(function (photo) {
-          return renderGalleryPhoto(photo, visit, items, visitArchived);
+          return renderGalleryPhoto(photo, visit, items, galleryReadOnly);
         }).join('') : '<p class="operacao-vazio">Nenhuma foto.</p>') + '</div></section>';
     };
     const products = renderCategory('produtos_utilizados', 'Produtos utilizados');
     const legacy = photos.some(function (photo) { return photo.category === 'durante_legado'; })
       ? renderCategory('durante_legado', 'Durante o procedimento (legado)') : '';
-    const upload = visitArchived ? '' : visit.protocol_id
+    const upload = galleryReadOnly
+      ? '<p class="operacao-nota">Galeria somente leitura enquanto a visita ou o prontuário estiver arquivado.</p>'
+      : visit.protocol_id && !photographyConsent
+      ? '<div class="operacao-aviso-listagem"><p>Registre a autorização atual de fotografia clínica antes de enviar arquivos.</p>' +
+          '<button type="button" class="operacao-botao pequeno secundario" data-prontuario-abrir="' +
+          escapeHtml(visit.protocol_id) + '">Abrir prontuário e registrar autorização</button></div>'
+      : visit.protocol_id
       ? '<form class="operacao-foto-upload" data-form-foto-upload data-atendimento-id="' + escapeHtml(visit.id) + '" ' +
           'data-protocolo-id="' + escapeHtml(visit.protocol_id) + '"><h6>Adicionar fotos clínicas</h6>' +
           '<p class="operacao-nota">Originais privados preservados. JPEG, PNG ou WebP, até 25 MB por arquivo. HEIC ainda não é aceito.</p>' +
           '<label>Categoria<select name="categoria" required><option value="antes">Antes</option>' +
-            '<option value="depois">Depois</option><option value="produtos_utilizados">Produtos utilizados</option></select></label>' +
+            '<option value="durante">Durante</option><option value="depois">Depois</option>' +
+            '<option value="produtos_utilizados">Produtos utilizados</option></select></label>' +
           '<label>Fotos<input name="arquivos" type="file" accept="image/jpeg,image/png,image/webp" multiple required></label>' +
           '<label>Capturadas em<input name="capturada_em" type="datetime-local" value="' + localNow() + '" required></label>' +
           '<label>Procedimento<select name="procedimento_item_id">' + procedureOptionsForVisit(items, '') + '</select></label>' +
@@ -646,9 +757,8 @@
             '<label>Motivo obrigatório<input name="motivo_duplicidade" maxlength="500" placeholder="Explique por que a foto deve ser mantida separadamente"></label></div>' +
           '<button class="operacao-botao pequeno" type="submit">Enviar e organizar</button></form>'
       : '<p class="operacao-aviso-listagem">Vincule um prontuário à visita para usar a galeria clínica.</p>';
-    return '<details class="operacao-galeria"><summary>Fotos clínicas (' + photos.length + ')</summary>' +
-      '<p class="operacao-nota">Uso clínico privado. Não autoriza marketing nem publicação.</p>' +
-      '<div class="operacao-antes-depois">' + renderCategory('antes', 'Antes') + renderCategory('depois', 'Depois') + '</div>' +
+    return galleryStart + '<div class="operacao-antes-depois">' + renderCategory('antes', 'Antes') +
+      renderCategory('durante', 'Durante') + renderCategory('depois', 'Depois') + '</div>' +
       products + legacy + upload + '</details>';
   }
 
@@ -674,6 +784,11 @@
             (profile.accessibility_note ? 'Apoio: ' + profile.accessibility_note : '')) + '</p>' : '') +
         visits.map(function (visit) {
           const archived = Boolean(visit.archived_at);
+          const protocol = protocolForVisit(visit);
+          const protocolSummary = protocolSummaryForVisit(visit);
+          const photoPending = clinicalPhotoPending(protocolSummary);
+          const consentPending = Boolean(visit.protocol_id) &&
+            !(protocolSummary && protocolSummary.clinical_photography_consented === true);
           const items = state.data.procedimentos_atendimento.filter(function (item) {
             return item.attendance_id === visit.id;
           }).sort(function (a, b) {
@@ -734,6 +849,16 @@
               escapeHtml(visit.id) + '">Editar visita</button>' +
               '<button type="button" class="operacao-botao pequeno perigo" data-atendimento-arquivar="' +
               escapeHtml(visit.id) + '" data-versao="' + escapeHtml(visit.version) + '">Apagar/Arquivar visita</button>';
+          const documentationActions = archived ? '' : !visit.protocol_id
+            ? '<button type="button" class="operacao-botao pequeno" data-prontuario-preparar="' +
+              escapeHtml(visit.id) + '" data-versao="' + escapeHtml(visit.version) +
+              '">Preparar prontuário e fotos</button>'
+            : '<button type="button" class="operacao-botao pequeno secundario" data-prontuario-abrir="' +
+              escapeHtml(visit.protocol_id) + '">Abrir prontuário e consentimento</button>' +
+              (protocol && protocol.status === 'draft' && !protocol.archived_at
+                ? '<button type="button" class="operacao-botao pequeno" data-prontuario-finalizar="' +
+                  escapeHtml(protocol.id) + '" data-versao="' + escapeHtml(protocol.version) +
+                  '">Finalizar registro da consulta</button>' : '');
           const addForm = archived ? '' : '<form class="operacao-adicionar-procedimento" data-form-procedimento data-atendimento-id="' +
              escapeHtml(visit.id) + '"><input name="procedimento_item_id" type="hidden"><input name="versao" type="hidden">' +
              '<input name="procedimento" maxlength="120" placeholder="Adicionar outro procedimento" required>' +
@@ -753,14 +878,21 @@
             '<header><div><strong>' + escapeHtml(dateTime(visit.attended_at)) + '</strong><span>' +
               escapeHtml(visit.status) + ' · ID ' + escapeHtml(visit.id) + '</span></div>' +
               '<div class="operacao-acoes"><button type="button" class="operacao-botao pequeno secundario" data-resumo-procedimento="' +
-                escapeHtml(visit.id) + '">Abrir/Imprimir resumo</button>' + visitActions + '</div></header>' +
+                escapeHtml(visit.id) + '">Abrir/Imprimir resumo</button>' + documentationActions + visitActions + '</div></header>' +
             '<ul class="operacao-procedimentos-lista">' + itemHtml + '</ul>' + addForm +
             '<div class="operacao-vinculos"><span><b>Valor:</b> ' + escapeHtml(money(total)) + '</span>' +
               '<span><b>Pago:</b> ' + escapeHtml(money(paid)) + '</span><span><b>Saldo:</b> ' +
               escapeHtml(money(Math.max(total - paid, 0))) + '</span><span><b>Prontuário:</b> ' +
-              escapeHtml(visit.protocol_id || 'não vinculado') + '</span><span><b>Retorno:</b> ' +
+              escapeHtml(protocol ? protocolStatusLabel(protocol) : visit.protocol_id ? 'vinculado' : 'não vinculado') +
+              (visit.protocol_id ? ' · ' + escapeHtml(visit.protocol_id) : '') +
+              '</span><span><b>Retorno:</b> ' +
               escapeHtml(returns.length ? returns.map(function (row) { return row.status; }).join(', ') : 'não registrado') +
-              '</span></div>' + renderAttendanceGallery(visit, items, archived) + '</article>';
+              '</span>' + (photoPending ? '<span class="operacao-selo alerta">Foto pendente</span>' :
+                '<span class="operacao-selo">Foto clínica registrada</span>') +
+              (consentPending ? '<span class="operacao-selo alerta">Consentimento de foto pendente</span>' : '') +
+              '</div>' + (protocol && protocol.status === 'draft' && !protocol.archived_at
+                ? '<p class="operacao-nota operacao-nota-documental">A finalização documental exige consentimento de fotografia confirmado explicitamente e ao menos uma foto clínica ativa em Antes, Durante ou Depois. Fotos de produtos não contam.</p>'
+                : '') + renderAttendanceGallery(visit, items, archived) + '</article>';
         }).join('') + '</section>';
     }).join('');
   }
@@ -967,9 +1099,12 @@
 
   async function load() {
     if (!state.root || state.loading || !ownerAccess()) return;
+    photoLoadEpoch += 1;
     state.loading = true; setBusy(true); status('Carregando operação clínica…');
     try {
       const data = await jsonRequest('listar', { limite: state.listLimit });
+      loadedPhotoAttendances.clear();
+      loadingPhotoAttendances.clear();
       Object.keys(emptyData()).forEach(function (key) { state.data[key] = Array.isArray(data[key]) ? data[key] : []; });
       state.pagination = data.paginacao && typeof data.paginacao === 'object' ? data.paginacao : null;
       state.loaded = true; render(); status('Dados atualizados. Nenhuma mensagem foi enviada.');
@@ -1033,7 +1168,8 @@
       throw new Error('Use somente JPEG, PNG ou WebP de até 25 MB por arquivo.');
     }
     const category = formValue(form, 'categoria');
-    const phase = category === 'antes' ? 'before' : category === 'depois' ? 'after' : 'products_used';
+    const phase = category === 'antes' ? 'before' : category === 'durante' ? 'during' :
+      category === 'depois' ? 'after' : 'products_used';
     const data = new FormData();
     data.append('acao', 'adicionar_foto');
     data.append('protocolo_id', form.dataset.protocoloId);
@@ -1064,7 +1200,7 @@
         }
         proof = await window.AMJProtecao.solicitarSenhaRecente({
           titulo: 'Confirmar foto clínica distinta',
-          motivoPadrao: reason,
+          motivo: reason,
           motivoObrigatorio: true
         });
         data.append('confirmar_arquivo_distinto', 'true');
@@ -1114,6 +1250,14 @@
 
   function bind() {
     bySelector('[data-operacao-recarregar]').addEventListener('click', load);
+    state.root.addEventListener('toggle', function (event) {
+      const gallery = event.target.closest && event.target.closest('[data-galeria-atendimento]');
+      if (!gallery || gallery !== event.target || !gallery.open) return;
+      const visit = state.data.atendimentos.find(function (item) {
+        return item.id === gallery.dataset.galeriaAtendimento;
+      });
+      if (visit && visit.protocol_id) loadAttendancePhotos(visit.id);
+    }, true);
     const attendance = bySelector('[data-form-atendimento]');
     attendance.addEventListener('submit', function (event) {
       event.preventDefault(); submit(attendance, async function () {
@@ -1366,6 +1510,55 @@
       }
     });
     state.root.addEventListener('click', async function (event) {
+      const prepareProtocol = event.target.closest('[data-prontuario-preparar]');
+      const openProtocol = event.target.closest('[data-prontuario-abrir]');
+      const finalizeProtocol = event.target.closest('[data-prontuario-finalizar]');
+      if (openProtocol) {
+        try {
+          if (!window.AMJProntuario || typeof window.AMJProntuario.abrirProtocolo !== 'function') {
+            throw new Error('O módulo de prontuários ainda não está disponível. Atualize a página.');
+          }
+          await window.AMJProntuario.abrirProtocolo(openProtocol.dataset.prontuarioAbrir);
+        } catch (error) { status(error.message || 'Não foi possível abrir o prontuário.', true); }
+        return;
+      }
+      if (prepareProtocol || finalizeProtocol) {
+        setBusy(true);
+        try {
+          if (prepareProtocol) {
+            const attendanceId = prepareProtocol.dataset.prontuarioPreparar;
+            const intentKey = protocolPrepareKey(attendanceId);
+            await protectedRequest('preparar_prontuario_atendimento', {
+              atendimento_id: attendanceId,
+              versao: Number(prepareProtocol.dataset.versao),
+              idempotency_key: intentKey
+            }, 'Preparação auditada do prontuário e da galeria clínica');
+            confirmProtocolPrepare(attendanceId, intentKey);
+            status('Prontuário em rascunho vinculado. Consentimento e fotos continuam pendentes até registro explícito.');
+          } else {
+            await protectedProntuarioRequest('finalizar', {
+              protocolo_id: finalizeProtocol.dataset.prontuarioFinalizar,
+              versao_esperada: Number(finalizeProtocol.dataset.versao)
+            }, {
+              titulo: 'Finalizar registro da consulta',
+              explicacao: 'Confirme somente após revisar o registro, o consentimento atual de fotografia e ao menos uma foto clínica ativa em Antes, Durante ou Depois. Fotos de produtos não contam.',
+              motivo: 'Finalização do registro clínico confirmada pela gestão'
+            });
+            status('Registro documental da consulta finalizado. O status clínico do atendimento não foi alterado.');
+          }
+          await loadAfterMutation();
+        } catch (error) {
+          const finalizationMessage = ({
+            clinical_photography_consent_required: 'Registre explicitamente o consentimento atual de fotografia clínica no prontuário antes de finalizar.',
+            clinical_photo_required: 'Adicione ao menos uma foto clínica ativa em Antes, Durante ou Depois. Fotos de produtos não contam.',
+            version_conflict: 'O registro mudou em outro acesso. Atualize e tente novamente.',
+            protocol_archived: 'Restaure o prontuário antes de finalizar.',
+            protocol_locked: 'Este registro documental já está finalizado.'
+          })[error && error.code];
+          status(finalizationMessage || error.message || 'Não foi possível concluir a ação documental.', true);
+        } finally { setBusy(false); }
+        return;
+      }
       const cancelProcedure = event.target.closest('[data-procedimento-cancelar]');
       if (cancelProcedure) {
         resetProcedureEditor(cancelProcedure.closest('[data-form-procedimento]'));
@@ -1589,7 +1782,11 @@
     const photo = state.data.fotos_atendimento.find(function (item) {
       return item.photo_id === requestedId;
     });
-    const attendanceId = procedure ? procedure.attendance_id : photo ? photo.attendance_id : requestedId;
+    const photoIndex = state.data.indice_fotos_atendimento.find(function (item) {
+      return item.photo_id === requestedId;
+    });
+    const attendanceId = procedure ? procedure.attendance_id : photo ? photo.attendance_id :
+      photoIndex ? photoIndex.attendance_id : requestedId;
     const card = bySelector('[data-atendimento-card="' + CSS.escape(attendanceId) + '"]');
     if (!card) return false;
     all('[data-atendimento-card]').forEach(function (item) { item.classList.remove('em-destaque'); });
@@ -1607,10 +1804,20 @@
     const requestedId = String(id || '');
     if (!requestedId) return false;
     if (!state.loaded && ownerAccess()) await load();
-    const photo = state.data.fotos_atendimento.find(function (item) {
+    let photo = state.data.fotos_atendimento.find(function (item) {
       return item.photo_id === requestedId;
     });
-    if (!photo || !await openAttendance(requestedId)) return false;
+    const photoIndex = state.data.indice_fotos_atendimento.find(function (item) {
+      return item.photo_id === requestedId;
+    });
+    const attendanceId = photo ? photo.attendance_id : photoIndex && photoIndex.attendance_id;
+    if (attendanceId && !attendancePhotosAreFresh(attendanceId)) {
+      if (!await loadAttendancePhotos(attendanceId)) return false;
+      photo = state.data.fotos_atendimento.find(function (item) {
+        return item.photo_id === requestedId;
+      });
+    }
+    if (!photo || !await openAttendance(attendanceId)) return false;
     const card = bySelector('[data-foto-card="' + CSS.escape(requestedId) + '"]');
     if (!card) return false;
     const gallery = card.closest('details');
@@ -1640,6 +1847,8 @@
   }
   function reset() {
     state.generation += 1; state.loaded = false; state.loading = false;
+    photoLoadEpoch += 1;
+    loadedPhotoAttendances.clear(); loadingPhotoAttendances.clear(); protocolPrepareKeys.clear();
     state.listLimit = 1000; state.pagination = null; state.data = emptyData();
   }
 
@@ -1661,7 +1870,10 @@
   if (window.__AMJ_TEST__) {
     window.AMJOperacaoClinica.__test = {
       intentKeyForForm: intentKeyForForm,
-      confirmFormIntent: confirmFormIntent
+      confirmFormIntent: confirmFormIntent,
+      protocolPrepareKey: protocolPrepareKey,
+      confirmProtocolPrepare: confirmProtocolPrepare,
+      clinicalPhotoPending: clinicalPhotoPending
     };
   }
   document.addEventListener('DOMContentLoaded', function () {

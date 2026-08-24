@@ -279,6 +279,11 @@ const BACKEND_MESSAGES: Record<string, string> = {
   attendance_photo_consumption_invalid:
     "O consumo não corresponde ao produto fotografado neste atendimento.",
   attendance_protocol_required: "Vincule um prontuário ao atendimento antes de adicionar fotos.",
+  attendance_professional_required:
+    "Defina a profissional responsável pelo atendimento antes de preparar o prontuário.",
+  attendance_protocol_mismatch:
+    "O prontuário vinculado não corresponde aos dados canônicos deste atendimento.",
+  procedure_kind_invalid: "Revise o tipo de procedimento antes de preparar o prontuário.",
   clinical_photography_consent_required:
     "Registre o consentimento clínico de fotografia no prontuário antes do upload.",
 };
@@ -316,14 +321,18 @@ async function rpc(name: string, body: JsonRecord): Promise<JsonRecord> {
   return value && typeof value === "object" && !Array.isArray(value) ? value as JsonRecord : {};
 }
 
-async function rest(path: string): Promise<unknown[]> {
+async function rest(path: string): Promise<JsonRecord[]> {
   const response = await serviceFetch(path, { headers: { "Accept": "application/json" } });
   if (!response.ok) {
     const failure = await readBackendError(response);
     throw new ApiError(503, failure.code, "Não foi possível carregar os dados operacionais.");
   }
   const value = await response.json();
-  return Array.isArray(value) ? value : [];
+  return Array.isArray(value)
+    ? value.filter((item): item is JsonRecord =>
+      Boolean(item) && typeof item === "object" && !Array.isArray(item)
+    )
+    : [];
 }
 
 async function signedPhotoLinks(paths: string[]): Promise<Record<string, string>> {
@@ -415,7 +424,7 @@ async function handleList(
     entries,
     payments,
     paymentFees,
-    attendancePhotos,
+    attendancePhotoIndex,
     consumptionEvents,
     members,
     appointmentLinks,
@@ -478,7 +487,7 @@ async function handleList(
       `/rest/v1/atendimento_pagamento_taxas?select=*&clinic_id=eq.${clinic}&order=recorded_at.desc&limit=${detailLimit}`,
     ),
     rest(
-      `/rest/v1/operacao_atendimento_fotos?select=*&clinic_id=eq.${clinic}&order=attendance_id.asc,category.asc,display_order.asc&limit=${detailLimit}`,
+      `/rest/v1/operacao_atendimento_fotos?select=photo_id,attendance_id,protocol_id,category,archived_at&clinic_id=eq.${clinic}&order=attendance_id.asc,category.asc&limit=${detailLimit}`,
     ),
     rest(
       `/rest/v1/operacao_consumo_eventos?select=id,attendance_id,product_id,lot_id,event_kind,amount,unit,occurred_at&clinic_id=eq.${clinic}&order=occurred_at.desc&limit=${detailLimit}`,
@@ -490,6 +499,30 @@ async function handleList(
       `/rest/v1/patient_source_links?select=patient_id,source_id,status&clinic_id=eq.${clinic}&source_kind=eq.agendamento&status=eq.confirmado&limit=${detailLimit}`,
     ),
   ]);
+
+  // A view tem uma linha por atendimento. Filtrar pelos IDs da página evita
+  // que um ORDER/LIMIT independente corte justamente os resumos exibidos.
+  const summaryAttendanceIds = [
+    ...new Set(
+      attendances.map((item) => safeText((item as JsonRecord).id, 40)).filter(validUuid),
+    ),
+  ];
+  const summaryIdChunks: string[][] = [];
+  for (let offset = 0; offset < summaryAttendanceIds.length; offset += 100) {
+    summaryIdChunks.push(summaryAttendanceIds.slice(offset, offset + 100));
+  }
+  const consultationProtocolSummaries: JsonRecord[] = [];
+  for (let offset = 0; offset < summaryIdChunks.length; offset += 8) {
+    const pageChunks = summaryIdChunks.slice(offset, offset + 8);
+    const pages = await Promise.all(pageChunks.map((ids) => {
+      const filter = encodeURIComponent(`in.(${ids.join(",")})`);
+      return rest(
+        `/rest/v1/operacao_consulta_prontuario_resumo?select=*&clinic_id=eq.${clinic}` +
+          `&attendance_id=${filter}&limit=${ids.length}`,
+      );
+    }));
+    pages.forEach((page) => consultationProtocolSummaries.push(...page));
+  }
 
   const appointmentIds = [
     ...new Set(
@@ -504,28 +537,6 @@ async function handleList(
         `&id=in.(${appointmentIds.join(",")})&order=inicio_em.desc&limit=${detailLimit}`,
     )
     : [];
-  const photoLinks = await signedPhotoLinks(
-    attendancePhotos.filter((item) => !(item as JsonRecord).archived_at)
-      .flatMap((item) => {
-        const row = item as JsonRecord;
-        return [
-          safeText(row.thumbnail_storage_path, 600),
-          safeText(row.storage_path, 600),
-        ].filter(Boolean);
-      }),
-  );
-  const gallery = attendancePhotos.map((item) => {
-    const row = item as JsonRecord;
-    const path = safeText(row.storage_path, 600);
-    const thumbnailPath = safeText(row.thumbnail_storage_path, 600);
-    return {
-      ...row,
-      url_assinada: row.archived_at ? null : photoLinks[path] || null,
-      miniatura_url: row.archived_at ? null : photoLinks[thumbnailPath] || photoLinks[path] || null,
-      expira_em_segundos: row.archived_at ? null : PHOTO_SIGNED_URL_SECONDS,
-    };
-  });
-
   return json(req, {
     ok: true,
     clientes: patients,
@@ -547,7 +558,9 @@ async function handleList(
     lancamentos_receita: entries,
     pagamentos: payments,
     taxas_pagamento: paymentFees,
-    fotos_atendimento: gallery,
+    fotos_atendimento: [],
+    indice_fotos_atendimento: attendancePhotoIndex,
+    resumos_prontuario_atendimento: consultationProtocolSummaries,
     eventos_consumo: consumptionEvents,
     responsaveis: members,
     vinculos_agenda: appointmentLinks,
@@ -578,12 +591,94 @@ async function handleList(
         inventory,
         payments,
         paymentFees,
-        attendancePhotos,
+        attendancePhotoIndex,
         consumptionEvents,
         appointmentLinks,
         appointments,
       ].some((items) => items.length >= detailLimit),
     },
+  });
+}
+
+async function handleAttendancePhotos(
+  req: Request,
+  context: DualAuthContext,
+  payload: JsonRecord,
+): Promise<Response> {
+  const { clinicId } = tenant(context);
+  const attendanceId = requiredUuid(payload.atendimento_id, "o atendimento");
+  const clinic = encodeURIComponent(clinicId);
+  const attendance = await rest(
+    `/rest/v1/atendimentos_realizados?select=id,protocol_id&clinic_id=eq.${clinic}` +
+      `&id=eq.${encodeURIComponent(attendanceId)}&limit=1`,
+  );
+  if (!attendance.length) {
+    throw new ApiError(404, "attendance_not_found", "Atendimento não encontrado.");
+  }
+  const protocolId = safeText((attendance[0] as JsonRecord).protocol_id, 40);
+  if (!validUuid(protocolId)) {
+    return json(req, { ok: true, atendimento_id: attendanceId, fotos_atendimento: [] });
+  }
+  const rows = await rest(
+    `/rest/v1/operacao_atendimento_fotos?select=*&clinic_id=eq.${clinic}` +
+      `&attendance_id=eq.${encodeURIComponent(attendanceId)}` +
+      `&order=category.asc,display_order.asc,captured_at.asc&limit=5000`,
+  );
+  const photoLinks = await signedPhotoLinks(
+    rows.filter((item) => !(item as JsonRecord).archived_at)
+      .flatMap((item) => {
+        const row = item as JsonRecord;
+        return [
+          safeText(row.thumbnail_storage_path, 600),
+          safeText(row.storage_path, 600),
+        ].filter(Boolean);
+      }),
+  );
+  const gallery = rows.map((item) => {
+    const row = item as JsonRecord;
+    const path = safeText(row.storage_path, 600);
+    const thumbnailPath = safeText(row.thumbnail_storage_path, 600);
+    return {
+      ...row,
+      url_assinada: row.archived_at ? null : photoLinks[path] || null,
+      miniatura_url: row.archived_at ? null : photoLinks[thumbnailPath] || photoLinks[path] || null,
+      expira_em_segundos: row.archived_at ? null : PHOTO_SIGNED_URL_SECONDS,
+    };
+  });
+  return json(req, {
+    ok: true,
+    atendimento_id: attendanceId,
+    protocolo_id: protocolId,
+    fotos_atendimento: gallery,
+    carregamento: "sob_demanda",
+  });
+}
+
+async function handlePrepareAttendanceProtocol(
+  req: Request,
+  context: DualAuthContext,
+  payload: JsonRecord,
+): Promise<Response> {
+  const attendanceId = requiredUuid(payload.atendimento_id, "o atendimento");
+  const operationId = await requireProof(
+    req,
+    context,
+    payload,
+    "operacao.preparar_prontuario_atendimento",
+    attendanceId,
+  );
+  const result = await rpc("operacao_preparar_prontuario_atendimento", {
+    ...baseRpc(context),
+    p_attendance_id: attendanceId,
+    p_expected_version: requiredInteger(payload.versao, "a versão", 1, 2_000_000_000),
+    p_idempotency_key: requiredUuid(payload.idempotency_key, "a chave da operação"),
+    p_reason: safeText(payload.motivo, 500),
+    p_request_id: operationId,
+  });
+  return response(req, result, {
+    consentimento_criado: false,
+    foto_criada: false,
+    status_clinico_alterado: false,
   });
 }
 
@@ -1162,6 +1257,10 @@ Deno.serve(async (req: Request) => {
     switch (action) {
       case "listar":
         return await handleList(req, context, payload);
+      case "listar_fotos_atendimento":
+        return await handleAttendancePhotos(req, context, payload);
+      case "preparar_prontuario_atendimento":
+        return await handlePrepareAttendanceProtocol(req, context, payload);
       case "salvar_atendimento":
         return await handleSaveAttendance(req, context, payload);
       case "arquivar_atendimento":

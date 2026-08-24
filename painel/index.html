@@ -15,8 +15,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
 <link href="./financeiro.css?v=20260824-1" rel="stylesheet">
-<link href="./prontuario.css?v=20260824-1" rel="stylesheet">
-<link href="./operacao.css?v=20260824-1" rel="stylesheet">
+<link href="./prontuario.css?v=20260824-3" rel="stylesheet">
+<link href="./operacao.css?v=20260824-2" rel="stylesheet">
 <link href="./gestao.css?v=20260824-1" rel="stylesheet">
 <link href="./cotacoes.css?v=20260824-1" rel="stylesheet">
 <link href="./app-shell.css?v=20260824-2" rel="stylesheet">
@@ -560,8 +560,8 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
       <div class="prontuario-cabecalho">
         <div>
           <p class="prontuario-sobretitulo">Registro clínico privado</p>
-          <h2>Prontuários e procedimentos</h2>
-          <p>Registre o procedimento, os produtos e lotes utilizados e as fotos clínicas autorizadas.</p>
+          <h2>Pacientes e consultas</h2>
+          <p>Cada paciente reúne suas consultas, produtos, lotes, quantidades e galerias clínicas privadas.</p>
         </div>
         <button class="prontuario-botao secundario" id="prontuario-atualizar" type="button">Atualizar</button>
       </div>
@@ -575,6 +575,7 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
           <form class="prontuario-form" id="prontuario-form" novalidate>
             <input id="prontuario-id" type="hidden">
             <input id="prontuario-versao" type="hidden">
+            <p class="prontuario-somente-leitura oculto" id="prontuario-somente-leitura" role="status">Consulta concluída: dados clínicos, produtos, lotes e quantidades estão disponíveis somente para leitura.</p>
             <div class="prontuario-grid">
               <label class="largo"><span>Paciente cadastrada</span><select id="prontuario-paciente" required><option value="">Selecione</option></select></label>
               <label><span>Procedimento</span><select id="prontuario-tipo" required><option value="">Selecione</option><option value="toxina_terco_superior">Toxina botulínica · terço superior</option><option value="toxina_full_face">Toxina botulínica · full face</option><option value="preenchimento_facial">Preenchimento facial</option><option value="bioestimulador_colageno">Bioestimulador de colágeno</option><option value="fios_pdo">Fios de PDO</option><option value="peeling_quimico">Peeling químico</option><option value="skinbooster">Skinbooster</option><option value="microagulhamento">Microagulhamento</option><option value="intradermoterapia">Intradermoterapia</option><option value="outro">Outro</option></select></label>
@@ -607,20 +608,20 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
         </details>
 
         <section class="prontuario-fotos-editor oculto" id="prontuario-fotos-editor" aria-labelledby="prontuario-fotos-titulo">
-          <div><h3 id="prontuario-fotos-titulo">Adicionar foto clínica</h3><p>A foto será gravada em armazenamento privado. Limite de 5 MB; JPEG, PNG ou WebP.</p></div>
+          <div><h3 id="prontuario-fotos-titulo">Adicionar fotos à consulta</h3><p>O original fica no armazenamento privado. Limite de 25 MB; JPEG, PNG ou WebP.</p></div>
           <form id="prontuario-foto-form" novalidate>
-            <label><span>Momento</span><select id="prontuario-foto-fase" required><option value="before">Antes</option><option value="during">Durante</option><option value="after">Depois</option></select></label>
+            <label><span>Categoria</span><select id="prontuario-foto-fase" required><option value="before">Antes</option><option value="during">Durante</option><option value="after">Depois</option><option value="products_used">Produtos utilizados</option></select></label>
             <label><span>Data e hora</span><input id="prontuario-foto-data" type="datetime-local"></label>
             <label class="largo"><span>Arquivo da foto</span><input id="prontuario-foto-arquivo" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" required></label>
-            <button class="prontuario-botao" type="submit">Enviar foto privada</button>
+            <button class="prontuario-botao" type="submit">Adicionar foto</button>
           </form>
           <p class="prontuario-status" id="prontuario-foto-status" role="status" aria-live="polite"></p>
         </section>
 
         <section class="prontuario-lista-card" aria-labelledby="prontuario-lista-titulo">
           <div class="prontuario-lista-topo">
-            <div><h3 id="prontuario-lista-titulo">Registros salvos</h3><p id="prontuario-contagem"></p></div>
-            <div class="prontuario-filtros"><input id="prontuario-busca" type="search" maxlength="80" placeholder="Buscar paciente ou procedimento"><label><input id="prontuario-mostrar-arquivados" type="checkbox"><span>Mostrar arquivados</span></label></div>
+            <div><h3 id="prontuario-lista-titulo">Pacientes e consultas</h3><p id="prontuario-contagem"></p></div>
+            <div class="prontuario-filtros"><input id="prontuario-busca" type="search" maxlength="80" aria-label="Buscar paciente, consulta, produto ou lote" placeholder="Buscar paciente, consulta, produto ou lote"><label><input id="prontuario-mostrar-arquivados" type="checkbox"><span>Mostrar arquivados</span></label></div>
           </div>
           <div id="prontuario-lista" aria-live="polite" aria-busy="false"></div>
           <p class="prontuario-status" id="prontuario-status" role="status" aria-live="polite"></p>
@@ -992,8 +993,8 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
 <script src="./vendor/supabase-js-2.112.3.min.js"></script>
 <script src="./auth-mfa.js?v=20260819-3"></script>
 <script src="./financeiro.js?v=20260824-1"></script>
-<script src="./prontuario.js?v=20260824-1"></script>
-<script src="./app-shell.js?v=20260824-3"></script>
+<script src="./prontuario.js?v=20260824-3"></script>
+<script src="./app-shell.js?v=20260824-4"></script>
 <script>
 const SUPABASE_URL = 'https://rjxtxoqprnumouqakxbc.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_Ip14p4tUfYFjwUYaWinMlw_Gf9v0YwT';
