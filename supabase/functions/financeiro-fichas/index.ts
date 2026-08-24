@@ -139,6 +139,21 @@ const PAYMENT_SELECT = [
   "created_at",
 ].join(",");
 
+const INSTALLMENT_SELECT = [
+  "id",
+  "entry_id",
+  "installment_number",
+  "due_date",
+  "amount",
+  "planned_payment_method",
+  "paid_amount",
+  "balance",
+  "calculated_status",
+  "state",
+  "created_at",
+  "updated_at",
+].join(",");
+
 class ApiError extends Error {
   constructor(
     readonly status: number,
@@ -704,6 +719,45 @@ function mapDatabaseError(
       "purchase_cancel_requires_full_workflow",
       "Uma compra não pode ser cancelada parcialmente.",
     ],
+    parcelas_invalidas: [422, "invalid_installments", "As parcelas informadas são inválidas."],
+    parcela_data_ou_forma_invalida: [
+      422,
+      "invalid_installment_due_or_method",
+      "Confira as datas e a forma de pagamento das parcelas.",
+    ],
+    parcelas_nao_sequenciais: [
+      422,
+      "invalid_installment_sequence",
+      "As parcelas devem estar numeradas em sequência.",
+    ],
+    lancamento_sem_saldo: [409, "entry_has_no_balance", "Este lançamento já está quitado."],
+    parcelas_soma_diverge_saldo: [
+      409,
+      "installment_total_mismatch",
+      "A soma das parcelas deve ser exatamente igual ao saldo restante.",
+    ],
+    parcelas_com_pagamentos: [
+      409,
+      "installments_have_payments",
+      "Não é possível reprogramar parcelas que já possuem recebimentos.",
+    ],
+    parcela_nao_encontrada: [404, "installment_not_found", "Parcela não encontrada."],
+    parcela_inativa: [409, "installment_inactive", "Esta parcela não está ativa."],
+    pagamento_nao_pertence_parcela: [
+      409,
+      "payment_installment_mismatch",
+      "O pagamento não pertence a esta parcela.",
+    ],
+    pagamento_vinculado_outra_parcela: [
+      409,
+      "payment_already_linked",
+      "O pagamento já está ligado a outra parcela.",
+    ],
+    valor_excede_saldo_parcela: [
+      409,
+      "amount_exceeds_installment_balance",
+      "O valor excede o saldo desta parcela.",
+    ],
   };
   for (const [needle, mapped] of Object.entries(mappings)) {
     if (message.includes(needle)) throw new ApiError(...mapped);
@@ -830,6 +884,82 @@ async function assertPaymentMethodActive(method: string): Promise<void> {
   }
 }
 
+function centsFromCanonical(value: string): bigint {
+  return BigInt(value.replace(".", ""));
+}
+
+async function installmentSchedule(
+  value: unknown,
+  minimumDate: string,
+  expectedBalance: string,
+): Promise<JsonRecord[]> {
+  if (!Array.isArray(value) || value.length < 1 || value.length > 120) {
+    throw new ApiError(
+      422,
+      "invalid_installments",
+      "Informe as parcelas do saldo, com valor e data de cada vencimento.",
+    );
+  }
+  const parsed = value.map((raw, index) => {
+    if (!isRecord(raw)) {
+      throw new ApiError(422, "invalid_installments", "Parcela inválida.");
+    }
+    const number = integerValue(
+      raw.numero ?? raw.installment_number,
+      `parcela_${index + 1}_numero`,
+      index + 1,
+      1,
+      120,
+    );
+    const due = dateValue(raw.vencimento ?? raw.due_date, `parcela_${number}_vencimento`);
+    if (due < minimumDate) {
+      throw new ApiError(
+        422,
+        "invalid_installment_due_date",
+        "O vencimento de uma parcela não pode ser anterior ao atendimento.",
+      );
+    }
+    const amount = decimalValue(raw.valor ?? raw.amount, `parcela_${number}_valor`, 2);
+    const method = enumValue(
+      raw.forma_pagamento ?? raw.planned_payment_method,
+      `parcela_${number}_forma_pagamento`,
+      PAYMENT_METHODS,
+    );
+    return {
+      numero: number,
+      vencimento: due,
+      valor: amount,
+      forma_pagamento: method,
+    };
+  }).sort((left, right) => Number(left.numero) - Number(right.numero));
+
+  parsed.forEach((item, index) => {
+    if (item.numero !== index + 1) {
+      throw new ApiError(
+        422,
+        "invalid_installment_sequence",
+        "As parcelas devem estar numeradas em sequência.",
+      );
+    }
+  });
+  const total = parsed.reduce(
+    (sum, item) => sum + centsFromCanonical(String(item.valor)),
+    0n,
+  );
+  if (total !== centsFromCanonical(expectedBalance)) {
+    throw new ApiError(
+      422,
+      "installment_total_mismatch",
+      "A soma das parcelas deve ser exatamente igual ao saldo restante.",
+    );
+  }
+  await Promise.all(
+    [...new Set(parsed.map((item) => String(item.forma_pagamento)))]
+      .map(assertPaymentMethodActive),
+  );
+  return parsed;
+}
+
 async function relatedNames(
   clinicId: string,
   table: "patients" | "financeiro_fornecedores",
@@ -866,11 +996,30 @@ async function paymentsForEntries(
   if (!result.response.ok) {
     throw new ApiError(502, "payments_read_failed", "Não foi possível ler os pagamentos.");
   }
-  for (const row of rows(result.data)) {
+  const paymentRows = rows(result.data);
+  const paymentIds = paymentRows.map((row) => row.id).filter(validUuid);
+  const installmentByPayment = new Map<string, string>();
+  if (paymentIds.length) {
+    const links = await admin(
+      "/rest/v1/financeiro_parcela_pagamentos?select=payment_id,installment_id" +
+        `&clinic_id=eq.${encode(clinicId)}&payment_id=in.${inFilter(paymentIds)}` +
+        `&limit=${Math.min(paymentIds.length, 1000)}`,
+    );
+    if (!links.response.ok) {
+      throw new ApiError(502, "payment_links_read_failed", "Não foi possível ler os vínculos das parcelas.");
+    }
+    for (const link of rows(links.data)) {
+      if (typeof link.payment_id === "string" && typeof link.installment_id === "string") {
+        installmentByPayment.set(link.payment_id, link.installment_id);
+      }
+    }
+  }
+  for (const row of paymentRows) {
     if (typeof row.entry_id !== "string") continue;
     const list = grouped.get(row.entry_id) || [];
     list.push({
       id: row.id,
+      parcela_id: typeof row.id === "string" ? installmentByPayment.get(row.id) || null : null,
       tipo: row.movement_type,
       forma: row.payment_method,
       valor: numberFrom(row.amount),
@@ -885,14 +1034,51 @@ async function paymentsForEntries(
   return grouped;
 }
 
+async function installmentsForEntries(
+  clinicId: string,
+  entryIds: string[],
+): Promise<Map<string, JsonRecord[]>> {
+  const unique = [...new Set(entryIds.filter(validUuid))];
+  const grouped = new Map<string, JsonRecord[]>();
+  if (!unique.length) return grouped;
+  const result = await admin(
+    `/rest/v1/financeiro_parcelas_resumo?select=${INSTALLMENT_SELECT}` +
+      `&clinic_id=eq.${encode(clinicId)}&entry_id=in.${inFilter(unique)}` +
+      "&state=eq.ativa&order=entry_id.asc,installment_number.asc&limit=1000",
+  );
+  if (!result.response.ok) {
+    throw new ApiError(502, "installments_read_failed", "Não foi possível ler as parcelas previstas.");
+  }
+  for (const row of rows(result.data)) {
+    if (typeof row.entry_id !== "string") continue;
+    const list = grouped.get(row.entry_id) || [];
+    list.push({
+      id: row.id,
+      numero: row.installment_number,
+      vencimento: row.due_date,
+      valor: numberFrom(row.amount),
+      valor_pago: numberFrom(row.paid_amount),
+      saldo: numberFrom(row.balance),
+      forma_pagamento: row.planned_payment_method,
+      status: row.calculated_status,
+      estado: row.state,
+      criado_em: row.created_at,
+      atualizado_em: row.updated_at,
+    });
+    grouped.set(row.entry_id, list);
+  }
+  return grouped;
+}
+
 async function presentEntries(clinicId: string, rawRows: JsonRecord[]): Promise<JsonRecord[]> {
   const patientIds = rawRows.map((row) => row.patient_id).filter(validUuid);
   const supplierIds = rawRows.map((row) => row.supplier_id).filter(validUuid);
   const entryIds = rawRows.map((row) => row.id).filter(validUuid);
-  const [patientNames, supplierNames, payments] = await Promise.all([
+  const [patientNames, supplierNames, payments, installments] = await Promise.all([
     relatedNames(clinicId, "patients", patientIds),
     relatedNames(clinicId, "financeiro_fornecedores", supplierIds),
     paymentsForEntries(clinicId, entryIds),
+    installmentsForEntries(clinicId, entryIds),
   ]);
   return rawRows.map((row) => {
     const patientId = typeof row.patient_id === "string" ? row.patient_id : null;
@@ -919,6 +1105,7 @@ async function presentEntries(clinicId: string, rawRows: JsonRecord[]): Promise<
         ? { id: supplierId, nome: supplierNames.get(supplierId) || "Fornecedor" }
         : null,
       pagamentos: payments.get(id) || [],
+      parcelas_previstas: installments.get(id) || [],
       criado_em: row.created_at,
       atualizado_em: row.updated_at,
       versao: row.version,
@@ -1162,6 +1349,52 @@ async function handleCreateEntry(
   }, 201);
 }
 
+async function handleProgramInstallments(
+  req: Request,
+  context: DualAuthContext,
+  payload: JsonRecord,
+): Promise<Response> {
+  const { clinicId, userId } = tenant(context);
+  const key = requiredUuid(payload.idempotency_key, "idempotency_key");
+  const entryId = requiredUuid(payload.lancamento_id ?? payload.entry_id, "lancamento_id");
+  const entry = await getEntryById(clinicId, entryId);
+  if (!entry) throw new ApiError(404, "entry_not_found", "Lançamento não encontrado.");
+  if (entry.state !== "ativo") {
+    throw new ApiError(409, "entry_inactive", "O lançamento não está ativo.");
+  }
+  const balanceNumber = numberFrom(entry.balance);
+  if (balanceNumber <= 0) {
+    throw new ApiError(409, "entry_has_no_balance", "Este lançamento já está quitado.");
+  }
+  const minimumDate = dateValue(entry.competence_date, "competencia");
+  const balance = balanceNumber.toFixed(2);
+  const planned = await installmentSchedule(
+    payload.parcelas ?? payload.parcelas_previstas,
+    minimumDate,
+    balance,
+  );
+  const result = await rpc("financeiro_programar_parcelas", {
+    p_clinic_id: clinicId,
+    p_user_id: userId,
+    p_entry_id: entryId,
+    p_installments: planned,
+    p_idempotency_key: key,
+    p_request_id: context.requestId,
+  });
+  const refreshed = await getEntryById(clinicId, entryId);
+  if (!refreshed) {
+    throw new ApiError(
+      502,
+      "installments_read_failed",
+      "As parcelas foram salvas, mas não foi possível recarregá-las.",
+    );
+  }
+  return success(req, context, {
+    resultado: result,
+    lancamento: (await presentEntries(clinicId, [refreshed]))[0] || null,
+  }, 201);
+}
+
 async function handleRegisterService(
   req: Request,
   context: DualAuthContext,
@@ -1176,10 +1409,6 @@ async function handleRegisterService(
     ? requiredText(payload.procedimento_outro, "procedimento_outro", 2, 100)
     : PROCEDURE_LABELS[procedureCode];
   const serviceDate = dateValue(payload.data_atendimento, "data_atendimento");
-  const dueDate = dateValue(payload.vencimento ?? serviceDate, "vencimento");
-  if (dueDate < serviceDate) {
-    throw new ApiError(422, "invalid_due_date", "O vencimento não pode ser anterior ao atendimento.");
-  }
   const total = decimalValue(payload.valor_total, "valor_total", 2);
   const totalNumber = numberFrom(total);
   const situation = enumValue(
@@ -1187,7 +1416,6 @@ async function handleRegisterService(
     "situacao_pagamento",
     PAYMENT_SITUATIONS,
   );
-  const installments = integerValue(payload.parcelas, "parcelas", 1, 1, 120);
   const notes = optionalText(payload.observacoes, "observacoes", 1000);
   let paidAmount = 0;
   if (situation === "recebido") paidAmount = totalNumber;
@@ -1200,6 +1428,29 @@ async function handleRegisterService(
         "No pagamento parcial, o valor recebido deve ser menor que o total.",
       );
     }
+  }
+  const balance = (totalNumber - paidAmount).toFixed(2);
+  const rawSchedule = payload.parcelas_previstas ?? payload.parcelas_saldo;
+  let plannedInstallments: JsonRecord[] = [];
+  const hasRawSchedule = rawSchedule !== undefined && rawSchedule !== null &&
+    (!Array.isArray(rawSchedule) || rawSchedule.length > 0);
+  if (hasRawSchedule) {
+    if (numberFrom(balance) <= 0) {
+      throw new ApiError(
+        422,
+        "unexpected_installments",
+        "Um atendimento já quitado não precisa de parcelas futuras.",
+      );
+    }
+    plannedInstallments = await installmentSchedule(rawSchedule, serviceDate, balance);
+  }
+  let installments = plannedInstallments.length ||
+    integerValue(payload.parcelas, "parcelas", 1, 1, 120);
+  let dueDate = plannedInstallments.length
+    ? String(plannedInstallments[0].vencimento)
+    : dateValue(payload.vencimento ?? serviceDate, "vencimento");
+  if (dueDate < serviceDate) {
+    throw new ApiError(422, "invalid_due_date", "O vencimento não pode ser anterior ao atendimento.");
   }
   let paymentMethod: string | null = null;
   let paymentKey: string | null = null;
@@ -1253,7 +1504,7 @@ async function handleRegisterService(
         p_payment_method: paymentMethod,
         p_amount: paidAmount.toFixed(2),
         p_paid_at: paidAt,
-        p_installments: installments,
+        p_installments: 1,
         p_reference: null,
         p_reversed_payment_id: null,
         p_idempotency_key: paymentKey,
@@ -1262,6 +1513,19 @@ async function handleRegisterService(
       "pagamento_id",
     );
   }
+  let installmentPlan: unknown = null;
+  if (plannedInstallments.length) {
+    installmentPlan = await rpc("financeiro_programar_parcelas", {
+      p_clinic_id: clinicId,
+      p_user_id: userId,
+      p_entry_id: entryId,
+      p_installments: plannedInstallments,
+      p_idempotency_key: await deterministicUuid(
+        `${clinicId}:financeiro_parcelas:${entryKey}`,
+      ),
+      p_request_id: context.requestId,
+    });
+  }
   const row = await getEntryById(clinicId, entryId);
   if (!row) {
     throw new ApiError(502, "service_read_failed", "Atendimento salvo, mas não foi possível recarregá-lo.");
@@ -1269,6 +1533,7 @@ async function handleRegisterService(
   return success(req, context, {
     lancamento: (await presentEntries(clinicId, [row]))[0] || null,
     pagamento_id: paymentId,
+    parcelas_programadas: installmentPlan,
   }, 201);
 }
 
@@ -1294,10 +1559,43 @@ async function getPaymentByIdempotency(clinicId: string, key: string): Promise<J
   return rows(result.data)[0] || null;
 }
 
+async function installmentForPayment(clinicId: string, paymentId: string): Promise<string | null> {
+  const result = await admin(
+    "/rest/v1/financeiro_parcela_pagamentos?select=installment_id" +
+      `&clinic_id=eq.${encode(clinicId)}&payment_id=eq.${encode(paymentId)}&limit=1`,
+  );
+  if (!result.response.ok) {
+    throw new ApiError(
+      502,
+      "payment_link_read_failed",
+      "Não foi possível conferir a parcela do pagamento.",
+    );
+  }
+  const value = rows(result.data)[0]?.installment_id;
+  return typeof value === "string" && validUuid(value) ? value : null;
+}
+
+async function entryHasActiveInstallments(clinicId: string, entryId: string): Promise<boolean> {
+  const result = await admin(
+    "/rest/v1/financeiro_parcelas?select=id" +
+      `&clinic_id=eq.${encode(clinicId)}&entry_id=eq.${encode(entryId)}` +
+      "&state=eq.ativa&limit=1",
+  );
+  if (!result.response.ok) {
+    throw new ApiError(
+      502,
+      "installments_check_failed",
+      "Não foi possível conferir as parcelas do lançamento.",
+    );
+  }
+  return rows(result.data).length > 0;
+}
+
 function presentPayment(row: JsonRecord): JsonRecord {
   return {
     id: row.id,
     lancamento_id: row.entry_id,
+    parcela_id: row.parcela_id ?? null,
     tipo: row.movement_type,
     forma: row.payment_method,
     valor: numberFrom(row.amount),
@@ -1318,6 +1616,7 @@ async function handlePayment(
   const { clinicId, userId } = tenant(context);
   const key = requiredUuid(payload.idempotency_key, "idempotency_key");
   const entryId = requiredUuid(payload.lancamento_id ?? payload.entry_id, "lancamento_id");
+  let installmentId = optionalUuid(payload.parcela_id ?? payload.installment_id, "parcela_id");
   const originalId = refund
     ? requiredUuid(payload.pagamento_id ?? payload.payment_id, "pagamento_id")
     : null;
@@ -1327,6 +1626,22 @@ async function handlePayment(
     if (!original || original.entry_id !== entryId || original.movement_type !== "pagamento") {
       throw new ApiError(404, "payment_not_found", "Pagamento não encontrado.");
     }
+    const originalInstallmentId = await installmentForPayment(clinicId, originalId);
+    if (installmentId && installmentId !== originalInstallmentId) {
+      throw new ApiError(
+        409,
+        "payment_installment_mismatch",
+        "O pagamento não pertence a esta parcela.",
+      );
+    }
+    installmentId = originalInstallmentId;
+  }
+  if (!refund && !installmentId && await entryHasActiveInstallments(clinicId, entryId)) {
+    throw new ApiError(
+      422,
+      "installment_required",
+      "Selecione qual parcela está sendo recebida ou paga.",
+    );
   }
   const existing = await getPaymentByIdempotency(clinicId, key);
   const method = paymentMethodForMovement(
@@ -1337,6 +1652,13 @@ async function handlePayment(
   if (!refund && !existing) await assertPaymentMethodActive(method);
   const amount = decimalValue(payload.valor, "valor", 2);
   const installments = integerValue(payload.parcelas, "parcelas", 1, 1, 120);
+  if (method !== "cartao_credito" && installments !== 1) {
+    throw new ApiError(
+      422,
+      "invalid_transaction_installments",
+      "O número de parcelas da transação só se aplica ao cartão de crédito.",
+    );
+  }
   const reference = safeReference(payload.referencia);
   const paidAtSource = payload.paid_at ?? payload.pago_em;
   const paidAt = paidAtSource === undefined && typeof existing?.paid_at === "string"
@@ -1359,9 +1681,24 @@ async function handlePayment(
         "Use uma nova chave para dados diferentes.",
       );
     }
+    const existingInstallmentId = await installmentForPayment(
+      clinicId,
+      requiredUuid(existing.id, "pagamento_id"),
+    );
+    if (existingInstallmentId !== installmentId) {
+      throw new ApiError(
+        409,
+        "idempotency_key_reused",
+        "Use uma nova chave para dados diferentes.",
+      );
+    }
+    existing.parcela_id = existingInstallmentId;
     return success(req, context, { pagamento: presentPayment(existing), idempotente: true });
   }
-  const result = await rpc("financeiro_registrar_pagamento", {
+  const rpcName = installmentId
+    ? "financeiro_registrar_pagamento_parcela"
+    : "financeiro_registrar_pagamento";
+  const rpcPayload: JsonRecord = {
     p_clinic_id: clinicId,
     p_user_id: userId,
     p_entry_id: entryId,
@@ -1374,12 +1711,19 @@ async function handlePayment(
     p_reversed_payment_id: originalId,
     p_idempotency_key: key,
     p_request_id: context.requestId,
-  });
+  };
+  if (installmentId) rpcPayload.p_installment_id = installmentId;
+  const result = await rpc(rpcName, rpcPayload);
   const id = requiredUuid(result, "pagamento_id");
   const created = await getPaymentById(clinicId, id);
   if (!created || !matchesRequest(created)) {
     throw new ApiError(409, "idempotency_key_reused", "Use uma nova chave para dados diferentes.");
   }
+  const createdInstallmentId = await installmentForPayment(clinicId, id);
+  if (createdInstallmentId !== installmentId) {
+    throw new ApiError(409, "payment_link_failed", "Não foi possível vincular o pagamento à parcela.");
+  }
+  created.parcela_id = createdInstallmentId;
   return success(req, context, {
     pagamento: presentPayment(created),
     idempotente: false,
@@ -2167,6 +2511,9 @@ export async function handleRequest(req: Request): Promise<Response> {
         break;
       case "registrar_atendimento":
         response = await handleRegisterService(req, context, payload);
+        break;
+      case "programar_parcelas":
+        response = await handleProgramInstallments(req, context, payload);
         break;
       case "registrar_pagamento":
         response = await handlePayment(req, context, payload, false);

@@ -26,6 +26,13 @@ const roundMoneySource = js.match(/function roundMoney\(value\) \{[\s\S]*?\n  \}
 assert(roundMoneySource, 'Função roundMoney ausente');
 const roundMoney = vm.runInNewContext(`(${roundMoneySource[0]})`);
 assert.equal(roundMoney(0.5 * 0.01) + roundMoney(0.5 * 0.01), 0.02);
+const allocateSource = js.match(/function allocateInstallments\(value, count\) \{[\s\S]*?\n  \}/);
+assert(allocateSource, 'Função allocateInstallments ausente');
+const allocateInstallments = vm.runInNewContext(`(${allocateSource[0]})`);
+assert.deepEqual(Array.from(allocateInstallments(1200, 3)), [400, 400, 400]);
+const uneven = Array.from(allocateInstallments(1000, 3));
+assert.equal(Math.round(uneven.reduce((sum, value) => sum + value, 0) * 100), 100000);
+assert.deepEqual(uneven, [333.34, 333.33, 333.33]);
 assert.match(js, /roundMoney\(item\.quantidade \* item\.valor_unitario\)/);
 assert.match(js, /saoPauloCalendarParts\(\)/);
 assert.match(js, /rawCost && !Number\.isFinite\(cost\)/);
@@ -53,7 +60,13 @@ const requiredIds = [
   'aba-bt-financeiro', 'aba-financeiro', 'financeiro-status', 'financeiro-grafico',
   'financeiro-form-atendimento', 'financeiro-atendimento-cliente',
   'financeiro-atendimento-procedimento', 'financeiro-atendimento-valor',
+  'financeiro-atendimento-saldo', 'financeiro-atendimento-saldo-forma',
+  'financeiro-atendimento-parcelas-lista',
   'financeiro-form-lancamento', 'financeiro-form-pagamento', 'financeiro-form-cliente',
+  'financeiro-pagamento-parcela', 'financeiro-pagamento-parcelas-campo',
+  'financeiro-editor-parcelas', 'financeiro-form-parcelas', 'financeiro-parcelas-lancamento',
+  'financeiro-parcelas-forma', 'financeiro-parcelas-quantidade', 'financeiro-parcelas-lista',
+  'financeiro-parcelas-saldo', 'financeiro-parcelas-status',
   'financeiro-form-fornecedor', 'financeiro-form-marca', 'financeiro-form-produto',
   'financeiro-form-compra', 'financeiro-compra-itens', 'financeiro-lista',
   'financeiro-editor-auditoria', 'financeiro-auditoria', 'financeiro-clientes-lista',
@@ -75,7 +88,8 @@ assert.match(html, /window\.AMJFinanceiro\.atualizarAcesso\(\)/);
 
 for (const action of [
   'resumo', 'listar_catalogos', 'listar_clientes', 'listar_lancamentos',
-  'criar_lancamento', 'registrar_atendimento', 'registrar_pagamento', 'sugerir_clientes', 'criar_cliente',
+  'criar_lancamento', 'registrar_atendimento', 'registrar_pagamento', 'programar_parcelas',
+  'sugerir_clientes', 'criar_cliente',
   'criar_fornecedor', 'criar_marca', 'criar_produto', 'criar_compra',
   'cancelar_lancamento', 'estornar_pagamento', 'listar_auditoria'
 ]) {
@@ -91,6 +105,15 @@ assert.match(js, /idempotency_key: intentKey\('lancamento'\)/);
 assert.match(js, /idempotency_key: intentKey\('atendimento'\)/);
 assert.match(js, /pagamento_idempotency_key:/);
 assert.match(js, /idempotency_key: intentKey\('pagamento'\)/);
+assert.match(js, /parcelas_previstas: planned/);
+assert.match(js, /parcela_id: byId\('financeiro-pagamento-parcela'\)\.value \|\| null/);
+assert.match(js, /const total = scheduled\.length/);
+assert.match(api, /"installment_required"/);
+assert.match(js, /function submitInstallmentSchedule\(event\)/);
+assert.match(js, /data-financeiro-programar-parcelas/);
+assert.match(js, /data-financeiro-pagar-parcela/);
+assert.match(js, /forma_pagamento: method/);
+assert.match(js, /actualCents === Math\.round\(Number\(expected\) \* 100\)/);
 assert.match(js, /idempotency_key: intentKey\('compra'\)/);
 assert.match(js, /resetIntentOnEdit/);
 assert.match(js, /entryOrigin\(entry\) !== 'compra'/);
@@ -100,6 +123,11 @@ assert.match(js, /entry\.tipo/);
 assert.match(js, /candidate\.origem_id/);
 assert.match(js, /item\.ator/);
 assert.match(html, /não informe cartão completo ou CVV/i);
+assert.match(html, /Forma do valor recebido agora/);
+assert.match(html, /Forma prevista para o saldo/);
+assert.match(html, /Quantidade de parcelas do saldo/);
+assert.match(html, /Parcelas desta transação/);
+assert.doesNotMatch(html, /Parcelas no cartão/);
 for (const productType of ['bioestimulador', 'toxina_botulinica', 'preenchedor', 'skinbooster']) {
   assert.match(html, new RegExp(`value=["']${productType}["']`), `Tipo de produto ausente: ${productType}`);
   assert(api.includes(`"${productType}"`), `Tipo de produto ausente na API: ${productType}`);
@@ -114,6 +142,8 @@ assert.doesNotMatch(html, /name=["'](?:card_number|cvv|pin|senha_bancaria)["']/i
 assert(css.includes('.financeiro-kpis'));
 assert(css.includes('@media(max-width:640px)'));
 assert(css.includes('.financeiro-grafico'));
+assert(css.includes('.financeiro-parcela-linha'));
+assert(css.includes('.financeiro-parcelas-resumo'));
 
 const ids = [...html.matchAll(/\sid="([^"]+)"/g)].map(match => match[1]);
 const duplicates = ids.filter((id, index) => ids.indexOf(id) !== index);

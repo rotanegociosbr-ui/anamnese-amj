@@ -130,6 +130,87 @@
     return entry.balance_amount != null ? entry.balance_amount : entry.saldo;
   }
   function entryStatus(entry) { return entry.calculated_status || entry.status || ''; }
+  function entryInstallments(entry) {
+    const rows = Array.isArray(entry && entry.parcelas_previstas) ? entry.parcelas_previstas : [];
+    return rows.filter(function (row) { return String(row.estado || '').toLowerCase() !== 'cancelado'; });
+  }
+  function installmentBalance(row) {
+    if (row && row.saldo != null) return num(row.saldo);
+    return Math.max(0, num(row && row.valor) - num(row && row.valor_pago));
+  }
+  function paymentMethodLabel(code) {
+    const found = state.catalogs.formas_pagamento.find(function (item) {
+      return String(item.codigo || item.code || item.id || '') === String(code || '');
+    });
+    return found ? (found.nome || found.label || code) : String(code || 'Não informada');
+  }
+  function allocateInstallments(value, count) {
+    const totalCents = Math.round(Number(value) * 100);
+    const quantity = Number(count);
+    if (!Number.isInteger(quantity) || quantity < 1 || quantity > 120 || !Number.isFinite(totalCents) || totalCents < 1) return [];
+    const base = Math.floor(totalCents / quantity);
+    const remainder = totalCents - base * quantity;
+    return Array.from({ length: quantity }, function (_, index) {
+      return (base + (index < remainder ? 1 : 0)) / 100;
+    });
+  }
+  function moneyInput(value) { return num(value).toFixed(2).replace('.', ','); }
+  function addMonthsIso(value, amount) {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value || ''));
+    if (!match) return today();
+    const year = Number(match[1]);
+    const monthIndex = Number(match[2]) - 1 + amount;
+    const targetYear = year + Math.floor(monthIndex / 12);
+    const targetMonth = ((monthIndex % 12) + 12) % 12;
+    const lastDay = new Date(Date.UTC(targetYear, targetMonth + 1, 0)).getUTCDate();
+    const day = Math.min(Number(match[3]), lastDay);
+    return String(targetYear).padStart(4, '0') + '-' + String(targetMonth + 1).padStart(2, '0') + '-' +
+      String(day).padStart(2, '0');
+  }
+  function renderInstallmentRows(containerId, value, count, baseDate) {
+    const container = byId(containerId);
+    const amounts = allocateInstallments(value, count);
+    if (!container) return;
+    if (!amounts.length) {
+      container.innerHTML = '<p class="financeiro-vazio">Informe um saldo e a quantidade de parcelas.</p>';
+      delete container.dataset.signature;
+      return;
+    }
+    const previousDates = Array.from(container.querySelectorAll('[data-financeiro-parcela-data]'))
+      .map(function (input) { return input.value; });
+    const signature = Math.round(Number(value) * 100) + ':' + amounts.length;
+    if (container.dataset.signature === signature &&
+        container.querySelectorAll('.financeiro-parcela-linha').length === amounts.length) return;
+    container.innerHTML = '<div class="financeiro-parcelas-topo"><strong>Datas e valores do saldo</strong>' +
+      '<small>Confira cada vencimento antes de salvar. A soma precisa ser ' + escapeHtml(money(value)) + '.</small></div>' +
+      amounts.map(function (amount, index) {
+        const dueDate = previousDates[index] || '';
+        return '<div class="financeiro-parcela-linha" data-financeiro-parcela-numero="' + (index + 1) + '">' +
+          '<span class="financeiro-parcela-numero">' + (index + 1) + '/' + amounts.length + '</span>' +
+          '<label><span>Vencimento</span><input type="date" data-financeiro-parcela-data value="' +
+          escapeHtml(dueDate) + '" required></label>' +
+          '<label><span>Valor</span><input type="text" inputmode="decimal" data-financeiro-parcela-valor value="' +
+          escapeHtml(moneyInput(amount)) + '" required></label></div>';
+      }).join('');
+    container.dataset.signature = signature;
+  }
+  function collectInstallments(containerId, method) {
+    return Array.from(byId(containerId).querySelectorAll('.financeiro-parcela-linha')).map(function (row) {
+      return {
+        numero: Number(row.dataset.financeiroParcelaNumero),
+        vencimento: row.querySelector('[data-financeiro-parcela-data]').value,
+        valor: parseMoney(row.querySelector('[data-financeiro-parcela-valor]').value),
+        forma_pagamento: method
+      };
+    });
+  }
+  function validateInstallments(rows, expected) {
+    if (!rows.length || rows.some(function (row) {
+      return !row.vencimento || !(row.valor > 0) || !row.forma_pagamento;
+    })) return false;
+    const actualCents = rows.reduce(function (sum, row) { return sum + Math.round(row.valor * 100); }, 0);
+    return actualCents === Math.round(Number(expected) * 100);
+  }
   function status(id, message, error) {
     const node = byId(id);
     if (!node) return;
@@ -236,6 +317,18 @@
       }).join('');
   }
 
+  function replaceOptions(id, html, preferred) {
+    const select = byId(id);
+    if (!select) return;
+    const current = select.value;
+    select.innerHTML = html;
+    if (current && Array.from(select.options).some(function (option) { return option.value === current; })) {
+      select.value = current;
+    } else if (preferred && Array.from(select.options).some(function (option) { return option.value === preferred; })) {
+      select.value = preferred;
+    }
+  }
+
   function populateCatalogs() {
     const catalog = state.catalogs;
     const clientOptions = options(state.clients, 'Selecione um cliente', function (item) {
@@ -260,8 +353,10 @@
     byId('financeiro-lancamento-fornecedor').innerHTML = supplierOptions;
     byId('financeiro-compra-fornecedor').innerHTML = requiredSupplier;
     byId('financeiro-produto-marca').innerHTML = brandOptions;
-    byId('financeiro-pagamento-forma').innerHTML = methodOptions;
-    byId('financeiro-atendimento-forma').innerHTML = methodOptions;
+    replaceOptions('financeiro-pagamento-forma', methodOptions);
+    replaceOptions('financeiro-atendimento-forma', methodOptions);
+    replaceOptions('financeiro-atendimento-saldo-forma', methodOptions, 'boleto');
+    replaceOptions('financeiro-parcelas-forma', methodOptions, 'boleto');
     populateOpenEntries();
     document.querySelectorAll('.financeiro-item-produto').forEach(function (select) {
       const current = select.value;
@@ -328,10 +423,18 @@
     const open = state.entries.filter(function (entry) {
       return entryState(entry) !== 'cancelado' && num(entryBalance(entry)) > 0;
     });
-    byId('financeiro-pagamento-lancamento').innerHTML = options(open, 'Selecione', function (entry) {
+    const paymentOptions = options(open, 'Selecione', function (entry) {
       const type = entryType(entry) === 'receita' ? 'Receber' : 'Pagar';
       return type + ' · ' + (entryDescription(entry) || 'Lançamento') + ' · ' + money(entryBalance(entry));
     });
+    replaceOptions('financeiro-pagamento-lancamento', paymentOptions);
+    const withoutSchedule = open.filter(function (entry) { return entryInstallments(entry).length === 0; });
+    const scheduleOptions = options(withoutSchedule, 'Selecione', function (entry) {
+      return (entryDescription(entry) || 'Lançamento') + ' · saldo ' + money(entryBalance(entry));
+    });
+    replaceOptions('financeiro-parcelas-lancamento', scheduleOptions);
+    syncPaymentEntry();
+    syncInstallmentEditor();
   }
 
   function renderSummary(data) {
@@ -390,6 +493,44 @@
       cancelado: 'Cancelado' })[String(value || '')] || String(value || 'Pendente');
   }
 
+  function installmentStatus(row) {
+    const stateValue = String(row.estado || '').toLowerCase();
+    const value = String(row.status || '').toLowerCase();
+    if (stateValue === 'cancelado' || value === 'cancelada' || value === 'cancelado') {
+      return { code: 'cancelada', label: 'Cancelada' };
+    }
+    if (installmentBalance(row) <= 0 || value === 'paga' || value === 'pago' || value === 'quitada') {
+      return { code: 'paga', label: 'Paga' };
+    }
+    if (value === 'vencida' || value === 'vencido' || (row.vencimento && row.vencimento < today())) {
+      return { code: 'vencida', label: 'Vencida' };
+    }
+    if (num(row.valor_pago) > 0 || value === 'parcial') return { code: 'parcial', label: 'Parcial' };
+    return { code: 'aberta', label: 'Em aberto' };
+  }
+
+  function renderInstallmentSummary(entry) {
+    const rows = entryInstallments(entry);
+    if (!rows.length) return '';
+    const revenue = entryType(entry) === 'receita';
+    const activeEntry = entryState(entry) !== 'cancelado';
+    return '<div class="financeiro-parcelas-resumo"><strong>Parcelas programadas</strong>' +
+      rows.map(function (row, index) {
+        const current = installmentStatus(row);
+        const number = Number(row.numero) || index + 1;
+        const balance = installmentBalance(row);
+        const details = [paymentMethodLabel(row.forma_pagamento), 'vence ' + safeDate(row.vencimento), money(row.valor)]
+          .filter(Boolean).join(' · ');
+        return '<div class="financeiro-parcela-registro"><div><span>' + number + '/' + rows.length + ' · ' +
+          escapeHtml(details) + '</span><small>Pago ' + escapeHtml(money(row.valor_pago)) + ' · saldo ' +
+          escapeHtml(money(balance)) + '</small></div><span class="financeiro-parcela-status ' + current.code + '">' +
+          current.label + '</span>' + (activeEntry && balance > 0 && current.code !== 'cancelada'
+            ? '<button type="button" data-financeiro-pagar-parcela="' + escapeHtml(row.id) +
+              '" data-financeiro-parcela-entry="' + escapeHtml(entry.id) + '">' +
+              (revenue ? 'Receber parcela' : 'Pagar parcela') + '</button>' : '') + '</div>';
+      }).join('') + '</div>';
+  }
+
   function filteredEntries() {
     const type = byId('financeiro-filtro-tipo').value;
     const situation = byId('financeiro-filtro-status').value;
@@ -418,10 +559,16 @@
       const party = entry.cliente && entry.cliente.nome ? 'Cliente: ' + entry.cliente.nome :
         (entry.fornecedor && entry.fornecedor.nome ? 'Fornecedor: ' + entry.fornecedor.nome : '');
       const payments = Array.isArray(entry.pagamentos) ? entry.pagamentos : [];
+      const scheduled = entryInstallments(entry);
+      const openScheduled = scheduled.filter(function (row) { return installmentBalance(row) > 0; });
       const actions = [];
-      if (entryState(entry) !== 'cancelado' && balance > 0) {
+      if (entryState(entry) !== 'cancelado' && balance > 0 && (!scheduled.length || !openScheduled.length)) {
         actions.push('<button type="button" data-financeiro-pagar="' + escapeHtml(entry.id) + '">' +
           (type === 'receita' ? 'Registrar recebimento' : 'Registrar pagamento') + '</button>');
+      }
+      if (entryState(entry) !== 'cancelado' && balance > 0 && !scheduled.length) {
+        actions.push('<button type="button" data-financeiro-programar-parcelas="' + escapeHtml(entry.id) +
+          '">Programar parcelas do saldo</button>');
       }
       if (entryState(entry) !== 'cancelado' && received === 0 && entryOrigin(entry) !== 'compra') {
         actions.push('<button type="button" data-financeiro-cancelar="' + escapeHtml(entry.id) + '">Cancelar</button>');
@@ -454,6 +601,7 @@
         '<span class="financeiro-selo">' + escapeHtml(entryCategory(entry)) + '</span></div>' +
         '<p class="financeiro-lancamento-meta">Pago: ' + escapeHtml(money(received)) +
         ' · saldo: ' + escapeHtml(money(balance)) + '</p>' +
+        renderInstallmentSummary(entry) +
         (actions.length ? '<div class="financeiro-lancamento-acoes">' + actions.join('') + '</div>' : '') +
         '</article>';
     }).join('');
@@ -545,16 +693,18 @@
         node.textContent = '';
         node.classList.remove('erro');
       });
-      ['financeiro-atendimento-cliente', 'financeiro-atendimento-forma',
+      ['financeiro-atendimento-cliente', 'financeiro-atendimento-forma', 'financeiro-atendimento-saldo-forma',
         'financeiro-lancamento-cliente', 'financeiro-lancamento-fornecedor',
         'financeiro-compra-fornecedor', 'financeiro-produto-marca', 'financeiro-pagamento-forma',
-        'financeiro-pagamento-lancamento'].forEach(function (id) {
+        'financeiro-pagamento-lancamento', 'financeiro-pagamento-parcela',
+        'financeiro-parcelas-lancamento', 'financeiro-parcelas-forma'].forEach(function (id) {
         const select = byId(id);
         if (select) select.innerHTML = '<option value="">Selecione</option>';
       });
       ['financeiro-lista', 'financeiro-auditoria', 'financeiro-cliente-candidatos',
         'financeiro-compra-itens', 'financeiro-clientes-lista', 'financeiro-fornecedores-lista',
-        'financeiro-produtos-lista'].forEach(function (id) {
+        'financeiro-produtos-lista', 'financeiro-atendimento-parcelas-lista',
+        'financeiro-parcelas-lista'].forEach(function (id) {
         const node = byId(id);
         if (node) node.innerHTML = '';
       });
@@ -577,6 +727,8 @@
       setInitialDates();
       syncServiceForm();
       syncEntryForm();
+      syncPaymentEntry();
+      syncInstallmentEditor();
       addPurchaseItem();
     }
     updateAccess();
@@ -587,12 +739,37 @@
     const situation = byId('financeiro-atendimento-situacao').value;
     const partial = situation === 'parcial';
     const paid = situation !== 'pendente';
+    const parsedTotal = parseMoney(byId('financeiro-atendimento-valor').value);
+    const total = Number.isFinite(parsedTotal) && parsedTotal > 0 ? parsedTotal : 0;
+    const parsedReceived = partial ? parseMoney(byId('financeiro-atendimento-valor-recebido').value) : 0;
+    const received = situation === 'recebido' ? total :
+      (partial && Number.isFinite(parsedReceived) && parsedReceived > 0 ? parsedReceived : 0);
+    const balance = roundMoney(Math.max(0, total - received));
+    const hasFutureBalance = total > 0 && balance > 0 && situation !== 'recebido';
     byId('financeiro-atendimento-outro-campo').classList.toggle('oculto', !procedureOther);
     byId('financeiro-atendimento-outro').required = procedureOther;
     byId('financeiro-atendimento-valor-recebido-campo').classList.toggle('oculto', !partial);
     byId('financeiro-atendimento-valor-recebido').required = partial;
     byId('financeiro-atendimento-forma-campo').classList.toggle('oculto', !paid);
     byId('financeiro-atendimento-forma').required = paid;
+    byId('financeiro-atendimento-saldo').textContent = money(balance);
+    byId('financeiro-atendimento-saldo-forma-campo').classList.toggle('oculto', !hasFutureBalance);
+    byId('financeiro-atendimento-parcelas-campo').classList.toggle('oculto', !hasFutureBalance);
+    byId('financeiro-atendimento-parcelas-lista').classList.toggle('oculto', !hasFutureBalance);
+    byId('financeiro-atendimento-saldo-forma').required = hasFutureBalance;
+    byId('financeiro-atendimento-parcelas').required = hasFutureBalance;
+    if (hasFutureBalance) {
+      if (!byId('financeiro-atendimento-saldo-forma').value &&
+          Array.from(byId('financeiro-atendimento-saldo-forma').options).some(function (option) {
+            return option.value === 'boleto';
+          })) byId('financeiro-atendimento-saldo-forma').value = 'boleto';
+      renderInstallmentRows('financeiro-atendimento-parcelas-lista', balance,
+        Number(byId('financeiro-atendimento-parcelas').value),
+        byId('financeiro-atendimento-data').value || today());
+    } else {
+      byId('financeiro-atendimento-parcelas-lista').innerHTML = '';
+      delete byId('financeiro-atendimento-parcelas-lista').dataset.signature;
+    }
     if (!partial) byId('financeiro-atendimento-valor-recebido').value = '';
   }
 
@@ -616,6 +793,15 @@
       byId('financeiro-atendimento-valor-recebido').focus();
       return;
     }
+    const balance = roundMoney(total - received);
+    const plannedMethod = byId('financeiro-atendimento-saldo-forma').value;
+    const planned = balance > 0
+      ? collectInstallments('financeiro-atendimento-parcelas-lista', plannedMethod) : [];
+    if (balance > 0 && !validateInstallments(planned, balance)) {
+      status('financeiro-atendimento-status',
+        'Confira as datas e os valores: as parcelas precisam somar exatamente ' + money(balance) + '.', true);
+      return;
+    }
     setBusy(form, true);
     try {
       await call('registrar_atendimento', {
@@ -629,8 +815,10 @@
         situacao_pagamento: situation,
         valor_recebido: received,
         forma_pagamento: received > 0 ? byId('financeiro-atendimento-forma').value : null,
-        parcelas: Number(byId('financeiro-atendimento-parcelas').value),
-        vencimento: byId('financeiro-atendimento-vencimento').value,
+        parcelas_pagamento: received > 0 ? 1 : null,
+        parcelas: planned.length || 1,
+        vencimento: planned.length ? planned[0].vencimento : byId('financeiro-atendimento-data').value,
+        parcelas_previstas: planned,
         observacoes: byId('financeiro-atendimento-observacoes').value.trim() || null
       });
       clearIntent('atendimento');
@@ -638,7 +826,9 @@
       form.reset();
       setInitialDates();
       syncServiceForm();
-      status('financeiro-atendimento-status', 'Atendimento, valor e pagamento foram salvos e auditados.', false);
+      status('financeiro-atendimento-status',
+        planned.length ? 'Atendimento, entrada e datas do saldo foram salvos e auditados.' :
+          'Atendimento e pagamento foram salvos e auditados.', false);
       await load({ silent: true });
     } catch (error) {
       if (!isStaleSession(error)) status('financeiro-atendimento-status', error.message, true);
@@ -692,6 +882,105 @@
     finally { setBusy(form, false); }
   }
 
+  function syncPaymentForm() {
+    const credit = byId('financeiro-pagamento-forma').value === 'cartao_credito';
+    byId('financeiro-pagamento-parcelas-campo').classList.toggle('oculto', !credit);
+    if (!credit) byId('financeiro-pagamento-parcelas').value = '1';
+  }
+
+  function syncPaymentSelection() {
+    const entry = state.entries.find(function (row) {
+      return row.id === byId('financeiro-pagamento-lancamento').value;
+    });
+    const installment = entryInstallments(entry).find(function (row) {
+      return row.id === byId('financeiro-pagamento-parcela').value;
+    });
+    if (installment) {
+      byId('financeiro-pagamento-valor').value = moneyInput(installmentBalance(installment));
+      if (Array.from(byId('financeiro-pagamento-forma').options).some(function (option) {
+        return option.value === installment.forma_pagamento;
+      })) byId('financeiro-pagamento-forma').value = installment.forma_pagamento;
+    }
+    syncPaymentForm();
+  }
+
+  function syncPaymentEntry(preferredInstallment) {
+    const select = byId('financeiro-pagamento-parcela');
+    if (!select) return;
+    const entry = state.entries.find(function (row) {
+      return row.id === byId('financeiro-pagamento-lancamento').value;
+    });
+    const scheduled = entryInstallments(entry);
+    const open = scheduled.filter(function (row) { return installmentBalance(row) > 0; });
+    const total = scheduled.length;
+    const previous = preferredInstallment || select.value;
+    select.innerHTML = options(open, 'Selecione a parcela', function (row) {
+      return (row.numero || 1) + '/' + total + ' · ' + safeDate(row.vencimento) + ' · ' +
+        money(installmentBalance(row)) + ' · ' + paymentMethodLabel(row.forma_pagamento);
+    });
+    const hasSchedule = open.length > 0;
+    byId('financeiro-pagamento-parcela-campo').classList.toggle('oculto', !hasSchedule);
+    select.required = hasSchedule;
+    if (previous && Array.from(select.options).some(function (option) { return option.value === previous; })) {
+      select.value = previous;
+    } else if (open.length === 1) select.value = open[0].id;
+    syncPaymentSelection();
+  }
+
+  function syncInstallmentEditor() {
+    const entry = state.entries.find(function (row) {
+      return row.id === byId('financeiro-parcelas-lancamento').value;
+    });
+    const balance = entry ? num(entryBalance(entry)) : 0;
+    byId('financeiro-parcelas-saldo').textContent = money(balance);
+    if (!entry || !(balance > 0)) {
+      byId('financeiro-parcelas-lista').innerHTML =
+        '<p class="financeiro-vazio">Selecione um lançamento para informar as datas.</p>';
+      delete byId('financeiro-parcelas-lista').dataset.signature;
+      return;
+    }
+    if (!byId('financeiro-parcelas-forma').value &&
+        Array.from(byId('financeiro-parcelas-forma').options).some(function (option) {
+          return option.value === 'boleto';
+        })) byId('financeiro-parcelas-forma').value = 'boleto';
+    renderInstallmentRows('financeiro-parcelas-lista', balance,
+      Number(byId('financeiro-parcelas-quantidade').value), today());
+  }
+
+  async function submitInstallmentSchedule(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    syncInstallmentEditor();
+    if (!requireValid(form)) return;
+    const entryId = byId('financeiro-parcelas-lancamento').value;
+    const entry = state.entries.find(function (row) { return row.id === entryId; });
+    const balance = entry ? num(entryBalance(entry)) : 0;
+    const installments = collectInstallments('financeiro-parcelas-lista', byId('financeiro-parcelas-forma').value);
+    if (!(balance > 0) || !validateInstallments(installments, balance)) {
+      status('financeiro-parcelas-status',
+        'Confira as datas e os valores: as parcelas precisam somar exatamente ' + money(balance) + '.', true);
+      return;
+    }
+    setBusy(form, true);
+    try {
+      await call('programar_parcelas', {
+        entry_id: entryId,
+        idempotency_key: intentKey('parcelas'),
+        parcelas: installments
+      });
+      clearIntent('parcelas');
+      form.reset();
+      if (Array.from(byId('financeiro-parcelas-forma').options).some(function (option) {
+        return option.value === 'boleto';
+      })) byId('financeiro-parcelas-forma').value = 'boleto';
+      syncInstallmentEditor();
+      status('financeiro-parcelas-status', 'Datas e valores das parcelas foram salvos.', false);
+      await load({ silent: true });
+    } catch (error) {
+      if (!isStaleSession(error)) status('financeiro-parcelas-status', error.message, true);
+    } finally { setBusy(form, false); }
+  }
+
   async function submitPayment(event) {
     event.preventDefault();
     const form = event.currentTarget;
@@ -702,6 +991,7 @@
     try {
       await call('registrar_pagamento', {
         entry_id: byId('financeiro-pagamento-lancamento').value,
+        parcela_id: byId('financeiro-pagamento-parcela').value || null,
         forma_pagamento: byId('financeiro-pagamento-forma').value,
         valor: amount,
         pago_em: new Date(byId('financeiro-pagamento-data').value).toISOString(),
@@ -713,6 +1003,7 @@
       form.reset();
       byId('financeiro-pagamento-data').value = isoLocalNow();
       byId('financeiro-pagamento-parcelas').value = '1';
+      syncPaymentEntry();
       status('financeiro-pagamento-status', 'Valor registrado no livro financeiro.', false);
       await load({ silent: true });
     } catch (error) { if (!isStaleSession(error)) status('financeiro-pagamento-status', error.message, true); }
@@ -961,7 +1252,6 @@
   function setInitialDates() {
     const date = today();
     byId('financeiro-atendimento-data').value = date;
-    byId('financeiro-atendimento-vencimento').value = date;
     byId('financeiro-lancamento-competencia').value = date;
     byId('financeiro-lancamento-vencimento').value = date;
     byId('financeiro-compra-data').value = date;
@@ -972,6 +1262,8 @@
     setInitialDates();
     syncServiceForm();
     syncEntryForm();
+    syncPaymentEntry();
+    syncInstallmentEditor();
     addPurchaseItem();
     byId('financeiro-atualizar').addEventListener('click', function () { load(); });
     document.querySelectorAll('[data-financeiro-abrir]').forEach(function (button) {
@@ -987,14 +1279,21 @@
     byId('financeiro-lancamento-origem').addEventListener('change', syncEntryForm);
     byId('financeiro-atendimento-procedimento').addEventListener('change', syncServiceForm);
     byId('financeiro-atendimento-situacao').addEventListener('change', syncServiceForm);
+    ['financeiro-atendimento-valor', 'financeiro-atendimento-valor-recebido',
+      'financeiro-atendimento-parcelas', 'financeiro-atendimento-data'].forEach(function (id) {
+      byId(id).addEventListener('input', syncServiceForm);
+      byId(id).addEventListener('change', syncServiceForm);
+    });
     byId('financeiro-form-atendimento').addEventListener('submit', submitService);
     byId('financeiro-form-lancamento').addEventListener('submit', submitEntry);
     byId('financeiro-form-pagamento').addEventListener('submit', submitPayment);
+    byId('financeiro-form-parcelas').addEventListener('submit', submitInstallmentSchedule);
     byId('financeiro-form-cliente').addEventListener('submit', submitClient);
     resetIntentOnEdit(byId('financeiro-form-atendimento'), 'atendimento');
     resetIntentOnEdit(byId('financeiro-form-atendimento'), 'atendimento_pagamento');
     resetIntentOnEdit(byId('financeiro-form-lancamento'), 'lancamento');
     resetIntentOnEdit(byId('financeiro-form-pagamento'), 'pagamento');
+    resetIntentOnEdit(byId('financeiro-form-parcelas'), 'parcelas');
     resetIntentOnEdit(byId('financeiro-form-cliente'), 'cliente');
     resetIntentOnEdit(byId('financeiro-form-compra'), 'compra');
     resetIntentOnEdit(byId('financeiro-form-fornecedor'), 'criar_fornecedor');
@@ -1074,14 +1373,34 @@
     });
     byId('financeiro-adicionar-item').addEventListener('click', addPurchaseItem);
     byId('financeiro-form-compra').addEventListener('submit', submitPurchase);
+    byId('financeiro-pagamento-lancamento').addEventListener('change', function () { syncPaymentEntry(); });
+    byId('financeiro-pagamento-parcela').addEventListener('change', syncPaymentSelection);
+    byId('financeiro-pagamento-forma').addEventListener('change', syncPaymentForm);
+    byId('financeiro-parcelas-lancamento').addEventListener('change', syncInstallmentEditor);
+    byId('financeiro-parcelas-quantidade').addEventListener('input', syncInstallmentEditor);
+    byId('financeiro-parcelas-quantidade').addEventListener('change', syncInstallmentEditor);
     byId('financeiro-filtro-tipo').addEventListener('change', renderEntries);
     byId('financeiro-filtro-status').addEventListener('change', renderEntries);
     byId('financeiro-lista').addEventListener('click', function (event) {
       const payment = event.target.closest('[data-financeiro-pagar]');
+      const installmentPayment = event.target.closest('[data-financeiro-pagar-parcela]');
+      const schedule = event.target.closest('[data-financeiro-programar-parcelas]');
       const cancel = event.target.closest('[data-financeiro-cancelar]');
       const reversal = event.target.closest('[data-financeiro-estornar]');
-      if (payment) {
+      if (installmentPayment) {
+        byId('financeiro-pagamento-lancamento').value = installmentPayment.dataset.financeiroParcelaEntry;
+        syncPaymentEntry(installmentPayment.dataset.financeiroPagarParcela);
+        byId('financeiro-editor-pagamento').open = true;
+        byId('financeiro-editor-pagamento').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        byId('financeiro-pagamento-data').focus({ preventScroll: true });
+      } else if (schedule) {
+        byId('financeiro-parcelas-lancamento').value = schedule.dataset.financeiroProgramarParcelas;
+        syncInstallmentEditor();
+        byId('financeiro-editor-parcelas').open = true;
+        byId('financeiro-editor-parcelas').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } else if (payment) {
         byId('financeiro-pagamento-lancamento').value = payment.dataset.financeiroPagar;
+        syncPaymentEntry();
         byId('financeiro-editor-pagamento').open = true;
         byId('financeiro-editor-pagamento').scrollIntoView({ behavior: 'smooth', block: 'start' });
       } else if (cancel) cancelEntry(cancel.dataset.financeiroCancelar);

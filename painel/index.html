@@ -14,7 +14,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
-<link href="./financeiro.css?v=20260823-1" rel="stylesheet">
+<link href="./financeiro.css?v=20260823-2" rel="stylesheet">
 <style>
 :root{
   --gelo:#FDFBF8;--dourado:#85611D;--linha:#E7D8BE;--tinta:#1B1917;
@@ -525,6 +525,7 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
           <button type="button" data-financeiro-abrir="financeiro-editor-atendimento">Registrar atendimento</button>
           <button type="button" data-financeiro-abrir="financeiro-editor-lancamento">Outras receitas ou despesas</button>
           <button type="button" data-financeiro-abrir="financeiro-editor-pagamento">Registrar pagamento</button>
+          <button type="button" data-financeiro-abrir="financeiro-editor-parcelas">Programar parcelas</button>
           <button type="button" data-financeiro-abrir="financeiro-editor-cliente">Cadastrar cliente</button>
           <button type="button" data-financeiro-abrir="financeiro-editor-catalogo">Marcas e produtos</button>
           <button type="button" data-financeiro-abrir="financeiro-editor-compra">Registrar compra</button>
@@ -568,9 +569,11 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
               <label><span>Valor total</span><input id="financeiro-atendimento-valor" type="text" inputmode="decimal" placeholder="0,00" required></label>
               <label><span>Situação do pagamento</span><select id="financeiro-atendimento-situacao" required><option value="recebido">Recebido integralmente</option><option value="parcial">Recebido parcialmente</option><option value="pendente">Ainda não recebido</option></select></label>
               <label class="oculto" id="financeiro-atendimento-valor-recebido-campo"><span>Valor recebido agora</span><input id="financeiro-atendimento-valor-recebido" type="text" inputmode="decimal" placeholder="0,00"></label>
-              <label id="financeiro-atendimento-forma-campo"><span>Forma de pagamento</span><select id="financeiro-atendimento-forma" required><option value="">Selecione</option></select></label>
-              <label><span>Parcelas</span><input id="financeiro-atendimento-parcelas" type="number" min="1" max="120" value="1" required></label>
-              <label><span>Vencimento do saldo</span><input id="financeiro-atendimento-vencimento" type="date" required></label>
+              <label id="financeiro-atendimento-forma-campo"><span>Forma do valor recebido agora</span><select id="financeiro-atendimento-forma" required><option value="">Selecione</option></select></label>
+              <div class="financeiro-saldo largo" id="financeiro-atendimento-saldo-campo"><span>Saldo a receber</span><output id="financeiro-atendimento-saldo">R$ 0,00</output></div>
+              <label class="oculto" id="financeiro-atendimento-saldo-forma-campo"><span>Forma prevista para o saldo</span><select id="financeiro-atendimento-saldo-forma"><option value="">Selecione</option></select></label>
+              <label class="oculto" id="financeiro-atendimento-parcelas-campo"><span>Quantidade de parcelas do saldo</span><input id="financeiro-atendimento-parcelas" type="number" min="1" max="120" value="1"></label>
+              <div class="financeiro-parcelas-editor largo oculto" id="financeiro-atendimento-parcelas-lista" aria-live="polite"></div>
               <label class="largo"><span>Observações administrativas <small>sem informações clínicas</small></span><textarea id="financeiro-atendimento-observacoes" maxlength="1000" rows="3"></textarea></label>
             </div>
             <div class="financeiro-form-acoes"><button class="financeiro-botao" type="submit">Salvar atendimento</button></div>
@@ -605,14 +608,31 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
           <form class="financeiro-form" id="financeiro-form-pagamento" novalidate>
             <div class="financeiro-grid">
               <label class="largo"><span>Lançamento em aberto</span><select id="financeiro-pagamento-lancamento" required><option value="">Selecione</option></select></label>
+              <label class="largo oculto" id="financeiro-pagamento-parcela-campo"><span>Parcela a receber ou pagar</span><select id="financeiro-pagamento-parcela"><option value="">Selecione a parcela</option></select></label>
               <label><span>Forma</span><select id="financeiro-pagamento-forma" required><option value="">Selecione</option></select></label>
               <label><span>Valor</span><input id="financeiro-pagamento-valor" type="text" inputmode="decimal" placeholder="0,00" required></label>
               <label><span>Data e hora</span><input id="financeiro-pagamento-data" type="datetime-local" required></label>
-              <label><span>Parcelas no cartão</span><input id="financeiro-pagamento-parcelas" type="number" min="1" max="120" value="1" required></label>
+              <label class="oculto" id="financeiro-pagamento-parcelas-campo"><span>Parcelas desta transação</span><input id="financeiro-pagamento-parcelas" type="number" min="1" max="120" value="1" required></label>
               <label class="largo"><span>Referência opcional <small>não informe cartão completo ou CVV</small></span><input id="financeiro-pagamento-referencia" type="text" maxlength="120"></label>
             </div>
             <div class="financeiro-form-acoes"><button class="financeiro-botao" type="submit">Registrar valor</button></div>
             <p class="financeiro-form-status" id="financeiro-pagamento-status" role="status" aria-live="polite"></p>
+          </form>
+        </details>
+
+        <details class="financeiro-editor" id="financeiro-editor-parcelas">
+          <summary>Programar parcelas de um saldo já lançado</summary>
+          <form class="financeiro-form" id="financeiro-form-parcelas" novalidate>
+            <p class="financeiro-nota">Use este formulário quando o atendimento ou lançamento já existe e o saldo ainda não possui datas de recebimento.</p>
+            <div class="financeiro-grid">
+              <label class="largo"><span>Lançamento com saldo em aberto</span><select id="financeiro-parcelas-lancamento" required><option value="">Selecione</option></select></label>
+              <div class="financeiro-saldo largo"><span>Saldo que será programado</span><output id="financeiro-parcelas-saldo">R$ 0,00</output></div>
+              <label><span>Forma prevista</span><select id="financeiro-parcelas-forma" required><option value="">Selecione</option></select></label>
+              <label><span>Quantidade de parcelas</span><input id="financeiro-parcelas-quantidade" type="number" min="1" max="120" value="1" required></label>
+              <div class="financeiro-parcelas-editor largo" id="financeiro-parcelas-lista" aria-live="polite"><p class="financeiro-vazio">Selecione um lançamento para informar as datas.</p></div>
+            </div>
+            <div class="financeiro-form-acoes"><button class="financeiro-botao" type="submit">Salvar datas das parcelas</button></div>
+            <p class="financeiro-form-status" id="financeiro-parcelas-status" role="status" aria-live="polite"></p>
           </form>
         </details>
 
@@ -717,7 +737,7 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
 
 <script src="./vendor/supabase-js-2.112.3.min.js"></script>
 <script src="./auth-mfa.js?v=20260819-3"></script>
-<script src="./financeiro.js?v=20260823-1"></script>
+<script src="./financeiro.js?v=20260823-2"></script>
 <script>
 const SUPABASE_URL = 'https://rjxtxoqprnumouqakxbc.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_Ip14p4tUfYFjwUYaWinMlw_Gf9v0YwT';

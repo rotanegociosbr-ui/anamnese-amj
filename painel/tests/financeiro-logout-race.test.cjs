@@ -23,6 +23,8 @@ class FakeNode {
     this.hidden = false;
     this.disabled = false;
     this.open = false;
+    this.options = [];
+    this.dataset = Object.create(null);
     this.classList = new FakeClassList();
     this.attributes = Object.create(null);
   }

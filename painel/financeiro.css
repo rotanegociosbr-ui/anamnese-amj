@@ -75,6 +75,16 @@
 .financeiro-form-acoes{display:flex;gap:9px;justify-content:flex-end;margin-top:14px}
 .financeiro-form-acoes .financeiro-botao{min-width:180px}
 .financeiro-nota{margin:0 0 13px;padding:10px 12px;border-left:3px solid var(--dourado);border-radius:0 8px 8px 0;background:#FFF9EE;color:var(--cinza);font-size:11px}
+.financeiro-saldo{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 13px;border:1px solid #E4C988;border-radius:9px;background:#FFF9EE}
+.financeiro-saldo span{color:var(--cinza);font-size:11px;font-weight:500}
+.financeiro-saldo output{font-family:'Cormorant Garamond',Georgia,serif;font-size:22px;font-weight:600;color:var(--dourado)}
+.financeiro-parcelas-editor{display:grid;gap:8px;padding:11px;border:1px solid var(--linha);border-radius:9px;background:#FFFDF9}
+.financeiro-parcelas-editor.oculto{display:none}
+.financeiro-parcelas-topo{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding-bottom:8px;border-bottom:1px solid var(--linha)}
+.financeiro-parcelas-topo strong{font-size:11.5px;color:var(--tinta)}
+.financeiro-parcelas-topo small{max-width:390px;text-align:right;font-size:9.5px}
+.financeiro-parcela-linha{display:grid;grid-template-columns:52px minmax(150px,1fr) minmax(120px,.8fr);gap:9px;align-items:end;padding:9px;border:1px solid var(--linha);border-radius:8px;background:#fff}
+.financeiro-parcela-numero{align-self:center;display:grid;place-items:center;min-height:38px;border-radius:20px;background:#F4E9CF;color:var(--dourado);font-size:11px;font-weight:600}
 .financeiro-candidatos:empty{display:none}
 .financeiro-candidatos{display:grid;gap:6px;padding:8px;border:1px solid var(--linha);border-radius:8px;background:#FFFDF9}
 .financeiro-candidato{display:flex;justify-content:space-between;align-items:center;gap:9px;padding:8px;border:1px solid var(--linha);border-radius:7px;background:#fff}
@@ -110,6 +120,18 @@
 .financeiro-selo.despesa,.financeiro-selo.vencido,.financeiro-selo.cancelado{border-color:#F0D5D0;background:var(--alerta-bg);color:var(--alerta)}
 .financeiro-lancamento-acoes{display:flex;gap:7px;flex-wrap:wrap;margin-top:9px;padding-top:9px;border-top:1px solid var(--linha)}
 .financeiro-lancamento-acoes button{padding:7px 9px;border:1px solid var(--dourado);border-radius:7px;background:#fff;color:var(--dourado);font-family:inherit;font-size:10px;cursor:pointer}
+.financeiro-parcelas-resumo{display:grid;gap:6px;margin-top:9px;padding:9px;border:1px solid var(--linha);border-radius:8px;background:#fff}
+.financeiro-parcelas-resumo>strong{font-size:10.5px;color:var(--tinta)}
+.financeiro-parcela-registro{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:8px;padding-top:6px;border-top:1px solid var(--linha)}
+.financeiro-parcela-registro div{min-width:0}
+.financeiro-parcela-registro div>span,.financeiro-parcela-registro small{display:block;overflow:hidden;text-overflow:ellipsis}
+.financeiro-parcela-registro div>span{font-size:10.5px;color:var(--tinta)}
+.financeiro-parcela-registro small{margin-top:2px;color:var(--cinza);font-size:9px}
+.financeiro-parcela-registro button{padding:6px 8px;border:1px solid var(--dourado);border-radius:7px;background:#fff;color:var(--dourado);font-family:inherit;font-size:9px;cursor:pointer}
+.financeiro-parcela-status{padding:3px 7px;border:1px solid var(--linha);border-radius:20px;background:#fff;color:var(--cinza);font-size:9px;white-space:nowrap}
+.financeiro-parcela-status.paga{border-color:#BFD7BF;background:#F2F8F2;color:#356B35}
+.financeiro-parcela-status.vencida,.financeiro-parcela-status.cancelada{border-color:#F0D5D0;background:var(--alerta-bg);color:var(--alerta)}
+.financeiro-parcela-status.parcial{border-color:#E4C988;background:#FFF9EE;color:var(--dourado)}
 .financeiro-vazio{padding:30px 12px;text-align:center;color:var(--cinza);font-size:12px}
 .financeiro-auditoria-wrap{padding:14px}
 .financeiro-auditoria{display:grid;gap:7px}
@@ -133,6 +155,12 @@
   .financeiro-grid .largo{grid-column:auto}
   .financeiro-item{grid-template-columns:1fr 1fr}
   .financeiro-item label:first-child{grid-column:1/-1}
+  .financeiro-parcelas-topo{flex-direction:column}
+  .financeiro-parcelas-topo small{text-align:left}
+  .financeiro-parcela-linha{grid-template-columns:42px 1fr}
+  .financeiro-parcela-linha label:last-child{grid-column:2}
+  .financeiro-parcela-registro{grid-template-columns:1fr auto}
+  .financeiro-parcela-registro button{grid-column:1/-1;width:100%}
   .financeiro-filtros select{flex:1;width:100%}
   .financeiro-lancamento-topo{flex-direction:column}
 }
@@ -142,4 +170,7 @@
   .financeiro-atalhos{grid-template-columns:1fr}
   .financeiro-item{grid-template-columns:1fr}
   .financeiro-item label:first-child{grid-column:auto}
+  .financeiro-parcela-linha{grid-template-columns:1fr}
+  .financeiro-parcela-linha label:last-child{grid-column:auto}
+  .financeiro-parcela-numero{min-height:30px}
 }
