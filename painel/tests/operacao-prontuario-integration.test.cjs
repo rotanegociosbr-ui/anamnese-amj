@@ -26,6 +26,10 @@ const migration = fs.readFileSync(
 );
 
 assert.match(ui, /Preparar prontuário e fotos/);
+assert.match(ui, /Fotos da consulta/,
+  'cada atendimento deve expor o acesso direto às fotos da consulta');
+assert.match(ui, /data-fotos-abrir/);
+assert.match(ui, /abrirFotos:\s*openAttendancePhotos/);
 assert.match(ui, /Finalizar registro da consulta/);
 assert.match(ui, /protectedRequest\('preparar_prontuario_atendimento'/,
   'preparação deve pedir prova recente pelo fluxo protegido');
@@ -35,21 +39,66 @@ assert.match(ui, /jsonRequest\('listar_fotos_atendimento'/,
   'originais e URLs assinadas devem ser carregados somente ao abrir a galeria');
 assert.match(ui, /<option value="durante">Durante<\/option>/,
   'upload operacional deve expor a fase clínica Durante');
+assert.match(ui, /Produtos, ativos e ampolas/,
+  'categoria de materiais deve mencionar explicitamente ativos e ampolas');
+for (const category of ['Antes', 'Durante', 'Depois', 'Produtos, ativos e ampolas', 'Arquivadas']) {
+  assert.match(ui, new RegExp("countChip\\('" + category.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + "'"),
+    'contagem separada ausente: ' + category);
+}
+assert.match(ui, /name="arquivos"[^>]+multiple/,
+  'seleção múltipla deve permanecer disponível');
+assert.match(ui, /name="camera"[^>]+capture="environment"/,
+  'captura traseira deve ser uma opção separada no celular');
+assert.match(ui, /selectedPhotoFiles\(uploadForm\)/,
+  'envio deve combinar câmera e seleção múltipla');
+assert.match(ui, /createPhotoThumbnail\(file\)/);
+assert.match(ui, /data\.append\('miniatura', thumbnail, thumbnail\.name\)/,
+  'Operação deve enviar miniatura WebP separada do original');
+assert.match(ui, /Para categorias, produtos ou lotes diferentes, faça envios separados/,
+  'metadados compartilhados pelo lote de arquivos devem ser explicados');
+assert.match(ui, /const photoUploadContexts = new WeakMap\(\)/,
+  'retry parcial deve guardar o contexto imutável de cada arquivo');
+assert.match(ui, /rememberPhotoUploadContext\(form, file\)[\s\S]*photoUploadResults\.has\(file\)/,
+  'resultado já enviado só pode ser reutilizado depois de conferir o mesmo contexto');
+assert.match(ui, /Esta foto já iniciou um envio com outros dados/,
+  'mudança de consulta, categoria, data, procedimento, produto ou lote deve falhar de forma clara');
+assert.match(ui, /const photoMetadataContexts = new WeakMap\(\)/,
+  'retry parcial do vínculo deve guardar o fingerprint dos metadados');
+assert.match(ui, /metadataForUploadedPhoto\(uploadForm, files\[index\], photo\)/,
+  'cada item do lote deve reutilizar sua chave somente com metadados idênticos');
+assert.match(ui, /Atualize a galeria para recuperar o que foi salvo/,
+  'mudança após falha parcial deve orientar recuperação sem duplicar o vínculo');
 assert.match(ui, /referrerpolicy="no-referrer"/,
   'abertura do original não deve enviar referer');
 assert.match(ui, /clinical_photography_consented === true/,
   'formulário de upload deve depender da autorização fotográfica atual');
 assert.match(ui, /Abrir prontuário e registrar autorização/,
   'sem autorização, a galeria deve orientar a regularização sem enviar arquivo');
+assert.match(ui, /prontuarioJsonRequest\('listar',[\s\S]{0,220}protocolo_id: id/,
+  'produto/lote deve vir do protocolo específico, não do catálogo inteiro');
+assert.match(ui, /protocolProductsById\.set\(id, products\)/);
+assert.match(ui, /protocolProductRows\(form\.dataset\.protocoloId\)/);
+assert.match(ui, /Boolean\(productId\) !== Boolean\(lot\)/,
+  'produto e lote devem ser informados juntos ou ambos vazios');
+assert.match(ui, /item\.product_name_snapshot[\s\S]{0,240}item\.brand_name_snapshot[\s\S]{0,240}productTypeLabel/,
+  'seletor deve identificar nome, marca, tipo e unidade quando disponíveis');
+assert.doesNotMatch(ui, /Informar outro lote/,
+  'lote livre não pode escapar dos produtos registrados no prontuário');
 const galleryStart = ui.indexOf('function renderAttendanceGallery');
 const galleryEnd = ui.indexOf('\n  function renderAttendances', galleryStart);
 const gallerySource = ui.slice(galleryStart, galleryEnd);
-const consentGate = gallerySource.indexOf('visit.protocol_id && !photographyConsent');
+const consentGate = gallerySource.indexOf(': !photographyConsent');
 const uploadForm = gallerySource.indexOf('data-form-foto-upload');
 assert(consentGate >= 0 && uploadForm > consentGate,
   'gate de consentimento deve preceder o formulário de upload operacional');
 assert.match(css, /operacao-antes-depois[\s\S]*repeat\(3,/,
   'Antes, Durante e Depois devem ter colunas próprias');
+assert.match(css, /\.operacao-foto-contagens[^{]*\{[^}]*repeat\(5,/,
+  'desktop deve exibir as cinco contagens da galeria');
+assert.match(css, /@media \(max-width: 430px\)[\s\S]*operacao-foto-contagens[\s\S]*grid-template-columns: 1fr/,
+  'contagens devem empilhar em celular estreito');
+assert.match(css, /\.operacao-fotos-consulta[^{]*\{[^}]*scroll-margin-top: 88px/,
+  'atalho de fotos não deve parar sob a barra fixa');
 assert.match(css,
   /\.operacao-card input:not\(\[type="checkbox"\]\):not\(\[type="file"\]\)[^{]*\{[^}]*letter-spacing: normal;[^}]*text-align: left;[^}]*text-transform: none;/,
   'inputs operacionais devem neutralizar o estilo tipográfico do login');
@@ -121,7 +170,7 @@ assert.doesNotMatch(medicalRecordEdge,
 const addPhotoStart = medicalRecordEdge.indexOf('async function handleAddPhoto(');
 const addPhotoEnd = medicalRecordEdge.indexOf('\nasync function handleRemovePhoto(', addPhotoStart);
 const addPhoto = medicalRecordEdge.slice(addPhotoStart, addPhotoEnd);
-const preflight = addPhoto.indexOf('await assertPhotoUploadPreflight(clinicId, protocolId)');
+const preflight = addPhoto.indexOf('await assertPhotoUploadPreflight(');
 const storageUpload = addPhoto.indexOf('await uploadPrivateImage(storagePath, file)');
 assert(preflight >= 0 && storageUpload > preflight,
   'Edge deve confirmar tenant, protocolo ativo e consentimento antes do Storage');
@@ -132,11 +181,11 @@ const finalizeArchivedCheck = finalizeMigration.indexOf('if v_protocol.archived_
 const finalizeSignedCheck = finalizeMigration.indexOf("if v_protocol.status = 'signed' then");
 assert(finalizeArchivedCheck >= 0 && finalizeArchivedCheck < finalizeSignedCheck,
   'protocolo arquivado deve ser rejeitado antes do retorno signed idempotente');
-assert.match(shell, /operacao\.js\?v=20260824-2/,
+assert.match(shell, /operacao\.js\?v=20260824-3/,
   'cache-bust deve entregar o JavaScript atualizado da Operação');
-assert.match(html, /operacao\.css\?v=20260824-2/,
+assert.match(html, /operacao\.css\?v=20260824-3/,
   'cache-bust deve entregar o CSS atualizado da Operação');
-assert.match(html, /app-shell\.js\?v=20260824-4/,
+assert.match(html, /app-shell\.js\?v=20260824-5/,
   'cache-bust do shell deve entregar a referência atualizada da Operação');
 assert.match(html, /id="prontuario-busca"[^>]+aria-label="[^"]+"/,
   'busca do prontuário deve ter nome acessível');
@@ -183,5 +232,14 @@ assert.notEqual(contract.protocolPrepareKey('attendance-1'), first,
 assert.equal(contract.clinicalPhotoPending({ active_clinical_count: 0, active_product_count: 4 }), true,
   'fotos de produtos não removem a pendência clínica');
 assert.equal(contract.clinicalPhotoPending({ active_clinical_count: 1, active_product_count: 0 }), false);
+assert.deepEqual(JSON.parse(JSON.stringify(contract.photoCategoryCounts([
+  { category: 'antes', archived_at: null },
+  { category: 'durante', archived_at: null },
+  { category: 'durante_legado', archived_at: null },
+  { category: 'depois', archived_at: null },
+  { category: 'produtos_utilizados', archived_at: null },
+  { category: 'antes', archived_at: '2026-08-24T12:00:00Z' }
+]))), { antes: 1, durante: 2, depois: 1, produtos: 1, arquivadas: 1 },
+  'contagens devem separar fases, produtos e arquivadas; Durante agrega apenas o legado compatível');
 
 console.log('operacao-prontuario-integration.test.cjs: ok');

@@ -21,7 +21,7 @@
   const MODULES = Object.freeze({
     operacao: Object.freeze({
       global: 'AMJOperacaoClinica',
-      src: './operacao.js?v=20260824-2',
+      src: './operacao.js?v=20260824-3',
       root: 'operacao-clinica-root'
     }),
     gestao: Object.freeze({

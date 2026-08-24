@@ -226,6 +226,8 @@ const DATABASE_ERROR_MESSAGES: Record<string, string> = {
   photo_thumbnail_object_not_found: "A miniatura privada não foi confirmada.",
   photo_thumbnail_metadata_mismatch: "A miniatura não corresponde aos dados enviados.",
   photo_product_context_invalid: "O produto ou lote não pertence a este procedimento.",
+  protocol_product_referenced_by_active_photo:
+    "Arquive ou corrija a foto de produto antes de alterar o produto ou lote.",
   photo_attendance_context_invalid: "A foto não pertence a este atendimento.",
   photo_procedure_item_context_invalid: "A foto não pertence a este item de procedimento.",
   photo_operation_link_invalid: "Revise o vínculo da foto com o atendimento.",
@@ -305,7 +307,17 @@ async function serviceJson(path: string): Promise<JsonRecord[]> {
 async function assertPhotoUploadPreflight(
   clinicId: string,
   protocolId: string,
+  productId: string | null,
+  lotSnapshot: string | null,
 ): Promise<void> {
+  if ((productId === null) !== (lotSnapshot === null)) {
+    throw new ApiError(
+      422,
+      "photo_product_context_invalid",
+      DATABASE_ERROR_MESSAGES.photo_product_context_invalid,
+    );
+  }
+
   const protocols = await serviceJson(
     "/rest/v1/protocols?select=id,status,archived_at" +
       "&clinic_id=eq." + encodeURIComponent(clinicId) +
@@ -339,6 +351,31 @@ async function assertPhotoUploadPreflight(
       403,
       "clinical_photography_consent_required",
       DATABASE_ERROR_MESSAGES.clinical_photography_consent_required,
+    );
+  }
+
+}
+
+async function assertPhotoProductContextPreflight(
+  protocolId: string,
+  productId: string | null,
+  lotSnapshot: string | null,
+): Promise<void> {
+  if (productId === null || lotSnapshot === null) return;
+  const protocolProducts = await serviceJson(
+    "/rest/v1/protocol_products?select=lot" +
+      "&protocol_id=eq." + encodeURIComponent(protocolId) +
+      "&product_id=eq." + encodeURIComponent(productId) +
+      "&limit=101",
+  );
+  const linkedProductLot = protocolProducts.some((item) =>
+    safeText(item.lot, 100) === lotSnapshot
+  );
+  if (!linkedProductLot) {
+    throw new ApiError(
+      422,
+      "photo_product_context_invalid",
+      DATABASE_ERROR_MESSAGES.photo_product_context_invalid,
     );
   }
 }
@@ -1112,6 +1149,7 @@ async function privateImageMatches(
 
 type PhotoIdempotencyExpectation = {
   phase: string;
+  takenAt: string;
   storagePath: string;
   mimeType: string;
   sizeBytes: number;
@@ -1134,8 +1172,10 @@ function assertPhotoIdempotencyMatch(
   const existingThumbnailSize = existing.thumbnail_size_bytes == null
     ? null
     : Number(existing.thumbnail_size_bytes);
+  const existingTakenAt = new Date(safeText(existing.taken_at, 40)).getTime();
   if (
     safeText(existing.phase, 20) !== expected.phase ||
+    existingTakenAt !== Date.parse(expected.takenAt) ||
     safeText(existing.storage_path, 600) !== expected.storagePath ||
     safeText(existing.mime_type, 80) !== expected.mimeType ||
     Number(existing.size_bytes) !== expected.sizeBytes ||
@@ -1172,7 +1212,8 @@ async function handleAddPhoto(
   const takenAtRaw = safeText(form.get("tirada_em"), 40);
   const productRaw = safeText(form.get("produto_id"), 40);
   const productId = productRaw || null;
-  const lotRaw = safeText(form.get("lote"), 100);
+  const lotValue = form.get("lote");
+  const lotRaw = typeof lotValue === "string" ? lotValue.trim() : "";
   const lotSnapshot = lotRaw || null;
   const attendanceRaw = safeText(form.get("atendimento_id"), 40);
   const attendanceId = attendanceRaw || null;
@@ -1197,7 +1238,8 @@ async function handleAddPhoto(
     (attendanceId !== null && !validUuid(attendanceId)) ||
     (procedureItemId !== null && !validUuid(procedureItemId)) ||
     (procedureItemId !== null && attendanceId === null) ||
-    (lotSnapshot !== null && /[\u0000-\u001f\u007f]/.test(lotSnapshot)) ||
+    (lotSnapshot !== null &&
+      (lotSnapshot.length > 100 || /[\u0000-\u001f\u007f]/.test(lotSnapshot))) ||
     (phase !== "products_used" && (productId !== null || lotSnapshot !== null))
   ) {
     throw new ApiError(
@@ -1233,7 +1275,12 @@ async function handleAddPhoto(
 
   // Evita gravar até 25 MB no Storage quando o protocolo não está ativo ou a
   // autorização atual foi revogada. O RPC repete a validação sob concorrência.
-  await assertPhotoUploadPreflight(clinicId, protocolId);
+  await assertPhotoUploadPreflight(
+    clinicId,
+    protocolId,
+    productId,
+    lotSnapshot,
+  );
 
   const bytes = new Uint8Array(await file.arrayBuffer());
   if (!validImageMagic(bytes, file.type)) {
@@ -1258,6 +1305,7 @@ async function handleAddPhoto(
   const originalName = sanitizeOriginalName(file.name);
   const idempotencyExpectation: PhotoIdempotencyExpectation = {
     phase,
+    takenAt: takenAt.toISOString(),
     storagePath,
     mimeType: file.type,
     sizeBytes: file.size,
@@ -1282,6 +1330,11 @@ async function handleAddPhoto(
       idempotente: true,
     });
   }
+
+  // O retry idempotente acima deve continuar reconhecivel mesmo se o rascunho
+  // tiver mudado depois do commit original. Somente uma nova foto exige que o
+  // par produto/lote ainda exista no protocolo antes de enviar bytes.
+  await assertPhotoProductContextPreflight(protocolId, productId, lotSnapshot);
 
   const duplicate = await findDuplicatePhoto(clinicId, protocolId, hash);
   if (duplicate && !confirmDistinct) {
@@ -1456,6 +1509,23 @@ async function handleAddPhoto(
     throw error;
   }
 
+  if (result.idempotent === true) {
+    const committedPhoto = await findExistingPhoto(clinicId, protocolId, idempotencyKey);
+    if (!committedPhoto) {
+      throw new ApiError(
+        503,
+        "photo_registration_uncertain",
+        "A confirmação da imagem está em andamento. Tente novamente.",
+      );
+    }
+    assertPhotoIdempotencyMatch(committedPhoto, idempotencyExpectation);
+    return json(req, {
+      ok: true,
+      foto: await presentStoredPhoto(committedPhoto),
+      idempotente: true,
+    });
+  }
+
   const registeredPhoto: JsonRecord = {
     id: result.id,
     protocol_id: protocolId,
@@ -1482,7 +1552,7 @@ async function handleAddPhoto(
   return json(req, {
     ok: true,
     foto: await presentStoredPhoto(registeredPhoto),
-    idempotente: result.idempotent === true,
+    idempotente: false,
   });
 }
 

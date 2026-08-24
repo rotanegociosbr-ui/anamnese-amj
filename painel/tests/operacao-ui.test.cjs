@@ -21,7 +21,7 @@ assert.match(ui, /data\.append\('item_procedimento_id', procedureItemId\)/,
   'upload deve aceitar vínculo direto ao item de procedimento');
 assert.match(ui, /photoUploadKeys\.get\(file\)/,
   'retry de upload deve reutilizar a chave de idempotência do mesmo arquivo');
-assert.match(ui, /photoMetadataKeys\.get\(files\[index\]\)/,
+assert.match(ui, /photoMetadataKeys\.get\(file\)/,
   'retry parcial da organização deve reutilizar a chave de cada foto já processada');
 assert.match(ui, /photo_exact_duplicate/, 'SHA exato deve abrir o fluxo explícito de duplicidade');
 assert.match(ui, /confirmar_arquivo_distinto/, 'exceção de foto distinta deve ser visível e protegida');
