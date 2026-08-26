@@ -1,9 +1,11 @@
 import {
+  canonicalReactivationNextAction,
   containsMessagingInstruction,
   contributionMargin,
   isOperationalPurpose,
   requiresRecentProof,
   returnScheduleIsValid,
+  validReactivationTransition,
 } from "./logic.ts";
 
 function assert(condition: unknown, message: string): asserts condition {
@@ -16,6 +18,33 @@ Deno.test("nao aceita instrucao de envio nem aninhada", () => {
   assert(
     !containsMessagingInstruction({ template_referencia: "retorno-v1" }),
     "referencia e permitida",
+  );
+});
+
+Deno.test("tentativa de reativacao usa matriz canonica sem divergencia com a fila", () => {
+  const attempted = "2026-08-26T12:00:00.000Z";
+  const future = "2026-08-26T13:00:00.000Z";
+  assert(canonicalReactivationNextAction("recusou") === "nenhuma", "recusa deve encerrar");
+  assert(
+    canonicalReactivationNextAction("agendou") === "confirmar_agenda",
+    "agenda deve confirmar",
+  );
+  assert(validReactivationTransition("recusou", "nenhuma", null, attempted), "recusa canonica");
+  assert(
+    !validReactivationTransition("recusou", "recontatar", future, attempted),
+    "recusa nao recontata",
+  );
+  assert(
+    !validReactivationTransition("respondeu", "nenhuma", null, attempted),
+    "resposta fica aberta",
+  );
+  assert(
+    validReactivationTransition("respondeu", "aguardar_resposta", future, attempted),
+    "resposta valida",
+  );
+  assert(
+    !validReactivationTransition("sem_resposta", "recontatar", attempted, attempted),
+    "data precisa ser futura",
   );
 });
 
@@ -45,6 +74,17 @@ Deno.test("edicao e operacoes criticas exigem prova recente", () => {
     requiresRecentProof("vincular_fotos_atendimento", {}),
     "lote da galeria deve exigir prova",
   );
+  for (
+    const action of [
+      "configurar_credencial_profissional",
+      "registrar_consentimento_marketing",
+      "ativar_sequencia_pos_procedimento",
+      "ativar_reativacao",
+      "registrar_tentativa_reativacao",
+    ]
+  ) {
+    assert(requiresRecentProof(action, {}), `${action} deve exigir prova recente`);
+  }
 });
 
 Deno.test("agenda de retorno aceita data exata ou janela, nunca ambas", () => {

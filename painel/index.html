@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
 <link href="./financeiro.css?v=20260824-2" rel="stylesheet">
-<link href="./prontuario.css?v=20260824-4" rel="stylesheet">
+<link href="./prontuario.css?v=20260826-1" rel="stylesheet">
 <link href="./operacao.css?v=20260824-5" rel="stylesheet">
 <link href="./gestao.css?v=20260824-2" rel="stylesheet">
 <link href="./cotacoes.css?v=20260824-2" rel="stylesheet">
@@ -378,6 +378,7 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
       <button class="aba" id="aba-bt-prontuarios" type="button" role="tab" aria-selected="false" aria-controls="aba-prontuarios" tabindex="-1" hidden>Prontuários</button>
       <button class="aba" id="aba-bt-financeiro" type="button" role="tab" aria-selected="false" aria-controls="aba-financeiro" tabindex="-1" hidden>Financeiro</button>
       <button class="aba" id="aba-bt-operacao" type="button" role="tab" aria-selected="false" aria-controls="aba-operacao" tabindex="-1" hidden>Procedimentos</button>
+      <button class="aba" id="aba-bt-acompanhamentos" type="button" role="tab" aria-selected="false" aria-controls="aba-acompanhamentos" tabindex="-1" hidden>Acompanhamentos</button>
       <button class="aba" id="aba-bt-gestao" type="button" role="tab" aria-selected="false" aria-controls="aba-gestao" tabindex="-1" hidden>Gestão e auditoria</button>
       <button class="aba" id="aba-bt-cotacoes" type="button" role="tab" aria-selected="false" aria-controls="aba-cotacoes" tabindex="-1" hidden>Cotações e preços</button>
     </div>
@@ -464,6 +465,10 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
 
     <section class="painel-aba oculto" id="aba-crm" role="tabpanel" aria-labelledby="aba-bt-crm" hidden>
       <div id="crm-root"></div>
+    </section>
+
+    <section class="painel-aba oculto" id="aba-acompanhamentos" role="tabpanel" aria-labelledby="aba-bt-acompanhamentos" hidden>
+      <div id="acompanhamentos-root"></div>
     </section>
 
     <section class="painel-aba oculto" id="aba-fichas" role="tabpanel" aria-labelledby="aba-bt-fichas" hidden>
@@ -1027,8 +1032,8 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
 <script src="./vendor/supabase-js-2.112.3.min.js"></script>
 <script src="./auth-mfa.js?v=20260819-3"></script>
 <script src="./financeiro.js?v=20260824-2"></script>
-<script src="./prontuario.js?v=20260824-3"></script>
-<script src="./app-shell.js?v=20260826-1"></script>
+<script src="./prontuario.js?v=20260826-1"></script>
+<script src="./app-shell.js?v=20260826-2"></script>
 <script>
 const SUPABASE_URL = 'https://rjxtxoqprnumouqakxbc.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_Ip14p4tUfYFjwUYaWinMlw_Gf9v0YwT';
@@ -2532,7 +2537,7 @@ function agendaIniciarPolling() {
 }
 
 function agendaAtivarAba(nome, moverFoco) {
-  const abas = ['inicio', 'crm', 'fichas', 'agenda', 'prontuarios', 'financeiro', 'operacao', 'gestao', 'cotacoes'];
+  const abas = ['inicio', 'crm', 'fichas', 'agenda', 'prontuarios', 'financeiro', 'operacao', 'acompanhamentos', 'gestao', 'cotacoes'];
   let ativa = abas.includes(nome) ? nome : 'inicio';
   if (!['inicio', 'fichas'].includes(ativa)) {
     const botaoSolicitado = el('aba-bt-' + ativa);
@@ -2554,6 +2559,9 @@ function agendaAtivarAba(nome, moverFoco) {
   if (ativa === 'financeiro' && window.AMJFinanceiro) window.AMJFinanceiro.ativar();
   if (ativa === 'operacao' && window.AMJOperacaoClinica && typeof window.AMJOperacaoClinica.ativar === 'function') {
     window.AMJOperacaoClinica.ativar();
+  }
+  if (ativa === 'acompanhamentos' && window.AMJAcompanhamentos && typeof window.AMJAcompanhamentos.ativar === 'function') {
+    window.AMJAcompanhamentos.ativar();
   }
   if (ativa === 'gestao' && window.AMJGestaoAdministrativa) window.AMJGestaoAdministrativa.ativar();
   if (ativa === 'cotacoes' && window.AMJCotacoes) window.AMJCotacoes.ativar();

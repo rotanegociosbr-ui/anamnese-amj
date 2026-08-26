@@ -31,6 +31,11 @@ export const PROTECTED_ACTIONS = new Set([
   "registrar_taxa_pagamento",
   "atualizar_foto_atendimento",
   "vincular_fotos_atendimento",
+  "configurar_credencial_profissional",
+  "registrar_consentimento_marketing",
+  "ativar_sequencia_pos_procedimento",
+  "ativar_reativacao",
+  "registrar_tentativa_reativacao",
 ]);
 
 export function containsMessagingInstruction(value: unknown): boolean {
@@ -73,4 +78,34 @@ export function contributionMargin(
 ): number | null {
   if (incomplete || revenue === null || materialCost === null || feeAmount === null) return null;
   return Math.round((revenue - materialCost - feeAmount + Number.EPSILON) * 1_000_000) / 1_000_000;
+}
+
+const REACTIVATION_NEXT_ACTION: Record<string, string> = {
+  sem_resposta: "recontatar",
+  canal_indisponivel: "recontatar",
+  respondeu: "aguardar_resposta",
+  agendou: "confirmar_agenda",
+  recusou: "nenhuma",
+};
+
+export function canonicalReactivationNextAction(result: unknown): string | null {
+  return typeof result === "string" ? REACTIVATION_NEXT_ACTION[result] || null : null;
+}
+
+export function validReactivationTransition(
+  result: unknown,
+  nextAction: unknown,
+  nextActionAt: unknown,
+  attemptedAt: unknown,
+): boolean {
+  const canonical = canonicalReactivationNextAction(result);
+  if (!canonical || canonical !== nextAction || typeof attemptedAt !== "string") return false;
+  const attempted = Date.parse(attemptedAt);
+  if (!Number.isFinite(attempted)) return false;
+  if (canonical === "nenhuma") {
+    return nextActionAt === null || nextActionAt === undefined || nextActionAt === "";
+  }
+  if (typeof nextActionAt !== "string") return false;
+  const next = Date.parse(nextActionAt);
+  return Number.isFinite(next) && next > attempted;
 }

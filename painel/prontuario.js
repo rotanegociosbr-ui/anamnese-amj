@@ -547,6 +547,45 @@
       (cards.length ? '<div class="prontuario-fotos-grade">' + cards.join('') + '</div>' :
         '<p class="prontuario-fotos-vazio">Nenhuma foto nesta categoria.</p>') + '</section>';
   }
+  function comparablePhoto(photo, phase) {
+    if (!photo || photo.archived_at || photo.phase !== phase) return false;
+    return Boolean(safeSignedPhotoUrl(photo.miniatura_url) || safeSignedPhotoUrl(photo.url_assinada));
+  }
+  function comparisonTimestamp(photo) {
+    const raw = photo && (photo.taken_at || photo.captured_at || photo.created_at) || '';
+    const parsed = Date.parse(raw);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  function renderComparisonPhoto(photo, label) {
+    const imageUrl = safeSignedPhotoUrl(photo.miniatura_url) || safeSignedPhotoUrl(photo.url_assinada);
+    const rawDate = photo.taken_at || photo.captured_at || photo.created_at || '';
+    return '<figure class="prontuario-comparacao-item"><img src="' + escapeHtml(imageUrl) +
+      '" alt="Foto clínica privada para comparação · ' + escapeHtml(label) +
+      '" loading="lazy" decoding="async" referrerpolicy="no-referrer"><figcaption><strong>' +
+      escapeHtml(label) + '</strong><span>' + escapeHtml(safeDate(rawDate)) + '</span></figcaption></figure>';
+  }
+  function renderPhotoComparison(protocol, photos) {
+    if (!consent(protocol, 'clinical_photography')) {
+      return '<aside class="prontuario-comparacao-pendente">Registre o consentimento clínico de fotografia para visualizar a comparação.</aside>';
+    }
+    const latest = function (phase) {
+      return (photos || []).filter(function (photo) { return comparablePhoto(photo, phase); })
+        .sort(function (left, right) {
+          return comparisonTimestamp(right) - comparisonTimestamp(left) ||
+            String(right.id || '').localeCompare(String(left.id || ''));
+        })[0] || null;
+    };
+    const before = latest('before');
+    const after = latest('after');
+    if (!before || !after) {
+      return '<aside class="prontuario-comparacao-pendente">Comparação pendente: registre fotos ativas de Antes e Depois nesta consulta.</aside>';
+    }
+    return '<section class="prontuario-comparacao" aria-label="Comparação clínica Antes e Depois">' +
+      '<div class="prontuario-comparacao-topo"><div><h6>Comparação Antes/Depois</h6>' +
+      '<p>Registro clínico privado desta consulta. A autorização para marketing é independente.</p></div>' +
+      '<span>Mesma consulta</span></div><div class="prontuario-comparacao-grade">' +
+      renderComparisonPhoto(before, 'Antes') + renderComparisonPhoto(after, 'Depois') + '</div></section>';
+  }
   function renderPhotoSection(protocol, showArchived) {
     const count = photoSummaryCount(protocol, showArchived);
     const page = photoPage(protocol.id);
@@ -570,7 +609,8 @@
         escapeHtml(protocol.id) + '">Carregar mais fotos</button>' : '') +
       (!page.loading ? '<button type="button" data-prontuario-recarregar-fotos="' + escapeHtml(protocol.id) +
         '">Atualizar galeria (' + count + ')</button>' : '') + '</div>';
-    return '<div class="prontuario-galerias">' + galleries + '</div>' + controls;
+    return renderPhotoComparison(protocol, photos) + '<div class="prontuario-galerias">' +
+      galleries + '</div>' + controls;
   }
   function consent(protocol, kind) {
     const current = protocol && protocol.consentimentos_atuais;
@@ -1336,6 +1376,7 @@
       phaseLabel: phaseLabel,
       renderConsultation: renderConsultation,
       renderPhotoCard: renderPhotoCard,
+      renderPhotoComparison: renderPhotoComparison,
       setPhotoPage: function (protocolId, page) { state.photosByProtocol.set(String(protocolId), page); },
       clearPhotoPages: function () { state.photosByProtocol.clear(); }
     };

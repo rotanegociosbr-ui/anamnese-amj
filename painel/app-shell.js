@@ -5,6 +5,7 @@
     inicio: Object.freeze({ title: 'Início', legacy: 'inicio', group: 'principal' }),
     crm: Object.freeze({ title: 'CRM Leads', legacy: 'crm', owner: true, group: 'principal' }),
     procedimentos: Object.freeze({ title: 'Procedimentos', legacy: 'operacao', owner: true, group: 'principal' }),
+    acompanhamentos: Object.freeze({ title: 'Acompanhamentos', legacy: 'acompanhamentos', owner: true, group: 'principal' }),
     clientes: Object.freeze({ title: 'Clientes', legacy: 'financeiro', owner: true, financeView: 'clientes', group: 'principal' }),
     produtos: Object.freeze({ title: 'Produtos', legacy: 'financeiro', owner: true, financeView: 'produtos', group: 'principal' }),
     marcas: Object.freeze({ title: 'Marcas', legacy: 'financeiro', owner: true, financeView: 'marcas', group: 'principal' }),
@@ -19,7 +20,7 @@
     prontuarios: Object.freeze({ title: 'Fotos e prontuários', legacy: 'prontuarios', owner: true, group: 'secondary' })
   });
 
-  const PRIMARY_ORDER = ['inicio', 'crm', 'procedimentos', 'clientes', 'agenda', 'receitas', 'despesas', 'produtos', 'marcas',
+  const PRIMARY_ORDER = ['inicio', 'crm', 'procedimentos', 'acompanhamentos', 'clientes', 'agenda', 'receitas', 'despesas', 'produtos', 'marcas',
     'fornecedores', 'estoque', 'cotacoes', 'fichas', 'gestao'];
   const SECONDARY_ORDER = ['prontuarios'];
   const STORAGE_ROUTE = 'amj_shell_route';
@@ -34,6 +35,12 @@
       global: 'AMJOperacaoClinica',
       src: './operacao.js?v=20260824-5',
       root: 'operacao-clinica-root'
+    }),
+    acompanhamentos: Object.freeze({
+      global: 'AMJAcompanhamentos',
+      src: './acompanhamentos.js?v=20260826-1',
+      css: './acompanhamentos.css?v=20260826-1',
+      root: 'acompanhamentos-root'
     }),
     gestao: Object.freeze({
       global: 'AMJGestaoAdministrativa',
@@ -63,6 +70,7 @@
     fichas: '<path d="M5 2.5h7l3 3V18H5z"/><path d="M12 2.5V6h3M7.5 10h5M7.5 13h5M7.5 16h3"/>',
     gestao: '<path d="M3 17V9h3v8M8.5 17V5h3v12M14 17V2.5h3V17M2 17.5h16"/>',
     prontuarios: '<rect x="2.5" y="4" width="15" height="12" rx="2"/><circle cx="7" cy="8" r="1.5"/><path d="m4.5 14 4-3 2.5 2 2.5-2 2 3"/>',
+    acompanhamentos: '<circle cx="10" cy="10" r="7.5"/><path d="M10 5.5V10l3 2M4 4l2 2M16 4l-2 2"/>',
     mais: '<circle cx="4" cy="10" r="1"/><circle cx="10" cy="10" r="1"/><circle cx="16" cy="10" r="1"/>'
   });
 
@@ -217,7 +225,7 @@
       setControlAccess(button, allowed);
     });
 
-    ['crm', 'operacao', 'gestao', 'cotacoes'].forEach(function (legacy) {
+    ['crm', 'operacao', 'acompanhamentos', 'gestao', 'cotacoes'].forEach(function (legacy) {
       const button = byId('aba-bt-' + legacy);
       if (!button) return;
       const allowed = owner;

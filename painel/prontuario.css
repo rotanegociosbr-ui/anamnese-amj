@@ -122,6 +122,17 @@
 .prontuario-foto-duplicada .botao,.prontuario-foto-duplicada button{display:inline-flex;align-items:center;min-height:34px;padding:7px 9px;border:1px solid var(--dourado);border-radius:7px;background:#fff;color:var(--dourado);font:inherit;font-size:9.5px;text-decoration:none;cursor:pointer}
 .prontuario-foto-duplicada button.perigo{border-color:#D9A6A0;color:var(--alerta)}
 .prontuario-fotos-vazio{margin-top:8px!important;padding:9px;border:1px dashed var(--linha);border-radius:8px;text-align:center}
+.prontuario-comparacao{display:grid;gap:9px;margin-top:10px;padding:10px;border:1px solid var(--dourado);border-radius:10px;background:linear-gradient(135deg,#FFFDF8,#FFF8E9)}
+.prontuario-comparacao-topo{display:flex;align-items:flex-start;justify-content:space-between;gap:9px}
+.prontuario-comparacao-topo h6{margin:0;font-family:Cormorant,Georgia,serif;font-size:17px}
+.prontuario-comparacao-topo p{margin:2px 0 0!important;color:var(--cinza);font-size:9px}
+.prontuario-comparacao-topo>span{padding:4px 7px;border-radius:999px;background:var(--dourado);color:#fff;font-size:8px;font-weight:700;text-transform:uppercase;white-space:nowrap}
+.prontuario-comparacao-grade{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.prontuario-comparacao-item{overflow:hidden;margin:0;border:1px solid var(--linha);border-radius:9px;background:#fff}
+.prontuario-comparacao-item img{display:block;width:100%;aspect-ratio:4/3;object-fit:cover}
+.prontuario-comparacao-item figcaption{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:7px;color:var(--cinza);font-size:9px}
+.prontuario-comparacao-item figcaption strong{color:var(--tinta)}
+.prontuario-comparacao-pendente{margin-top:10px;padding:10px;border:1px dashed var(--dourado);border-radius:10px;background:#FFF8E9;color:#7A591D;font-size:9.5px}
 .prontuario-vazio{padding:28px 10px;text-align:center;color:var(--cinza);font-size:11px}
 
 @media(max-width:840px){
@@ -165,6 +176,10 @@
   .prontuario-consulta-acoes button{width:100%}
 }
 @media(max-width:430.98px){
+  .prontuario-comparacao-topo{flex-direction:column}
+  .prontuario-comparacao-topo>span{align-self:flex-start}
+  .prontuario-comparacao-grade{grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}
+  .prontuario-comparacao-item figcaption{align-items:flex-start;flex-direction:column}
   .prontuario-produto-linha{grid-template-columns:1fr}
   .prontuario-produto-linha label:first-child,.prontuario-produto-linha button{grid-column:auto}
   .prontuario-produtos-topo{align-items:stretch;flex-direction:column}

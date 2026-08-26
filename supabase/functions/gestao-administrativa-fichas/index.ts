@@ -661,6 +661,33 @@ async function handleDashboard(
   return success(req, context, { dashboard: data });
 }
 
+async function handlePhase2FollowupReport(
+  req: Request,
+  context: DualAuthContext,
+  payload: JsonRecord,
+): Promise<Response> {
+  const { clinicId, userId } = tenant(context);
+  const start = dateValue(payload.inicio, "inicio");
+  const end = dateValue(payload.fim, "fim");
+  if (!start || !end) throw new ApiError(422, "report_period_invalid", "Informe o período.");
+  const today = clinicDateForInstant(new Date());
+  const days = (Date.parse(`${end}T00:00:00Z`) - Date.parse(`${start}T00:00:00Z`)) /
+    86_400_000;
+  if (end < start || end > today || days > 365) {
+    throw new ApiError(422, "report_period_invalid", "Selecione até 366 dias, sem datas futuras.");
+  }
+  const report = await rpc("gestao_relatorio_acompanhamentos_fase2", {
+    p_clinic_id: clinicId,
+    p_user_id: userId,
+    p_actor_role: context.role,
+    p_auth_method: context.authMethod,
+    p_aal: context.aal,
+    p_start_date: start,
+    p_end_date: end,
+  });
+  return success(req, context, { relatorio: report });
+}
+
 async function handleList(
   req: Request,
   context: DualAuthContext,
@@ -1271,6 +1298,9 @@ export async function handleRequest(req: Request): Promise<Response> {
     switch (action) {
       case "dashboard":
         response = await handleDashboard(req, context, payload);
+        break;
+      case "relatorio_acompanhamentos_fase2":
+        response = await handlePhase2FollowupReport(req, context, payload);
         break;
       case "listar_contas_financeiras":
         response = await handleList(req, context, payload, "contas_financeiras");

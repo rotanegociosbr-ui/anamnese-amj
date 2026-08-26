@@ -112,7 +112,7 @@ assert.match(css, /@media \(max-width:700px\)/,
   'CRM deve ter composição específica para celular');
 assert.match(shell, /global: 'AMJCRMLeads'[\s\S]*?root: 'crm-root'/,
   'shell deve registrar o módulo CRM lazy');
-assert.match(html, /app-shell\.js\?v=20260826-1/,
+assert.match(html, /app-shell\.js\?v=20260826-2/,
   'asset do shell deve ser versionado após integrar o CRM');
 assert.doesNotMatch(html, /<script[^>]+crm\.js|<link[^>]+crm\.css/i,
   'CRM não deve aumentar o carregamento inicial');

@@ -360,7 +360,6 @@ async function assertPhotoUploadPreflight(
       DATABASE_ERROR_MESSAGES.clinical_photography_consent_required,
     );
   }
-
 }
 
 async function assertPhotoProductContextPreflight(
@@ -375,9 +374,7 @@ async function assertPhotoProductContextPreflight(
       "&product_id=eq." + encodeURIComponent(productId) +
       "&limit=101",
   );
-  const linkedProductLot = protocolProducts.some((item) =>
-    safeText(item.lot, 100) === lotSnapshot
-  );
+  const linkedProductLot = protocolProducts.some((item) => safeText(item.lot, 100) === lotSnapshot);
   if (!linkedProductLot) {
     throw new ApiError(
       422,
@@ -387,8 +384,21 @@ async function assertPhotoProductContextPreflight(
   }
 }
 
-async function signedLinks(paths: string[]): Promise<Record<string, string>> {
-  const uniquePaths = [...new Set(paths.filter(Boolean))];
+function validClinicalPhotoPath(path: string, clinicId: string, protocolId: string): boolean {
+  const prefix = `${clinicId}/${protocolId}/`;
+  return path.startsWith(prefix) && path.length > prefix.length &&
+    !path.includes("\\") && !path.split("/").includes("..") &&
+    !path.includes("//") && !containsControlCharacter(path);
+}
+
+async function signedLinks(
+  paths: string[],
+  clinicId: string,
+  protocolId: string,
+): Promise<Record<string, string>> {
+  const uniquePaths = [
+    ...new Set(paths.filter((path) => validClinicalPhotoPath(path, clinicId, protocolId))),
+  ];
   if (!uniquePaths.length) return {};
   const response = await serviceFetch("/storage/v1/object/sign/" + BUCKET, {
     method: "POST",
@@ -598,6 +608,7 @@ async function handleListPhotos(
   if (!validUuid(protocolId)) {
     throw new ApiError(422, "invalid_protocol", "Prontuário inválido.");
   }
+  await assertPhotoUploadPreflight(clinicId, protocolId, null, null);
   const page = positiveInteger(payload.pagina, 1, 100_000);
   const pageSize = positiveInteger(payload.por_pagina, 12, 24);
   const includeArchived = payload.incluir_arquivadas === true;
@@ -622,7 +633,7 @@ async function handleListPhotos(
     if (originalPath) paths.push(originalPath);
     if (thumbnailPath) paths.push(thumbnailPath);
   }
-  const links = await signedLinks(paths);
+  const links = await signedLinks(paths, clinicId, protocolId);
   const photos = pageRows.map((raw) => {
     const photo = { ...raw };
     delete photo.protocols;
@@ -1057,7 +1068,7 @@ async function findExistingPhoto(
       "mime_type,size_bytes,sha256,original_name,thumbnail_storage_path," +
       "thumbnail_mime_type,thumbnail_size_bytes,thumbnail_sha256,product_id," +
       "lot_snapshot,attendance_id,procedure_item_id,duplicate_of_photo_id," +
-      "duplicate_confirmed_at,archived_at," +
+      "duplicate_reason,duplicate_confirmed_at,duplicate_operation_id,archived_at," +
       "protocols!inner(clinic_id)" +
       "&protocol_id=eq." + protocolId +
       "&idempotency_key=eq." + idempotencyKey +
@@ -1090,11 +1101,14 @@ async function findDuplicatePhoto(
   return photo;
 }
 
-async function presentStoredPhoto(photo: JsonRecord): Promise<JsonRecord> {
+async function presentStoredPhoto(photo: JsonRecord, clinicId: string): Promise<JsonRecord> {
   const originalPath = safeText(photo.storage_path, 600);
   const thumbnailPath = safeText(photo.thumbnail_storage_path, 600);
   const archived = Boolean(photo.archived_at);
-  const links = archived ? {} : await signedLinks([originalPath, thumbnailPath]);
+  const protocolId = safeText(photo.protocol_id, 40);
+  const links = archived || !validUuid(protocolId)
+    ? {}
+    : await signedLinks([originalPath, thumbnailPath], clinicId, protocolId);
   return {
     id: photo.id,
     protocolo_id: photo.protocol_id,
@@ -1128,6 +1142,36 @@ async function uploadPrivateImage(path: string, file: File): Promise<Response> {
     },
     body: file,
   });
+}
+
+async function queueOrphanPhotoObjects(
+  context: DualAuthContext,
+  protocolId: string,
+  photoId: string,
+  storagePath: string,
+  thumbnailPath: string | null,
+  reasonCode: "metadata_rejected" | "thumbnail_failed",
+): Promise<void> {
+  const { clinicId, userId } = tenant(context);
+  try {
+    await rpc("prontuario_enfileirar_gc_foto_orfa", {
+      p_clinic_id: clinicId,
+      p_user_id: userId,
+      p_actor_role: context.role,
+      p_auth_method: context.authMethod,
+      p_protocol_id: protocolId,
+      p_photo_id: photoId,
+      p_storage_path: storagePath,
+      p_thumbnail_storage_path: thumbnailPath,
+      p_reason_code: reasonCode,
+      p_request_id: photoId,
+    });
+  } catch (error) {
+    console.error(
+      "Clinical photo GC enqueue failed",
+      error instanceof Error ? error.name : "error",
+    );
+  }
 }
 
 async function privateImageMatches(
@@ -1170,6 +1214,8 @@ type PhotoIdempotencyExpectation = {
   attendanceId: string | null;
   procedureItemId: string | null;
   confirmDistinct: boolean;
+  duplicateReason: string | null;
+  duplicateOperationId: string | null;
 };
 
 function assertPhotoIdempotencyMatch(
@@ -1197,7 +1243,9 @@ function assertPhotoIdempotencyMatch(
     (safeText(existing.lot_snapshot, 100) || null) !== expected.lotSnapshot ||
     (safeText(existing.attendance_id, 40) || null) !== expected.attendanceId ||
     (safeText(existing.procedure_item_id, 40) || null) !== expected.procedureItemId ||
-    Boolean(existing.duplicate_confirmed_at) !== expected.confirmDistinct
+    Boolean(existing.duplicate_confirmed_at) !== expected.confirmDistinct ||
+    (safeText(existing.duplicate_reason, 500) || null) !== expected.duplicateReason ||
+    (safeText(existing.duplicate_operation_id, 40) || null) !== expected.duplicateOperationId
   ) {
     throw new ApiError(
       409,
@@ -1326,6 +1374,8 @@ async function handleAddPhoto(
     attendanceId,
     procedureItemId,
     confirmDistinct,
+    duplicateReason: confirmDistinct ? duplicateReason : null,
+    duplicateOperationId: confirmDistinct ? duplicateOperationId : null,
   };
 
   const existing = await findExistingPhoto(clinicId, protocolId, idempotencyKey);
@@ -1333,7 +1383,7 @@ async function handleAddPhoto(
     assertPhotoIdempotencyMatch(existing, idempotencyExpectation);
     return json(req, {
       ok: true,
-      foto: await presentStoredPhoto(existing),
+      foto: await presentStoredPhoto(existing, clinicId),
       idempotente: true,
     });
   }
@@ -1352,7 +1402,7 @@ async function handleAddPhoto(
       {
         correspondencia: "exata",
         existing_id: duplicate.id,
-        candidato: await presentStoredPhoto(duplicate),
+        candidato: await presentStoredPhoto(duplicate, clinicId),
       },
     );
   }
@@ -1392,7 +1442,7 @@ async function handleAddPhoto(
       assertPhotoIdempotencyMatch(concurrent, idempotencyExpectation);
       return json(req, {
         ok: true,
-        foto: await presentStoredPhoto(concurrent),
+        foto: await presentStoredPhoto(concurrent, clinicId),
         idempotente: true,
       });
     }
@@ -1431,6 +1481,14 @@ async function handleAddPhoto(
             DATABASE_ERROR_MESSAGES.idempotency_key_reused,
           );
         }
+        await queueOrphanPhotoObjects(
+          context,
+          protocolId,
+          photoId,
+          storagePath,
+          thumbnailPath,
+          "thumbnail_failed",
+        );
         throw new ApiError(
           503,
           "photo_upload_failed",
@@ -1492,7 +1550,7 @@ async function handleAddPhoto(
       assertPhotoIdempotencyMatch(committedPhoto, idempotencyExpectation);
       return json(req, {
         ok: true,
-        foto: await presentStoredPhoto(committedPhoto),
+        foto: await presentStoredPhoto(committedPhoto, clinicId),
         idempotente: true,
       });
     }
@@ -1509,10 +1567,16 @@ async function handleAddPhoto(
       );
     }
 
-    // Mesmo um erro SQL definitivo pode concorrer com outra requisição que já
-    // adotou este path idempotente. Nunca removemos o objeto publicado aqui:
-    // o próximo retry reconcilia MIME/tamanho/SHA; órfãos privados exigem um GC
-    // futuro com prova de ownership/lock, fora do caminho clínico concorrente.
+    // Erro SQL definitivo: a fila tem espera minima e o RPC relê referencias.
+    // Nenhum objeto e apagado no caminho da consulta ou sem nova verificacao.
+    await queueOrphanPhotoObjects(
+      context,
+      protocolId,
+      photoId,
+      storagePath,
+      thumbnailPath,
+      "metadata_rejected",
+    );
     throw error;
   }
 
@@ -1528,7 +1592,7 @@ async function handleAddPhoto(
     assertPhotoIdempotencyMatch(committedPhoto, idempotencyExpectation);
     return json(req, {
       ok: true,
-      foto: await presentStoredPhoto(committedPhoto),
+      foto: await presentStoredPhoto(committedPhoto, clinicId),
       idempotente: true,
     });
   }
@@ -1558,7 +1622,7 @@ async function handleAddPhoto(
   };
   return json(req, {
     ok: true,
-    foto: await presentStoredPhoto(registeredPhoto),
+    foto: await presentStoredPhoto(registeredPhoto, clinicId),
     idempotente: false,
   });
 }

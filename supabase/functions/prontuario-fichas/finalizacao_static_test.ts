@@ -178,8 +178,8 @@ Deno.test("erro pós-upload nunca apaga path que uma concorrente pode adotar", (
   }
   assertIncludes(
     recovery,
-    "Nunca removemos o objeto publicado aqui",
-    "órfão privado deve ser preferido a metadado clínico fantasma",
+    "await queueOrphanPhotoObjects(",
+    "rollback SQL conclusivo deve enfileirar GC auditável sem apagar na requisição",
   );
 });
 
@@ -212,16 +212,22 @@ Deno.test("retry de upload reconcilia objeto exato e usa um presenter estável",
       "attendanceId",
       "procedureItemId",
       "confirmDistinct",
+      "duplicateReason",
+      "duplicateOperationId",
     ]
   ) {
     assertIncludes(edge, `expected.${field}`, `idempotência completa: ${field}`);
   }
-  if (
-    edge.includes("expected.duplicateOperationId") ||
-    edge.includes("expected.duplicateReason")
-  ) {
-    throw new Error("Prova/motivo de duplicidade não são conteúdo material do replay.");
-  }
+  assertIncludes(
+    edge,
+    "expected.duplicateOperationId",
+    "retry deve recusar prova recente distinta sob a mesma chave",
+  );
+  assertIncludes(
+    edge,
+    "expected.duplicateReason",
+    "retry deve recusar motivo distinto sob a mesma chave",
+  );
   assertIncludes(
     edge,
     "Boolean(existing.duplicate_confirmed_at) !== expected.confirmDistinct",

@@ -9,11 +9,13 @@ import {
   writeClinicAudit,
 } from "../_shared/dual-auth.ts";
 import {
+  canonicalReactivationNextAction,
   containsMessagingInstruction,
   isOperationalPurpose,
   JsonRecord,
   requiresRecentProof,
   returnScheduleIsValid,
+  validReactivationTransition,
 } from "./logic.ts";
 
 const URL = (Deno.env.get("SUPABASE_URL") || "").replace(/\/+$/, "");
@@ -286,6 +288,28 @@ const BACKEND_MESSAGES: Record<string, string> = {
   procedure_kind_invalid: "Revise o tipo de procedimento antes de preparar o prontuário.",
   clinical_photography_consent_required:
     "Registre o consentimento clínico de fotografia no prontuário antes do upload.",
+  professional_member_not_found: "O membro profissional não está ativo nesta clínica.",
+  credential_not_found: "Credencial profissional não encontrada.",
+  credential_revoked: "Uma credencial revogada não pode ser reativada; registre uma nova.",
+  active_professional_credential_required:
+    "Selecione uma profissional com credencial clínica ativa para validar o acompanhamento.",
+  attendance_not_completed: "Conclua o atendimento antes de ativar o acompanhamento.",
+  followup_steps_invalid: "Informe de 1 a 12 prazos distintos e válidos.",
+  completed_attendance_required: "Não há consulta concluída para usar como âncora.",
+  reactivation_anchor_changed: "A última consulta mudou. Atualize a elegibilidade.",
+  marketing_consent_required:
+    "Registre o termo de marketing assinado para este canal antes da reativação.",
+  marketing_consent_changed:
+    "O consentimento de marketing mudou. Atualize a tela antes de registrar contato.",
+  reactivation_plan_not_found: "Plano de reativação não encontrado.",
+  reactivation_plan_closed: "Este plano de reativação já foi encerrado.",
+  active_return_exists: "Já existe um acompanhamento ativo para esta paciente.",
+  active_followup_plan_exists: "Já existe uma sequência ativa para este atendimento.",
+  active_reactivation_exists: "Já existe uma reativação vigente para esta paciente.",
+  followup_step_conflict: "Um dos prazos já está registrado neste atendimento.",
+  reactivation_not_due: "A paciente ainda não atingiu uma janela de reativação.",
+  future_appointment_exists: "Já existe um agendamento futuro para esta paciente.",
+  report_period_invalid: "O período do relatório deve ter no máximo 366 dias.",
 };
 
 function backendStatus(code: string): number {
@@ -335,8 +359,29 @@ async function rest(path: string): Promise<JsonRecord[]> {
     : [];
 }
 
-async function signedPhotoLinks(paths: string[]): Promise<Record<string, string>> {
-  const uniquePaths = [...new Set(paths.map((path) => safeText(path, 600)).filter(Boolean))];
+function validClinicalPhotoPath(path: string, clinicId: string, protocolId: string): boolean {
+  const prefix = `${clinicId}/${protocolId}/`;
+  return path.startsWith(prefix) && path.length > prefix.length &&
+    !path.includes("\\") && !path.split("/").includes("..") &&
+    !path.includes("//") &&
+    ![...path].some((character) => {
+      const codePoint = character.codePointAt(0) || 0;
+      return codePoint <= 0x1f || codePoint === 0x7f;
+    });
+}
+
+async function signedPhotoLinks(
+  paths: string[],
+  clinicId: string,
+  protocolId: string,
+): Promise<Record<string, string>> {
+  const uniquePaths = [
+    ...new Set(
+      paths.map((path) => safeText(path, 600)).filter((path) =>
+        validClinicalPhotoPath(path, clinicId, protocolId)
+      ),
+    ),
+  ];
   if (!uniquePaths.length) return {};
   const result: Record<string, string> = {};
   for (let offset = 0; offset < uniquePaths.length; offset += 100) {
@@ -619,6 +664,19 @@ async function handleAttendancePhotos(
   if (!validUuid(protocolId)) {
     return json(req, { ok: true, atendimento_id: attendanceId, fotos_atendimento: [] });
   }
+  const consent = await rest(
+    `/rest/v1/protocol_consent_current?select=accepted&protocol_id=eq.${
+      encodeURIComponent(protocolId)
+    }` +
+      `&kind=eq.clinical_photography&accepted=eq.true&limit=1`,
+  );
+  if (!consent.length) {
+    throw new ApiError(
+      403,
+      "clinical_photography_consent_required",
+      BACKEND_MESSAGES.clinical_photography_consent_required,
+    );
+  }
   const rows = await rest(
     `/rest/v1/operacao_atendimento_fotos?select=*&clinic_id=eq.${clinic}` +
       `&attendance_id=eq.${encodeURIComponent(attendanceId)}` +
@@ -633,6 +691,8 @@ async function handleAttendancePhotos(
           safeText(row.storage_path, 600),
         ].filter(Boolean);
       }),
+    clinicId,
+    protocolId,
   );
   const gallery = rows.map((item) => {
     const row = item as JsonRecord;
@@ -1145,6 +1205,223 @@ async function handlePhotoMetadataBatch(
   });
 }
 
+async function handleListPhase2Followups(
+  req: Request,
+  context: DualAuthContext,
+  payload: JsonRecord,
+): Promise<Response> {
+  const cursor = payload.cursor && typeof payload.cursor === "object" &&
+      !Array.isArray(payload.cursor)
+    ? payload.cursor as JsonRecord
+    : {};
+  const result = await rpc("operacao_listar_acompanhamentos_fase2", {
+    ...baseRpc(context),
+    p_limit: optionalInteger(payload.limite, "o limite", 1, 100) || 50,
+    p_cursor_at: cursor.sort_at ? optionalTimestamp(cursor.sort_at, "o cursor") : null,
+    p_cursor_kind: cursor.kind ? safeText(cursor.kind, 20) : null,
+    p_cursor_id: cursor.id ? requiredUuid(cursor.id, "o cursor") : null,
+  });
+  return json(req, { ok: true, ...result });
+}
+async function handleConfigureProfessionalCredential(
+  req: Request,
+  context: DualAuthContext,
+  payload: JsonRecord,
+): Promise<Response> {
+  const professionalId = requiredUuid(payload.profissional_id, "a profissional");
+  const operationId = await requireProof(
+    req,
+    context,
+    payload,
+    "operacao.configurar_credencial_profissional",
+    professionalId,
+  );
+  const result = await rpc("operacao_configurar_credencial_profissional", {
+    ...baseRpc(context),
+    p_professional_user_id: professionalId,
+    p_council_code: safeText(payload.conselho, 20).toUpperCase(),
+    p_council_state: safeText(payload.uf, 2).toUpperCase(),
+    p_registration_number: safeText(payload.numero_registro, 40),
+    p_valid_until: optionalDate(payload.valido_ate, "a validade"),
+    p_reason: safeText(payload.motivo, 500),
+    p_idempotency_key: requiredUuid(payload.idempotency_key, "a chave da operação"),
+    p_request_id: operationId,
+  });
+  return response(req, result);
+}
+
+async function handleMarketingConsent(
+  req: Request,
+  context: DualAuthContext,
+  payload: JsonRecord,
+): Promise<Response> {
+  const patientId = requiredUuid(payload.cliente_id, "o cliente");
+  const operationId = await requireProof(
+    req,
+    context,
+    payload,
+    "operacao.registrar_consentimento_marketing",
+    patientId,
+  );
+  const accepted = payload.aceito;
+  if (typeof accepted !== "boolean") {
+    throw new ApiError(422, "invalid_consent", "Informe a decisão assinada da paciente.");
+  }
+  const evidenceId = accepted
+    ? requiredUuid(payload.evidencia_assinatura_id, "a evidência assinada")
+    : null;
+  if (!accepted && payload.evidencia_assinatura_id) {
+    throw new ApiError(422, "invalid_consent", "A recusa não recebe evidência de aceite.");
+  }
+  const result = await rpc("operacao_registrar_consentimento_marketing", {
+    ...baseRpc(context),
+    p_patient_id: patientId,
+    p_channel: safeText(payload.canal, 20),
+    p_accepted: accepted,
+    p_signature_evidence_id: evidenceId,
+    p_idempotency_key: requiredUuid(payload.idempotency_key, "a chave da operação"),
+    p_request_id: operationId,
+  });
+  return response(req, result, { envio_realizado: false });
+}
+
+async function handleActivatePostProcedureSequence(
+  req: Request,
+  context: DualAuthContext,
+  payload: JsonRecord,
+): Promise<Response> {
+  const attendanceId = requiredUuid(payload.atendimento_id, "o atendimento");
+  const operationId = await requireProof(
+    req,
+    context,
+    payload,
+    "operacao.ativar_sequencia_pos_procedimento",
+    attendanceId,
+  );
+  if (
+    !Array.isArray(payload.intervalos_dias) || payload.intervalos_dias.length < 1 ||
+    payload.intervalos_dias.length > 12
+  ) {
+    throw new ApiError(422, "followup_steps_invalid", BACKEND_MESSAGES.followup_steps_invalid);
+  }
+  const offsets = payload.intervalos_dias.map((value) =>
+    requiredInteger(value, "cada prazo", 1, 3_650)
+  );
+  if (new Set(offsets).size !== offsets.length) {
+    throw new ApiError(422, "followup_steps_invalid", BACKEND_MESSAGES.followup_steps_invalid);
+  }
+  const result = await rpc("operacao_ativar_sequencia_pos_procedimento", {
+    ...baseRpc(context),
+    p_attendance_id: attendanceId,
+    p_expected_version: requiredInteger(payload.versao_atendimento, "a versão", 1, 2_000_000_000),
+    p_responsible_user_id: requiredUuid(payload.responsavel_id, "o responsável"),
+    p_offsets_days: offsets,
+    p_activation_id: requiredUuid(payload.activation_id, "a ativação"),
+    p_idempotency_key: requiredUuid(payload.idempotency_key, "a chave da operação"),
+    p_request_id: operationId,
+  });
+  return response(req, result, {
+    mensagem_enviada: false,
+    decisao_clinica_automatica: false,
+  });
+}
+
+async function handleActivateReactivation(
+  req: Request,
+  context: DualAuthContext,
+  payload: JsonRecord,
+): Promise<Response> {
+  const patientId = requiredUuid(payload.cliente_id, "o cliente");
+  const operationId = await requireProof(
+    req,
+    context,
+    payload,
+    "operacao.ativar_reativacao",
+    patientId,
+  );
+  const result = await rpc("operacao_ativar_reativacao", {
+    ...baseRpc(context),
+    p_patient_id: patientId,
+    p_last_attendance_id: requiredUuid(payload.ultimo_atendimento_id, "a última consulta"),
+    p_expected_attendance_version: requiredInteger(
+      payload.versao_ultimo_atendimento,
+      "a versão da consulta",
+      1,
+      2_000_000_000,
+    ),
+    p_channel: safeText(payload.canal, 20),
+    p_responsible_user_id: requiredUuid(payload.responsavel_id, "o responsável"),
+    p_activation_id: requiredUuid(payload.activation_id, "a ativação"),
+    p_idempotency_key: requiredUuid(payload.idempotency_key, "a chave da operação"),
+    p_request_id: operationId,
+  });
+  return response(req, result, {
+    mensagem_enviada: false,
+    crm_alterado: false,
+  });
+}
+
+async function handleReactivationAttempt(
+  req: Request,
+  context: DualAuthContext,
+  payload: JsonRecord,
+): Promise<Response> {
+  const planId = requiredUuid(payload.plano_id, "o plano");
+  const operationId = await requireProof(
+    req,
+    context,
+    payload,
+    "operacao.registrar_tentativa_reativacao",
+    planId,
+  );
+  const resultCode = safeText(payload.resultado, 30);
+  const nextAction = safeText(payload.proxima_acao, 30);
+  if (
+    !canonicalReactivationNextAction(resultCode) ||
+    canonicalReactivationNextAction(resultCode) !== nextAction
+  ) {
+    throw new ApiError(
+      422,
+      "reactivation_attempt_transition_invalid",
+      "Resultado e próxima ação são incompatíveis.",
+    );
+  }
+  const attemptedAt = optionalTimestamp(payload.tentativa_em, "a data da tentativa") ||
+    new Date().toISOString();
+  const nextActionAt = optionalTimestamp(payload.proxima_acao_em, "a próxima ação");
+  if (!validReactivationTransition(resultCode, nextAction, nextActionAt, attemptedAt)) {
+    throw new ApiError(
+      422,
+      "reactivation_attempt_transition_invalid",
+      "Informe uma próxima ação futura compatível.",
+    );
+  }
+  const result = await rpc("operacao_registrar_tentativa_reativacao", {
+    ...baseRpc(context),
+    p_plan_id: planId,
+    p_expected_plan_version: requiredInteger(
+      payload.versao_plano,
+      "a versão do plano",
+      1,
+      2_000_000_000,
+    ),
+    p_queue_id: requiredUuid(payload.fila_id, "a fila"),
+    p_expected_queue_version: requiredInteger(
+      payload.versao_fila,
+      "a versão da fila",
+      1,
+      2_000_000_000,
+    ),
+    p_result: resultCode,
+    p_next_action: nextAction,
+    p_next_action_at: nextActionAt,
+    p_attempted_at: attemptedAt,
+    p_idempotency_key: requiredUuid(payload.idempotency_key, "a chave da operação"),
+    p_request_id: operationId,
+  });
+  return response(req, result, { mensagem_enviada: false });
+}
+
 async function parseJsonBody(req: Request): Promise<JsonRecord> {
   const contentLength = Number(req.headers.get("content-length") || 0);
   if (Number.isFinite(contentLength) && contentLength > MAX_JSON_BYTES) {
@@ -1295,6 +1572,18 @@ Deno.serve(async (req: Request) => {
         return await handlePhotoMetadata(req, context, payload);
       case "vincular_fotos_atendimento":
         return await handlePhotoMetadataBatch(req, context, payload);
+      case "listar_acompanhamentos_fase2":
+        return await handleListPhase2Followups(req, context, payload);
+      case "configurar_credencial_profissional":
+        return await handleConfigureProfessionalCredential(req, context, payload);
+      case "registrar_consentimento_marketing":
+        return await handleMarketingConsent(req, context, payload);
+      case "ativar_sequencia_pos_procedimento":
+        return await handleActivatePostProcedureSequence(req, context, payload);
+      case "ativar_reativacao":
+        return await handleActivateReactivation(req, context, payload);
+      case "registrar_tentativa_reativacao":
+        return await handleReactivationAttempt(req, context, payload);
       default:
         throw new ApiError(422, "invalid_action", "Ação inválida.");
     }
