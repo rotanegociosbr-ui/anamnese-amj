@@ -19,8 +19,12 @@ assert.doesNotMatch(html, /<script[^>]+src=["']\.\/operacao\.js/i,
   'Operação deve ser carregada sob demanda pelo shell');
 assert.doesNotMatch(html, /<script[^>]+src=["']\.\/gestao\.js/i,
   'Gestão deve ser carregada sob demanda pelo shell');
+assert.doesNotMatch(html, /<script[^>]+src=["']\.\/crm\.js/i,
+  'CRM deve ser carregado sob demanda pelo shell');
+assert.doesNotMatch(html, /<link[^>]+href=["']\.\/crm\.css/i,
+  'CSS do CRM deve ser carregado sob demanda pelo shell');
 
-for (const route of ['inicio', 'procedimentos', 'clientes', 'produtos', 'marcas', 'fornecedores', 'agenda',
+for (const route of ['inicio', 'crm', 'procedimentos', 'clientes', 'produtos', 'marcas', 'fornecedores', 'agenda',
   'receitas', 'despesas', 'estoque', 'fichas', 'gestao']) {
   assert.match(js, new RegExp('\\b' + route + ': Object\\.freeze'), 'rota principal ausente: ' + route);
 }
@@ -53,6 +57,10 @@ assert.match(js, /AMJFinanceiro\.abrirCadastro\(type, id\)/,
   'cadastros existentes devem abrir pela fonte financeira canônica');
 assert.match(js, /AMJOperacaoClinica\.abrirAtendimento\(id\)/,
   'atendimentos existentes devem abrir pela fonte operacional canônica');
+assert.match(js, /src: '\.\/crm\.js\?v=20260826-1'[\s\S]*?css: '\.\/crm\.css\?v=20260826-1'/,
+  'CRM deve versionar e carregar JS/CSS sob demanda');
+assert.match(js, /AMJCRMLeads\.abrirLead\(id\)/,
+  'Abrir existente deve encaminhar lead à fonte canônica do CRM');
 assert.match(js, /app-procedure-photo-shortcut[^>]*data-app-action="fotos-atendimento"[^>]*>Adicionar ou tirar fotos/,
   'Procedimentos deve destacar a ação direta de fotos');
 assert.match(js, /AMJOperacaoClinica\.abrirAtalhoFotos\(\)/,
@@ -69,9 +77,15 @@ assert.match(css, /\.app-shell-mobile-bar\s*\{[\s\S]*?position:\s*fixed/,
 assert.match(css, /\.app-shell-content\s*\{[\s\S]*?width:\s*min\(100%,\s*1580px\)/,
   'workspace não pode continuar preso ao limite legado de 760px');
 
-assert.match(html, /const abas = \['inicio', 'fichas', 'agenda'/,
+assert.match(html, /const abas = \['inicio', 'crm', 'fichas', 'agenda'/,
   'ativador legado deve reconhecer Início');
 assert.match(html, /id="aba-inicio"/, 'painel Início deve existir no HTML');
+assert.match(html, /id="aba-crm"[\s\S]*?id="crm-root"/,
+  'painel CRM deve fornecer somente a raiz do módulo lazy');
+assert.match(html, /data-shell-metric="crm-abertos"[\s\S]*?data-shell-metric="crm-vencidos"/,
+  'Início deve mostrar contadores reais do CRM após o módulo carregar');
+assert.match(html, /data-shell-route="crm" data-shell-action="novo-lead"/,
+  'Início deve oferecer cadastro rápido de lead');
 assert.match(html, /data-shell-route="estoque" data-shell-action="nova-compra"/,
   'atalho de compra/frete deve abrir Estoque');
 assert.match(html, /data-shell-route="procedimentos" data-shell-action="fotos-atendimento"[^>]*><strong>Adicionar ou tirar fotos<\/strong>/,

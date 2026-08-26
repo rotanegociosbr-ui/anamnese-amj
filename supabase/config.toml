@@ -103,3 +103,11 @@ enabled = true
 verify_jwt = false
 import_map = "./functions/cotacoes-fichas/deno.json"
 entrypoint = "./functions/cotacoes-fichas/index.ts"
+
+[functions.crm-fichas]
+enabled = true
+# Validação interna obrigatória: Bearer, sessão ativa, owner e AAL2.
+# Arquivamento e conversão final também consomem prova recente de senha.
+verify_jwt = false
+import_map = "./functions/crm-fichas/deno.json"
+entrypoint = "./functions/crm-fichas/index.ts"

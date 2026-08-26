@@ -13,6 +13,7 @@ const financeCss = read('financeiro.css');
 const operationCss = read('operacao.css');
 const recordCss = read('prontuario.css');
 const managementCss = read('gestao.css');
+const crmCss = read('crm.css');
 
 assert.match(shellJs,
   /mobileMedia\.addEventListener\('change',[\s\S]*?if \(!state\.mobileMedia\.matches\) closeDrawer\(false\);[\s\S]*?else updateDrawerAccessibility\(\)/,
@@ -102,5 +103,16 @@ assert.match(managementCss,
 assert.match(managementCss,
   /@media \(max-width: 640px\)[\s\S]*?\.gestao-form-inline \{ align-items: stretch; display: grid; grid-template-columns: 1fr; \}/,
   'fechamento mensal deve empilhar em uma coluna no celular');
+
+assert.match(crmCss,
+  /@media \(max-width:700px\)[\s\S]*?\.crm-quick-grid,\.crm-detail-grid,\.crm-filters\{grid-template-columns:1fr\}/,
+  'cadastro e filtros do CRM devem empilhar no celular');
+assert.match(crmCss,
+  /@media \(max-width:700px\)[\s\S]*?\.crm-shell input,\.crm-shell select,\.crm-shell textarea\{font-size:16px\}/,
+  'campos do CRM devem evitar zoom automático no celular');
+assert.match(crmCss, /\.crm-shell button\{min-height:44px\}/,
+  'ações principais do CRM devem manter alvo de toque acessível');
+assert.match(crmCss, /\.crm-kanban\{[^}]*overflow-x:auto[^}]*scroll-snap-type:x proximity/,
+  'as 13 etapas do Kanban devem permanecer navegáveis em telas estreitas');
 
 console.log('responsive-mobile.test.cjs: breakpoints, toque, galerias, tabelas e drawer OK');

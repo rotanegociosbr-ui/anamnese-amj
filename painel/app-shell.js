@@ -3,6 +3,7 @@
 
   const ROUTES = Object.freeze({
     inicio: Object.freeze({ title: 'Início', legacy: 'inicio', group: 'principal' }),
+    crm: Object.freeze({ title: 'CRM Leads', legacy: 'crm', owner: true, group: 'principal' }),
     procedimentos: Object.freeze({ title: 'Procedimentos', legacy: 'operacao', owner: true, group: 'principal' }),
     clientes: Object.freeze({ title: 'Clientes', legacy: 'financeiro', owner: true, financeView: 'clientes', group: 'principal' }),
     produtos: Object.freeze({ title: 'Produtos', legacy: 'financeiro', owner: true, financeView: 'produtos', group: 'principal' }),
@@ -18,11 +19,17 @@
     prontuarios: Object.freeze({ title: 'Fotos e prontuários', legacy: 'prontuarios', owner: true, group: 'secondary' })
   });
 
-  const PRIMARY_ORDER = ['inicio', 'procedimentos', 'clientes', 'agenda', 'receitas', 'despesas', 'produtos', 'marcas',
+  const PRIMARY_ORDER = ['inicio', 'crm', 'procedimentos', 'clientes', 'agenda', 'receitas', 'despesas', 'produtos', 'marcas',
     'fornecedores', 'estoque', 'cotacoes', 'fichas', 'gestao'];
   const SECONDARY_ORDER = ['prontuarios'];
   const STORAGE_ROUTE = 'amj_shell_route';
   const MODULES = Object.freeze({
+    crm: Object.freeze({
+      global: 'AMJCRMLeads',
+      src: './crm.js?v=20260826-1',
+      css: './crm.css?v=20260826-1',
+      root: 'crm-root'
+    }),
     operacao: Object.freeze({
       global: 'AMJOperacaoClinica',
       src: './operacao.js?v=20260824-5',
@@ -42,6 +49,7 @@
 
   const ICONS = Object.freeze({
     inicio: '<path d="M3 10.5 10 4l7 6.5v6.2a1.3 1.3 0 0 1-1.3 1.3H4.3A1.3 1.3 0 0 1 3 16.7Z"/><path d="M7.5 18v-5h5v5"/>',
+    crm: '<path d="M3 4h14l-5.5 6v5l-3 1.5V10Z"/><path d="M13.5 13.5h3M15 12v3"/>',
     procedimentos: '<path d="M6.5 4.5h7v12h-7z"/><path d="M8.5 2.5h3v3h-3zM8.5 9.5h3M10 8v3M14 7h2.5M14 10h2.5M14 13h2.5"/>',
     clientes: '<circle cx="8" cy="7" r="3"/><path d="M2.8 17c.6-3 2.3-4.5 5.2-4.5s4.6 1.5 5.2 4.5M14 7.5a2.5 2.5 0 0 1 0 5M14.5 13.5c1.5.5 2.4 1.6 2.7 3.5"/>',
     produtos: '<path d="M5 3.5h10v13H5zM7.5 1.8h5v3.5h-5zM7.5 9h5M10 6.5v5"/>',
@@ -141,7 +149,7 @@
         '<div class="app-shell-session"></div></header>' +
         '<div class="app-shell-content" id="app-shell-content"></div></div>' +
       '<nav class="app-shell-mobile-bar" aria-label="Atalhos no celular">' +
-        navButton('inicio', true) + navButton('procedimentos', true) + navButton('agenda', true) +
+        navButton('inicio', true) + navButton('crm', true) + navButton('procedimentos', true) + navButton('agenda', true) +
         '<button class="app-mobile-action" type="button" data-shell-open-menu aria-expanded="false" aria-controls="app-shell-sidebar">' + icon('mais') + '<span>Mais</span></button>' +
       '</nav><p class="app-shell-route-status" role="status" aria-live="polite"></p>';
 
@@ -209,7 +217,7 @@
       setControlAccess(button, allowed);
     });
 
-    ['operacao', 'gestao', 'cotacoes'].forEach(function (legacy) {
+    ['crm', 'operacao', 'gestao', 'cotacoes'].forEach(function (legacy) {
       const button = byId('aba-bt-' + legacy);
       if (!button) return;
       const allowed = owner;
@@ -242,6 +250,28 @@
     if (state.authenticated) document.title = route.title + ' — Ana Maria Jacob Estética';
   }
 
+  function ensureModuleStyle(legacy, config) {
+    if (!config || !config.css) return Promise.resolve();
+    const selector = 'link[data-app-module-style="' + CSS.escape(legacy) + '"]';
+    const existing = document.querySelector(selector);
+    if (existing && (existing.dataset.loaded === 'true' || existing.sheet)) return Promise.resolve();
+    return new Promise(function (resolve, reject) {
+      const link = existing || document.createElement('link');
+      const loaded = function () { link.dataset.loaded = 'true'; resolve(); };
+      link.addEventListener('load', loaded, { once: true });
+      link.addEventListener('error', function () {
+        if (!existing) link.remove();
+        reject(new Error('Não foi possível carregar o visual desta área agora.'));
+      }, { once: true });
+      if (!existing) {
+        link.rel = 'stylesheet';
+        link.href = config.css;
+        link.dataset.appModuleStyle = legacy;
+        document.head.appendChild(link);
+      }
+    });
+  }
+
   function ensureModule(legacy) {
     const config = MODULES[legacy];
     if (!config) return Promise.resolve(null);
@@ -253,17 +283,19 @@
     };
     if (window[config.global]) return Promise.resolve(prepare(window[config.global]));
     if (state.scripts.has(legacy)) return state.scripts.get(legacy);
-    const promise = new Promise(function (resolve, reject) {
-      const script = document.createElement('script');
-      script.src = config.src;
-      script.async = true;
-      script.onload = function () {
-        const api = window[config.global];
-        if (!api) { reject(new Error('O módulo foi carregado, mas não iniciou.')); return; }
-        resolve(prepare(api));
-      };
-      script.onerror = function () { reject(new Error('Não foi possível carregar esta área agora.')); };
-      document.head.appendChild(script);
+    const promise = ensureModuleStyle(legacy, config).then(function () {
+      return new Promise(function (resolve, reject) {
+        const script = document.createElement('script');
+        script.src = config.src;
+        script.async = true;
+        script.onload = function () {
+          const api = window[config.global];
+          if (!api) { reject(new Error('O módulo foi carregado, mas não iniciou.')); return; }
+          resolve(prepare(api));
+        };
+        script.onerror = function () { reject(new Error('Não foi possível carregar esta área agora.')); };
+        document.head.appendChild(script);
+      });
     }).catch(function (error) {
       state.scripts.delete(legacy);
       throw error;
@@ -419,6 +451,12 @@
         const selector = '[data-financeiro-editar="' + CSS.escape(type) + '"][data-financeiro-id="' + CSS.escape(id) + '"]';
         const button = await waitForElement(selector, 5000);
         if (button) { button.click(); return true; }
+      } else if (type === 'lead') {
+        await navigate('crm', { source: 'open-existing', focus: false });
+        if (window.AMJCRMLeads && typeof window.AMJCRMLeads.abrirLead === 'function') {
+          await window.AMJCRMLeads.abrirLead(id);
+          return true;
+        }
       } else if (['atendimento', 'procedimento'].includes(type)) {
         await navigate('procedimentos', { source: 'open-existing', focus: false });
         if (window.AMJOperacaoClinica && typeof window.AMJOperacaoClinica.abrirAtendimento === 'function') {
@@ -508,6 +546,14 @@
       } else if (filterName) {
         const filter = document.querySelector('.agenda-filtro[data-agenda-filtro="' + filterName + '"],.agenda-resumo[data-agenda-filtro="' + filterName + '"]');
         if (filter) filter.click();
+      }
+    } else if (routeName === 'crm' && window.AMJCRMLeads) {
+      if (action === 'novo-lead' && typeof window.AMJCRMLeads.novoLead === 'function') {
+        window.AMJCRMLeads.novoLead();
+      } else if (action === 'leads-abertos' && typeof window.AMJCRMLeads.aplicarFiltro === 'function') {
+        window.AMJCRMLeads.aplicarFiltro('abertos');
+      } else if (action === 'acoes-vencidas' && typeof window.AMJCRMLeads.aplicarFiltro === 'function') {
+        window.AMJCRMLeads.aplicarFiltro('vencidos');
       }
     } else if (routeName === 'clientes' && action === 'novo-cliente') handleAppAction('new-client');
     else if (routeName === 'estoque' && action === 'nova-compra') handleAppAction('new-purchase');
@@ -620,6 +666,17 @@
       if (installmentMetric) installmentMetric.textContent = 'Financeiro indisponível — abra para tentar novamente';
       if (stockMetric) stockMetric.textContent = 'Estoque indisponível — abra para tentar novamente';
     }
+  }
+
+  function updateCrmSummary(detail) {
+    const data = detail && typeof detail === 'object' ? detail : {};
+    const open = document.querySelector('[data-shell-metric="crm-abertos"]');
+    const overdue = document.querySelector('[data-shell-metric="crm-vencidos"]');
+    const openCount = Number(data.open == null ? data.abertos : data.open);
+    const overdueCount = Number(data.overdue == null ? data.vencidos : data.overdue);
+    if (open && Number.isFinite(openCount)) open.textContent = openCount + (openCount === 1 ? ' lead aberto' : ' leads abertos');
+    if (overdue && Number.isFinite(overdueCount)) overdue.textContent = overdueCount +
+      (overdueCount === 1 ? ' próxima ação vencida' : ' próximas ações vencidas');
   }
 
   function observeMetrics() {
@@ -752,6 +809,10 @@
       void openExisting(event.detail || {});
     });
 
+    window.addEventListener('amj:crm-summary', function (event) {
+      updateCrmSummary(event.detail || {});
+    });
+
     const financeContent = byId('financeiro-conteudo');
     if (financeContent) {
       const financeObserver = new MutationObserver(function () {
@@ -798,7 +859,7 @@
     state.accessObserver.observe(list, { attributes: true, attributeFilter: ['class', 'hidden'] });
     const identity = byId('usuario-detalhes');
     if (identity) state.accessObserver.observe(identity, { childList: true, subtree: true });
-    ['aba-bt-financeiro', 'aba-bt-prontuarios', 'aba-bt-cotacoes'].forEach(function (id) {
+    ['aba-bt-crm', 'aba-bt-financeiro', 'aba-bt-prontuarios', 'aba-bt-cotacoes'].forEach(function (id) {
       const button = byId(id);
       if (button) state.accessObserver.observe(button, { attributes: true, attributeFilter: ['hidden', 'disabled'] });
     });

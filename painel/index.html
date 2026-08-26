@@ -19,7 +19,7 @@
 <link href="./operacao.css?v=20260824-5" rel="stylesheet">
 <link href="./gestao.css?v=20260824-2" rel="stylesheet">
 <link href="./cotacoes.css?v=20260824-2" rel="stylesheet">
-<link href="./app-shell.css?v=20260824-4" rel="stylesheet">
+<link href="./app-shell.css?v=20260826-1" rel="stylesheet">
 <style>
 :root{
   --gelo:#FDFBF8;--dourado:#85611D;--linha:#E7D8BE;--tinta:#1B1917;
@@ -372,6 +372,7 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
     </div>
     <div class="abas" role="tablist" aria-label="Áreas do aplicativo Fichas">
       <button class="aba" id="aba-bt-inicio" type="button" role="tab" aria-selected="true" aria-controls="aba-inicio" tabindex="0">Início</button>
+      <button class="aba" id="aba-bt-crm" type="button" role="tab" aria-selected="false" aria-controls="aba-crm" tabindex="-1" hidden>CRM Leads</button>
       <button class="aba" id="aba-bt-fichas" type="button" role="tab" aria-selected="false" aria-controls="aba-fichas" tabindex="-1">Fichas</button>
       <button class="aba" id="aba-bt-agenda" type="button" role="tab" aria-selected="false" aria-controls="aba-agenda" tabindex="-1">Agenda e retornos</button>
       <button class="aba" id="aba-bt-prontuarios" type="button" role="tab" aria-selected="false" aria-controls="aba-prontuarios" tabindex="-1" hidden>Prontuários</button>
@@ -389,6 +390,16 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
       </header>
 
       <div class="app-prioridades" aria-label="Atalhos das atividades de hoje">
+        <button class="app-prioridade" type="button" data-shell-route="crm" data-shell-action="leads-abertos">
+          <span class="app-prioridade-icone" aria-hidden="true">CRM</span>
+          <span><strong>Leads em andamento</strong><small data-shell-metric="crm-abertos">Carrega ao abrir CRM Leads</small></span>
+          <span class="app-prioridade-seta" aria-hidden="true">→</span>
+        </button>
+        <button class="app-prioridade" type="button" data-shell-route="crm" data-shell-action="acoes-vencidas">
+          <span class="app-prioridade-icone" aria-hidden="true">!</span>
+          <span><strong>Próximas ações vencidas</strong><small data-shell-metric="crm-vencidos">Carrega ao abrir CRM Leads</small></span>
+          <span class="app-prioridade-seta" aria-hidden="true">→</span>
+        </button>
         <button class="app-prioridade" type="button" data-shell-route="agenda" data-shell-agenda-filter="hoje">
           <span class="app-prioridade-icone" aria-hidden="true">01</span>
           <span><strong>Agenda de hoje</strong><small data-shell-metric="agenda-hoje">Atualizando agenda…</small></span>
@@ -422,6 +433,7 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
           <span>Uma tela por vez, sem perder o contexto</span>
         </div>
         <div class="app-atalhos-grid">
+          <button type="button" data-shell-route="crm" data-shell-action="novo-lead"><strong>Novo lead</strong><span>Cadastro rápido, origem e próxima ação</span></button>
           <button type="button" data-shell-route="procedimentos" data-shell-action="novo-procedimento"><strong>Novo procedimento</strong><span>Paciente, itens, produtos, fotos e retorno</span></button>
           <button type="button" data-shell-route="procedimentos" data-shell-action="fotos-atendimento"><strong>Adicionar ou tirar fotos</strong><span>Escolha a paciente e a consulta certa</span></button>
           <button type="button" data-shell-route="clientes" data-shell-action="novo-cliente"><strong>Cadastrar cliente</strong><span>Pesquise antes e abra um cadastro existente</span></button>
@@ -448,6 +460,10 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
         </div>
         <p class="app-fluxo-seguro">Localize a pessoa antes de criar. O sistema nunca une duas pacientes apenas pelo nome, e as fotos ficam privadas dentro da consulta selecionada.</p>
       </section>
+    </section>
+
+    <section class="painel-aba oculto" id="aba-crm" role="tabpanel" aria-labelledby="aba-bt-crm" hidden>
+      <div id="crm-root"></div>
     </section>
 
     <section class="painel-aba oculto" id="aba-fichas" role="tabpanel" aria-labelledby="aba-bt-fichas" hidden>
@@ -1012,7 +1028,7 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
 <script src="./auth-mfa.js?v=20260819-3"></script>
 <script src="./financeiro.js?v=20260824-2"></script>
 <script src="./prontuario.js?v=20260824-3"></script>
-<script src="./app-shell.js?v=20260824-8"></script>
+<script src="./app-shell.js?v=20260826-1"></script>
 <script>
 const SUPABASE_URL = 'https://rjxtxoqprnumouqakxbc.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_Ip14p4tUfYFjwUYaWinMlw_Gf9v0YwT';
@@ -1740,6 +1756,7 @@ function limparEstadoAplicativo() {
   agendaCarregada = false;
   identidadeBackend = null;
   if (window.AMJFinanceiro) window.AMJFinanceiro.reset();
+  if (window.AMJCRMLeads) window.AMJCRMLeads.reset();
   if (window.AMJProntuario) window.AMJProntuario.reset();
   if (window.AMJOperacaoClinica) window.AMJOperacaoClinica.reset();
   if (window.AMJGestaoAdministrativa) window.AMJGestaoAdministrativa.reset();
@@ -2515,7 +2532,7 @@ function agendaIniciarPolling() {
 }
 
 function agendaAtivarAba(nome, moverFoco) {
-  const abas = ['inicio', 'fichas', 'agenda', 'prontuarios', 'financeiro', 'operacao', 'gestao', 'cotacoes'];
+  const abas = ['inicio', 'crm', 'fichas', 'agenda', 'prontuarios', 'financeiro', 'operacao', 'gestao', 'cotacoes'];
   let ativa = abas.includes(nome) ? nome : 'inicio';
   if (!['inicio', 'fichas'].includes(ativa)) {
     const botaoSolicitado = el('aba-bt-' + ativa);
@@ -2532,6 +2549,7 @@ function agendaAtivarAba(nome, moverFoco) {
   });
   if (moverFoco) el('aba-bt-' + ativa).focus();
   if (ativa === 'agenda' && !agendaCarregada) carregarAgenda();
+  if (ativa === 'crm' && window.AMJCRMLeads) window.AMJCRMLeads.ativar();
   if (ativa === 'prontuarios' && window.AMJProntuario) window.AMJProntuario.ativar();
   if (ativa === 'financeiro' && window.AMJFinanceiro) window.AMJFinanceiro.ativar();
   if (ativa === 'operacao' && window.AMJOperacaoClinica && typeof window.AMJOperacaoClinica.ativar === 'function') {
@@ -2771,6 +2789,7 @@ async function agendaMarcarLembrete(agendamento, lembrete, botao) {
 }
 
 el('aba-bt-inicio').addEventListener('click', () => agendaAtivarAba('inicio', false));
+el('aba-bt-crm').addEventListener('click', () => agendaAtivarAba('crm', false));
 el('aba-bt-fichas').addEventListener('click', () => agendaAtivarAba('fichas', false));
 el('aba-bt-agenda').addEventListener('click', () => agendaAtivarAba('agenda', false));
 el('aba-bt-prontuarios').addEventListener('click', () => agendaAtivarAba('prontuarios', false));
@@ -2781,7 +2800,7 @@ el('aba-bt-cotacoes').addEventListener('click', () => agendaAtivarAba('cotacoes'
 document.querySelector('.abas').addEventListener('keydown', evento => {
   if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(evento.key)) return;
   evento.preventDefault();
-  const disponiveis = ['inicio', 'fichas', 'agenda', 'prontuarios', 'financeiro', 'operacao', 'gestao', 'cotacoes'].filter(chave => {
+  const disponiveis = ['inicio', 'crm', 'fichas', 'agenda', 'prontuarios', 'financeiro', 'operacao', 'gestao', 'cotacoes'].filter(chave => {
     const botao = el('aba-bt-' + chave);
     return !botao.hidden && !botao.disabled;
   });
