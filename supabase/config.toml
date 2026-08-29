@@ -127,3 +127,11 @@ enabled = true
 verify_jwt = false
 import_map = "./functions/ia-copiloto-fichas/deno.json"
 entrypoint = "./functions/ia-copiloto-fichas/index.ts"
+
+[functions.integracoes-fichas]
+enabled = true
+# Fase 5A somente leitura. O handler valida internamente Bearer, sessao ativa,
+# owner e AAL2. Todas as integracoes e chamadas externas seguem desativadas.
+verify_jwt = false
+import_map = "./functions/integracoes-fichas/deno.json"
+entrypoint = "./functions/integracoes-fichas/index.ts"

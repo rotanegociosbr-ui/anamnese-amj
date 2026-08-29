@@ -13,7 +13,8 @@ const privateFunctions = [
   'prontuario-fichas',
   'operacao-clinica-fichas',
   'gestao-administrativa-fichas',
-  'cotacoes-fichas'
+  'cotacoes-fichas',
+  'integracoes-fichas'
 ];
 
 const shared = read('supabase', 'functions', '_shared', 'dual-auth.ts');
@@ -27,7 +28,7 @@ for (const name of privateFunctions) {
   assert.doesNotMatch(source,
     /legacy_shared_secret|legacyHash|legacyClinicId|PAINEL_HASH_SENHA|["']x-senha["']/,
     `${name} não pode aceitar ou configurar senha compartilhada.`);
-  assert.match(source, /authenticateDual\s*\(/,
+  assert.match(source, /(?:authenticateDual\s*\(|authenticate:\s*authenticateDual[\s\S]*?deps\.authenticate\s*\()/,
     `${name} precisa validar a sessão individual no servidor.`);
   assert.match(source, /allowedRoles:\s*\["owner"\]/,
     `${name} precisa restringir dados privados aos proprietários.`);

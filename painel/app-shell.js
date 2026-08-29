@@ -18,11 +18,12 @@
     cotacoes: Object.freeze({ title: 'Cotações e preços', legacy: 'cotacoes', owner: true, group: 'principal' }),
     fichas: Object.freeze({ title: 'Fichas', legacy: 'fichas', group: 'principal' }),
     gestao: Object.freeze({ title: 'Gestão', legacy: 'gestao', owner: true, group: 'principal' }),
+    integracoes: Object.freeze({ title: 'Integrações', legacy: 'integracoes', owner: true, group: 'principal' }),
     prontuarios: Object.freeze({ title: 'Fotos e prontuários', legacy: 'prontuarios', owner: true, group: 'secondary' })
   });
 
   const PRIMARY_ORDER = ['inicio', 'crm', 'marketing', 'procedimentos', 'acompanhamentos', 'clientes', 'agenda', 'receitas', 'despesas', 'produtos', 'marcas',
-    'fornecedores', 'estoque', 'cotacoes', 'fichas', 'gestao'];
+    'fornecedores', 'estoque', 'cotacoes', 'fichas', 'gestao', 'integracoes'];
   const SECONDARY_ORDER = ['prontuarios'];
   const STORAGE_ROUTE = 'amj_shell_route';
   const MODULES = Object.freeze({
@@ -59,6 +60,12 @@
       src: './cotacoes.js?v=20260824-1',
       root: 'cotacoes-root'
     }),
+    integracoes: Object.freeze({
+      global: 'AMJIntegracoes',
+      src: './integracoes.js?v=20260829-1',
+      css: './integracoes.css?v=20260829-1',
+      root: 'integracoes-root'
+    }),
     copiloto: Object.freeze({
       global: 'AMJCopiloto',
       src: './copiloto.js?v=20260829-1',
@@ -83,6 +90,7 @@
     cotacoes: '<path d="M3 5h14v11H3z"/><path d="M3 8h14M6 12h2M12 11.5c-.4-.5-1-.7-1.6-.5-.7.2-.9 1.1-.3 1.5l1.5.7c.7.4.5 1.4-.2 1.6-.7.2-1.4 0-1.8-.5M11 10v1M11 15v1"/>',
     fichas: '<path d="M5 2.5h7l3 3V18H5z"/><path d="M12 2.5V6h3M7.5 10h5M7.5 13h5M7.5 16h3"/>',
     gestao: '<path d="M3 17V9h3v8M8.5 17V5h3v12M14 17V2.5h3V17M2 17.5h16"/>',
+    integracoes: '<path d="M7.5 6.5 5 4 2.5 6.5 5 9Zm5 7 2.5-2.5 2.5 2.5L15 16ZM8 8l4 4M12 8l-4 4"/>',
     prontuarios: '<rect x="2.5" y="4" width="15" height="12" rx="2"/><circle cx="7" cy="8" r="1.5"/><path d="m4.5 14 4-3 2.5 2 2.5-2 2 3"/>',
     acompanhamentos: '<circle cx="10" cy="10" r="7.5"/><path d="M10 5.5V10l3 2M4 4l2 2M16 4l-2 2"/>',
     copiloto: '<path d="m10 2 1.2 4.2L15 8l-3.8 1.8L10 14l-1.2-4.2L5 8l3.8-1.8Z"/><path d="m15.5 13 .6 2.1L18 16l-1.9.9-.6 2.1-.6-2.1L13 16l1.9-.9Z"/>',
@@ -247,7 +255,7 @@
     });
     if (owner) void ensureModuleStyle('copiloto', MODULES.copiloto).catch(function () {});
 
-    ['crm', 'marketing', 'operacao', 'acompanhamentos', 'gestao', 'cotacoes'].forEach(function (legacy) {
+    ['crm', 'marketing', 'operacao', 'acompanhamentos', 'gestao', 'cotacoes', 'integracoes'].forEach(function (legacy) {
       const button = byId('aba-bt-' + legacy);
       if (!button) return;
       const allowed = owner;
@@ -261,6 +269,9 @@
     }
     if (window.AMJCotacoes && typeof window.AMJCotacoes.atualizarAcesso === 'function') {
       window.AMJCotacoes.atualizarAcesso();
+    }
+    if (window.AMJIntegracoes && typeof window.AMJIntegracoes.atualizarAcesso === 'function') {
+      window.AMJIntegracoes.atualizarAcesso();
     }
     if (!routeAllowed(ROUTES[state.currentRoute]) && state.authenticated) {
       void navigate('inicio', { source: 'access', focus: false, persist: false });
@@ -892,6 +903,7 @@
       document.body.classList.toggle('app-shell-authenticated', authenticated);
       if (!authenticated) {
         if (window.AMJCotacoes && typeof window.AMJCotacoes.reset === 'function') window.AMJCotacoes.reset();
+        if (window.AMJIntegracoes && typeof window.AMJIntegracoes.reset === 'function') window.AMJIntegracoes.reset();
         if (window.AMJAcompanhamentos && typeof window.AMJAcompanhamentos.reset === 'function') window.AMJAcompanhamentos.reset();
         if (window.AMJMarketing && typeof window.AMJMarketing.reset === 'function') window.AMJMarketing.reset();
         if (window.AMJCopiloto && typeof window.AMJCopiloto.reset === 'function') window.AMJCopiloto.reset();
@@ -920,7 +932,7 @@
     state.accessObserver.observe(list, { attributes: true, attributeFilter: ['class', 'hidden'] });
     const identity = byId('usuario-detalhes');
     if (identity) state.accessObserver.observe(identity, { childList: true, subtree: true });
-    ['aba-bt-crm', 'aba-bt-marketing', 'aba-bt-financeiro', 'aba-bt-prontuarios', 'aba-bt-cotacoes'].forEach(function (id) {
+    ['aba-bt-crm', 'aba-bt-marketing', 'aba-bt-financeiro', 'aba-bt-prontuarios', 'aba-bt-cotacoes', 'aba-bt-integracoes'].forEach(function (id) {
       const button = byId(id);
       if (button) state.accessObserver.observe(button, { attributes: true, attributeFilter: ['hidden', 'disabled'] });
     });

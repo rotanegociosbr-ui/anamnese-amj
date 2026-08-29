@@ -382,6 +382,7 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
       <button class="aba" id="aba-bt-acompanhamentos" type="button" role="tab" aria-selected="false" aria-controls="aba-acompanhamentos" tabindex="-1" hidden>Acompanhamentos</button>
       <button class="aba" id="aba-bt-gestao" type="button" role="tab" aria-selected="false" aria-controls="aba-gestao" tabindex="-1" hidden>Gestão e auditoria</button>
       <button class="aba" id="aba-bt-cotacoes" type="button" role="tab" aria-selected="false" aria-controls="aba-cotacoes" tabindex="-1" hidden>Cotações e preços</button>
+      <button class="aba" id="aba-bt-integracoes" type="button" role="tab" aria-selected="false" aria-controls="aba-integracoes" tabindex="-1" hidden>Integrações</button>
     </div>
 
     <section class="painel-aba app-inicio" id="aba-inicio" role="tabpanel" aria-labelledby="aba-bt-inicio">
@@ -981,6 +982,10 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
     <section class="painel-aba oculto" id="aba-cotacoes" role="tabpanel" aria-labelledby="aba-bt-cotacoes" hidden>
       <div id="cotacoes-root"></div>
     </section>
+
+    <section class="painel-aba oculto" id="aba-integracoes" role="tabpanel" aria-labelledby="aba-bt-integracoes" hidden>
+      <div id="integracoes-root"></div>
+    </section>
   </section>
 
 </main>
@@ -1040,7 +1045,7 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
 <script src="./auth-mfa.js?v=20260819-3"></script>
 <script src="./financeiro.js?v=20260824-2"></script>
 <script src="./prontuario.js?v=20260826-1"></script>
-<script src="./app-shell.js?v=20260829-1"></script>
+<script src="./app-shell.js?v=20260829-2"></script>
 <script>
 const SUPABASE_URL = 'https://rjxtxoqprnumouqakxbc.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_Ip14p4tUfYFjwUYaWinMlw_Gf9v0YwT';
@@ -1306,6 +1311,7 @@ function atualizarIdentidade(dados) {
   if (window.AMJGestaoAdministrativa) window.AMJGestaoAdministrativa.atualizarAcesso();
   if (window.AMJAcompanhamentos) window.AMJAcompanhamentos.atualizarAcesso();
   if (window.AMJMarketing) window.AMJMarketing.atualizarAcesso();
+  if (window.AMJIntegracoes) window.AMJIntegracoes.atualizarAcesso();
 }
 
 async function cabecalhosAcesso(comJson, provaSenha) {
@@ -1776,6 +1782,7 @@ function limparEstadoAplicativo() {
   if (window.AMJGestaoAdministrativa) window.AMJGestaoAdministrativa.reset();
   if (window.AMJAcompanhamentos) window.AMJAcompanhamentos.reset();
   if (window.AMJMarketing) window.AMJMarketing.reset();
+  if (window.AMJIntegracoes) window.AMJIntegracoes.reset();
   agendaAtivarAba('inicio', false);
   if (sessaoMonitor) clearInterval(sessaoMonitor);
   sessaoMonitor = null;
@@ -2548,7 +2555,7 @@ function agendaIniciarPolling() {
 }
 
 function agendaAtivarAba(nome, moverFoco) {
-  const abas = ['inicio', 'crm', 'marketing', 'fichas', 'agenda', 'prontuarios', 'financeiro', 'operacao', 'acompanhamentos', 'gestao', 'cotacoes'];
+  const abas = ['inicio', 'crm', 'marketing', 'fichas', 'agenda', 'prontuarios', 'financeiro', 'operacao', 'acompanhamentos', 'gestao', 'cotacoes', 'integracoes'];
   let ativa = abas.includes(nome) ? nome : 'inicio';
   if (!['inicio', 'fichas'].includes(ativa)) {
     const botaoSolicitado = el('aba-bt-' + ativa);
@@ -2557,13 +2564,14 @@ function agendaAtivarAba(nome, moverFoco) {
   abas.forEach(chave => {
     const botao = el('aba-bt-' + chave);
     const painel = el('aba-' + chave);
+    if (!botao || !painel) return;
     const selecionada = chave === ativa;
     botao.setAttribute('aria-selected', String(selecionada));
     botao.tabIndex = selecionada ? 0 : -1;
     painel.classList.toggle('oculto', !selecionada);
     painel.hidden = !selecionada;
   });
-  if (moverFoco) el('aba-bt-' + ativa).focus();
+  if (moverFoco && el('aba-bt-' + ativa)) el('aba-bt-' + ativa).focus();
   if (ativa === 'agenda' && !agendaCarregada) carregarAgenda();
   if (ativa === 'crm' && window.AMJCRMLeads) window.AMJCRMLeads.ativar();
   if (ativa === 'marketing' && window.AMJMarketing) window.AMJMarketing.ativar();
@@ -2577,6 +2585,7 @@ function agendaAtivarAba(nome, moverFoco) {
   }
   if (ativa === 'gestao' && window.AMJGestaoAdministrativa) window.AMJGestaoAdministrativa.ativar();
   if (ativa === 'cotacoes' && window.AMJCotacoes) window.AMJCotacoes.ativar();
+  if (ativa === 'integracoes' && window.AMJIntegracoes) window.AMJIntegracoes.ativar();
 }
 
 function agendaAtualizarEstadoCentral() {
@@ -2818,10 +2827,11 @@ el('aba-bt-financeiro').addEventListener('click', () => agendaAtivarAba('finance
 el('aba-bt-operacao').addEventListener('click', () => agendaAtivarAba('operacao', false));
 el('aba-bt-gestao').addEventListener('click', () => agendaAtivarAba('gestao', false));
 el('aba-bt-cotacoes').addEventListener('click', () => agendaAtivarAba('cotacoes', false));
+el('aba-bt-integracoes').addEventListener('click', () => agendaAtivarAba('integracoes', false));
 document.querySelector('.abas').addEventListener('keydown', evento => {
   if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(evento.key)) return;
   evento.preventDefault();
-  const disponiveis = ['inicio', 'crm', 'fichas', 'agenda', 'prontuarios', 'financeiro', 'operacao', 'gestao', 'cotacoes'].filter(chave => {
+  const disponiveis = ['inicio', 'crm', 'fichas', 'agenda', 'prontuarios', 'financeiro', 'operacao', 'gestao', 'cotacoes', 'integracoes'].filter(chave => {
     const botao = el('aba-bt-' + chave);
     return !botao.hidden && !botao.disabled;
   });

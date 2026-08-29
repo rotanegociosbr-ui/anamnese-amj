@@ -27,7 +27,7 @@ Maria Jacob Estética.
 - `/painel/` — acesso restrito da equipe, com filtros para anamneses e TCLEs,
   links de convite, QR codes, acesso aos PDFs armazenados e o módulo interno
   **Agenda e retornos**; proprietários autenticados com MFA também recebem a
-  aba privada **Financeiro**
+  aba privada **Financeiro** e a **Central de integrações** somente leitura
 
 Domínio: `anamariajacob.com.br`
 
@@ -90,6 +90,38 @@ origem, senha, conteúdo, transições de estado e idempotência; somente ela us
 acesso para `public`, `anon` ou `authenticated` e não armazenam a senha. Dados da
 agenda e credenciais também não devem ser gravados em `localStorage`, exibidos
 em notificações ou registrados em logs.
+
+## Central de integrações — Fase 5A
+
+A área privada **Integrações** apresenta o inventário das conexões futuras com
+site, WhatsApp oficial, calendário, pagamentos online e outras APIs autorizadas.
+Nesta fase ela é deliberadamente somente leitura: todos os conectores aparecem
+como **Desativados**, **Não verificados** e **Sem conexão externa**.
+
+O catálogo usa um adaptador nulo que interrompe qualquer tentativa antes de um
+transporte externo. A Fase 5A não possui botão de conectar, autorização OAuth,
+webhook público, envio de mensagem, sincronização de calendário, cobrança,
+consulta bancária, SDK de provedor ou segredo de integração. Portanto, ela não
+cria custo externo. O site, a anamnese, os TCLEs, a agenda interna, o financeiro
+administrativo e o modo inteligente gratuito por regras continuam funcionando
+como antes; o item “site” na Central representa apenas uma integração futura.
+
+Arquivos principais:
+
+- `painel/integracoes.js` e `painel/integracoes.css` — módulo responsivo e
+  somente leitura da Central;
+- `supabase/functions/integracoes-fichas/` — endpoint privado de status,
+  protegido por conta individual `owner` e MFA `aal2`, sem chamar provedores;
+- `supabase/config.toml` — registro da Edge Function privada.
+
+Antes da Fase 5B, cada integração exige decisão explícita de provedor, análise
+do contrato oficial vigente, custos conhecidos e autorizados, credenciais em
+secrets do servidor, ambiente de testes e critérios próprios de segurança. Um
+webhook futuro deverá validar assinatura sobre o corpo bruto, deduplicar eventos
+e impedir replay antes de qualquer efeito. Filas futuras deverão ser duráveis,
+carregar preferencialmente referências em vez de dados clínicos e possuir
+reconciliação e tratamento de falhas. Nenhum desses mecanismos está ativo na
+Fase 5A.
 
 ## Financeiro, estoque e operação clínica
 

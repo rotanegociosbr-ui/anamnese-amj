@@ -1,0 +1,44 @@
+.integracoes-shell{display:grid;gap:18px;color:#25211c}
+.integracoes-header{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;padding:24px;border:1px solid #e7d8be;border-radius:18px;background:linear-gradient(135deg,#fff 0%,#fbf6ee 100%);box-shadow:0 12px 34px rgba(67,47,19,.07)}
+.integracoes-header>div{min-width:0}
+.integracoes-header p{margin:0 0 5px;color:#85611d;font-size:.76rem;font-weight:600;letter-spacing:.11em;text-transform:uppercase}
+.integracoes-header h2{margin:0;color:#29231d;font-family:'Cormorant Garamond',Georgia,serif;font-size:clamp(2rem,4vw,2.8rem);line-height:1}
+.integracoes-header span{display:block;max-width:690px;margin-top:9px;color:#6b6560;line-height:1.6}
+.integracoes-header button{flex:0 0 auto;min-height:44px;padding:10px 17px;border:1px solid #85611d;border-radius:11px;background:#85611d;color:#fff;font:600 .88rem 'Poppins',sans-serif;cursor:pointer}
+.integracoes-header button:hover{background:#6f5018;border-color:#6f5018}
+.integracoes-header button:disabled{cursor:wait;opacity:.62}
+.integracoes-header button:focus-visible{outline:3px solid rgba(133,97,29,.28);outline-offset:3px}
+.integracoes-safe-note,.integracoes-site-note{display:grid;grid-template-columns:minmax(180px,260px) 1fr;gap:16px;padding:16px 18px;border-radius:14px}
+.integracoes-safe-note{border:1px solid #d7c397;background:#fbf7ed}
+.integracoes-site-note{border:1px solid #cddbcf;background:#f5faf5}
+.integracoes-safe-note strong{color:#76551b}.integracoes-site-note strong{color:#35623c}
+.integracoes-safe-note span,.integracoes-site-note span{color:#5f5953;line-height:1.55}
+.integracoes-status{min-height:24px;margin:0;padding:0 3px;color:#516a54;font-size:.9rem}
+.integracoes-status.erro{color:#963d3d}
+.integracoes-cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.integracoes-card{min-width:0;padding:20px;border:1px solid #e7d8be;border-radius:16px;background:#fff;box-shadow:0 7px 22px rgba(52,42,27,.05)}
+.integracoes-card header{display:flex;align-items:flex-start;gap:14px;margin-bottom:17px}
+.integracoes-symbol{display:grid;place-items:center;flex:0 0 48px;min-height:48px;border:1px solid #dfcda9;border-radius:14px;background:#faf4e8;color:#78581d;font-size:.73rem;font-weight:700;letter-spacing:.04em}
+.integracoes-card h3{margin:1px 0 4px;color:#2a251f;font-family:'Cormorant Garamond',Georgia,serif;font-size:1.55rem;line-height:1.1}
+.integracoes-card header p{margin:0;color:#716a63;font-size:.86rem;line-height:1.5}
+.integracoes-card dl{display:grid;gap:0;margin:0;border:1px solid #eee5d6;border-radius:12px;overflow:hidden}
+.integracoes-card dl div{display:flex;align-items:center;justify-content:space-between;gap:14px;min-height:45px;padding:9px 12px;background:#fdfbf8}
+.integracoes-card dl div+div{border-top:1px solid #eee5d6}
+.integracoes-card dt{color:#716a63;font-size:.78rem}
+.integracoes-card dd{display:flex;align-items:center;gap:7px;margin:0;color:#684a19;font-size:.8rem;font-weight:600;text-align:right}
+.integracoes-dot{width:8px;height:8px;border-radius:50%;background:#a33a3a;box-shadow:0 0 0 3px rgba(163,58,58,.1)}
+.integracoes-registry{margin:13px 2px 0;color:#706860;font-size:.75rem;line-height:1.45}
+.integracoes-footer{display:flex;align-items:flex-start;gap:18px;padding:17px 20px;border:1px dashed #d7c8ae;border-radius:14px;background:#fff;color:#625b54}
+.integracoes-footer strong{flex:0 0 270px;color:#443b31}.integracoes-footer span{line-height:1.55}
+@media(max-width:840px){
+  .integracoes-header{padding:20px}.integracoes-cards{grid-template-columns:1fr}
+  .integracoes-safe-note,.integracoes-site-note{grid-template-columns:1fr;gap:5px}
+  .integracoes-footer{display:grid;gap:5px}.integracoes-footer strong{flex-basis:auto}
+}
+@media(max-width:430.98px){
+  .integracoes-shell{gap:14px}.integracoes-header{display:grid;gap:16px;padding:17px;border-radius:15px}
+  .integracoes-header button{width:100%}.integracoes-card{padding:16px}
+  .integracoes-card dl div{align-items:flex-start;flex-direction:column;gap:3px;padding:10px 12px}
+  .integracoes-card dd{text-align:left}.integracoes-safe-note,.integracoes-site-note,.integracoes-footer{padding:14px 15px}
+}
+@media(prefers-reduced-motion:reduce){.integracoes-header button{transition:none}}
