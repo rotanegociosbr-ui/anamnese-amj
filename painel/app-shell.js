@@ -58,6 +58,12 @@
       global: 'AMJCotacoes',
       src: './cotacoes.js?v=20260824-1',
       root: 'cotacoes-root'
+    }),
+    copiloto: Object.freeze({
+      global: 'AMJCopiloto',
+      src: './copiloto.js?v=20260829-1',
+      css: './copiloto.css?v=20260829-1',
+      root: 'copiloto-root'
     })
   });
 
@@ -79,6 +85,7 @@
     gestao: '<path d="M3 17V9h3v8M8.5 17V5h3v12M14 17V2.5h3V17M2 17.5h16"/>',
     prontuarios: '<rect x="2.5" y="4" width="15" height="12" rx="2"/><circle cx="7" cy="8" r="1.5"/><path d="m4.5 14 4-3 2.5 2 2.5-2 2 3"/>',
     acompanhamentos: '<circle cx="10" cy="10" r="7.5"/><path d="M10 5.5V10l3 2M4 4l2 2M16 4l-2 2"/>',
+    copiloto: '<path d="m10 2 1.2 4.2L15 8l-3.8 1.8L10 14l-1.2-4.2L5 8l3.8-1.8Z"/><path d="m15.5 13 .6 2.1L18 16l-1.9.9-.6 2.1-.6-2.1L13 16l1.9-.9Z"/>',
     mais: '<circle cx="4" cy="10" r="1"/><circle cx="10" cy="10" r="1"/><circle cx="16" cy="10" r="1"/>'
   });
 
@@ -162,8 +169,11 @@
         '<button class="app-shell-menu-button" type="button" aria-expanded="false" aria-controls="app-shell-sidebar" aria-label="Abrir menu"><span></span></button>' +
         '<div class="app-shell-location"><span class="app-shell-breadcrumb">Fichas / área atual</span>' +
           '<h1 class="app-shell-current-title" id="app-shell-current-title" tabindex="-1">Início</h1></div>' +
-        '<div class="app-shell-session"></div></header>' +
+        '<div class="app-shell-topbar-actions"><button class="app-shell-copilot-button" type="button" data-copiloto-open ' +
+          'aria-expanded="false" aria-controls="copiloto-drawer" aria-label="Abrir Copiloto">' + icon('copiloto') +
+          '<span>Copiloto</span></button><div class="app-shell-session"></div></div></header>' +
         '<div class="app-shell-content" id="app-shell-content"></div></div>' +
+      '<div id="copiloto-root"></div>' +
       '<nav class="app-shell-mobile-bar" aria-label="Atalhos no celular">' +
         navButton('inicio', true) + navButton('crm', true) + navButton('procedimentos', true) + navButton('agenda', true) +
         '<button class="app-mobile-action" type="button" data-shell-open-menu aria-expanded="false" aria-controls="app-shell-sidebar">' + icon('mais') + '<span>Mais</span></button>' +
@@ -232,6 +242,10 @@
       const allowed = routeAllowed(route);
       setControlAccess(button, allowed);
     });
+    document.querySelectorAll('[data-copiloto-open]').forEach(function (button) {
+      setControlAccess(button, owner);
+    });
+    if (owner) void ensureModuleStyle('copiloto', MODULES.copiloto).catch(function () {});
 
     ['crm', 'marketing', 'operacao', 'acompanhamentos', 'gestao', 'cotacoes'].forEach(function (legacy) {
       const button = byId('aba-bt-' + legacy);
@@ -610,6 +624,21 @@
       window.dispatchEvent(new CustomEvent('amj:shell-route', {
         detail: Object.freeze({ route: routeName, legacy: route.legacy, source: settings.source || 'interface' })
       }));
+      if (window.AMJCopiloto && typeof window.AMJCopiloto.atualizarContexto === 'function') {
+        window.AMJCopiloto.atualizarContexto(routeName);
+      }
+      if (routeName === 'inicio' && isOwner()) {
+        void ensureModule('copiloto').then(function (api) {
+          if (api && typeof api.ativar === 'function') api.ativar({ foco: routeName });
+        }).catch(function () {
+          const home = byId('ai-home-root');
+          if (home) {
+            home.hidden = false;
+            home.innerHTML = '<section class="copiloto-home-card copiloto-state-error" role="alert"><strong>Copiloto indisponível.</strong>' +
+              '<span>As demais tarefas continuam funcionando normalmente.</span></section>';
+          }
+        });
+      }
       return true;
     } catch (error) {
       setRouteStatus(error && error.message ? error.message : 'Não foi possível abrir esta área agora.');
@@ -776,6 +805,19 @@
         });
         return;
       }
+      const copilotButton = event.target.closest('[data-copiloto-open]');
+      if (copilotButton) {
+        event.preventDefault();
+        copilotButton.setAttribute('aria-busy', 'true');
+        void ensureModule('copiloto').then(function (api) {
+          if (api && typeof api.abrir === 'function') api.abrir({ foco: state.currentRoute, gatilho: copilotButton });
+        }).catch(function (error) {
+          setRouteStatus(error && error.message ? error.message : 'Não foi possível abrir o Copiloto agora.');
+        }).finally(function () {
+          copilotButton.removeAttribute('aria-busy');
+        });
+        return;
+      }
       const appAction = event.target.closest('[data-app-action]');
       if (appAction) {
         event.preventDefault();
@@ -852,6 +894,7 @@
         if (window.AMJCotacoes && typeof window.AMJCotacoes.reset === 'function') window.AMJCotacoes.reset();
         if (window.AMJAcompanhamentos && typeof window.AMJAcompanhamentos.reset === 'function') window.AMJAcompanhamentos.reset();
         if (window.AMJMarketing && typeof window.AMJMarketing.reset === 'function') window.AMJMarketing.reset();
+        if (window.AMJCopiloto && typeof window.AMJCopiloto.reset === 'function') window.AMJCopiloto.reset();
         state.restoredForSession = false;
         document.title = 'Fichas, Agenda, Prontuários e Financeiro — Ana Maria Jacob Estética';
         closeDrawer(false);

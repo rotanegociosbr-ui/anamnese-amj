@@ -119,3 +119,11 @@ enabled = true
 verify_jwt = false
 import_map = "./functions/marketing-fichas/import_map.json"
 entrypoint = "./functions/marketing-fichas/index.ts"
+
+[functions.ia-copiloto-fichas]
+enabled = true
+# Compatibilidade com o padrao privado atual: o handler valida internamente
+# Bearer, sessao ativa, vinculo owner e AAL2 antes de ler o corpo.
+verify_jwt = false
+import_map = "./functions/ia-copiloto-fichas/deno.json"
+entrypoint = "./functions/ia-copiloto-fichas/index.ts"

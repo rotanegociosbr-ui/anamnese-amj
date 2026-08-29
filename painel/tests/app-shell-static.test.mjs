@@ -25,6 +25,8 @@ assert.doesNotMatch(html, /<link[^>]+href=["']\.\/crm\.css/i,
   'CSS do CRM deve ser carregado sob demanda pelo shell');
 assert.doesNotMatch(html, /<script[^>]+src=["']\.\/marketing\.js/i,
   'Marketing deve ser carregado sob demanda pelo shell');
+assert.doesNotMatch(html, /<script[^>]+src=["']\.\/copiloto\.js/i,
+  'Copiloto deve ser carregado sob demanda pelo shell');
 
 for (const route of ['inicio', 'crm', 'marketing', 'procedimentos', 'clientes', 'produtos', 'marcas', 'fornecedores', 'agenda',
   'receitas', 'despesas', 'estoque', 'fichas', 'gestao']) {
@@ -61,6 +63,16 @@ assert.match(js, /AMJOperacaoClinica\.abrirAtendimento\(id\)/,
   'atendimentos existentes devem abrir pela fonte operacional canônica');
 assert.match(js, /src: '\.\/crm\.js\?v=20260826-1'[\s\S]*?css: '\.\/crm\.css\?v=20260826-1'/,
   'CRM deve versionar e carregar JS/CSS sob demanda');
+assert.match(js, /copiloto: Object\.freeze\(\{[\s\S]*?global: 'AMJCopiloto'[\s\S]*?src: '\.\/copiloto\.js\?v=[^']+'[\s\S]*?css: '\.\/copiloto\.css\?v=[^']+'[\s\S]*?root: 'copiloto-root'/,
+  'shell deve registrar o Copiloto como módulo lazy');
+assert.match(js, /data-copiloto-open[\s\S]*?aria-controls="copiloto-drawer"/,
+  'topbar deve oferecer acesso global e acessível ao Copiloto');
+assert.match(js, /routeName === 'inicio'[\s\S]*?ensureModule\('copiloto'\)/,
+  'Início deve iniciar o briefing sem bloquear a navegação');
+assert.match(js, /AMJCopiloto\.reset\(\)/,
+  'logout deve limpar respostas e cancelar requisições do Copiloto');
+assert.doesNotMatch(js, /navButton\('copiloto', true\)/,
+  'Copiloto não deve criar uma sexta ação na barra móvel');
 assert.match(js, /AMJCRMLeads\.abrirLead\(id\)/,
   'Abrir existente deve encaminhar lead à fonte canônica do CRM');
 assert.match(js, /app-procedure-photo-shortcut[^>]*data-app-action="fotos-atendimento"[^>]*>Adicionar ou tirar fotos/,
@@ -82,6 +94,10 @@ assert.match(css, /\.app-shell-content\s*\{[\s\S]*?width:\s*min\(100%,\s*1580px\
 assert.match(html, /const abas = \['inicio', 'crm', 'marketing', 'fichas', 'agenda'/,
   'ativador legado deve reconhecer Início');
 assert.match(html, /id="aba-inicio"/, 'painel Início deve existir no HTML');
+assert.match(html, /id="ai-home-root"[^>]*hidden/,
+  'Início deve reservar uma região progressiva para o briefing gerencial');
+assert.match(html, /Dados observados são exibidos como reais; previsões aparecem identificadas como estimativas\./,
+  'Início deve separar fatos observados de previsões');
 assert.match(html, /id="aba-crm"[\s\S]*?id="crm-root"/,
   'painel CRM deve fornecer somente a raiz do módulo lazy');
 assert.match(html, /id="aba-marketing"[\s\S]*?id="marketing-root"/,
