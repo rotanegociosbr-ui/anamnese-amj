@@ -13,16 +13,16 @@ export type IntegrationId =
 export interface IntegrationStatusDto {
   id: IntegrationId;
   nome: string;
-  state: "disabled";
-  enabled: false;
-  verified: false;
+  state: "disabled" | "internal_active";
+  enabled: boolean;
+  verified: boolean;
   external_calls_allowed: false;
 }
 
 export class IntegrationDisabledError extends Error {
   readonly status = 409;
   readonly code = "integration_disabled";
-  readonly publicMessage = "A integracao esta desativada e nao pode realizar chamadas externas.";
+  readonly publicMessage = "A integracao externa esta desativada e nao pode realizar chamadas.";
   readonly integrationId: IntegrationId;
 
   constructor(integrationId: IntegrationId) {
@@ -65,12 +65,17 @@ const CANONICAL_INTEGRATIONS: ReadonlyArray<
 export function integrationStatusDto(): IntegrationStatusDto[] {
   // DTO construido por allowlist. Nenhum endpoint, segredo, identificador de
   // paciente ou configuracao interna pode atravessar esta fronteira.
-  return CANONICAL_INTEGRATIONS.map((integration) => ({
-    id: integration.id,
-    nome: integration.nome,
-    state: "disabled",
-    enabled: false,
-    verified: false,
-    external_calls_allowed: false,
-  }));
+  return CANONICAL_INTEGRATIONS.map((integration) => {
+    const internalSiteFlow = integration.id === "site_futuro";
+    return {
+      id: integration.id,
+      nome: integration.nome,
+      state: internalSiteFlow ? "internal_active" : "disabled",
+      enabled: internalSiteFlow,
+      verified: internalSiteFlow,
+      // A captacao usa somente o Supabase da clinica. Nenhum provedor externo
+      // e liberado por este status, nem mesmo para o fluxo interno do site.
+      external_calls_allowed: false,
+    };
+  });
 }

@@ -7,7 +7,7 @@
   });
   const PROVIDERS = Object.freeze([
     Object.freeze({ key: 'site', title: 'Formulários do site', symbol: 'SITE',
-      description: 'Integração futura dos novos contatos do site com o histórico da clínica.' }),
+      description: 'Captação interna de pedidos do site para revisão segura no CRM da clínica.' }),
     Object.freeze({ key: 'whatsapp', title: 'WhatsApp oficial', symbol: 'WA',
       description: 'Preparação para confirmações, lembretes e acompanhamento por canal oficial.' }),
     Object.freeze({ key: 'calendario', title: 'Calendário', symbol: 'CAL',
@@ -26,6 +26,9 @@
   });
   const SAFE_STATE = Object.freeze({
     operation: 'Desativado', verification: 'Não verificado', connection: 'Sem conexão externa'
+  });
+  const INTERNAL_SITE_STATE = Object.freeze({
+    operation: 'Ativo internamente', verification: 'Verificado', connection: 'Somente Supabase da clínica'
   });
   const state = {
     root: null, loaded: false, loading: false, generation: 0, controller: null,
@@ -72,16 +75,24 @@
   }
   function normalizeIntegrations(payload) {
     const registered = new Set();
+    const rowsByKey = new Map();
     integrationRows(payload).forEach(function (row) {
       const sourceKey = normalized(row && (row.id || row.codigo || row.code || row.chave || row.key || row.tipo || row.provider));
       const key = ALIASES[sourceKey] || sourceKey;
-      if (PROVIDERS.some(function (provider) { return provider.key === key; })) registered.add(key);
+      if (PROVIDERS.some(function (provider) { return provider.key === key; })) {
+        registered.add(key);
+        rowsByKey.set(key, row || {});
+      }
     });
     return PROVIDERS.map(function (provider) {
+      const raw = rowsByKey.get(provider.key) || {};
+      const internalActive = provider.key === 'site' && raw.state === 'internal_active' &&
+        raw.enabled === true && raw.verified === true && raw.external_calls_allowed === false;
+      const displayState = internalActive ? INTERNAL_SITE_STATE : SAFE_STATE;
       return Object.freeze({
         key: provider.key, title: provider.title, symbol: provider.symbol, description: provider.description,
-        operation: SAFE_STATE.operation, verification: SAFE_STATE.verification,
-        connection: SAFE_STATE.connection, registered: registered.has(provider.key)
+        operation: displayState.operation, verification: displayState.verification,
+        connection: displayState.connection, registered: registered.has(provider.key), active: internalActive
       });
     });
   }
@@ -92,14 +103,14 @@
 
   function shell() {
     return '<section class="integracoes-shell" aria-labelledby="integracoes-titulo">' +
-      '<header class="integracoes-header"><div><p>Fase 5A · base segura</p>' +
+      '<header class="integracoes-header"><div><p>Fase 5B · captação interna segura</p>' +
       '<h2 id="integracoes-titulo">Central de integrações</h2>' +
-      '<span>Consulte o estado da preparação técnica sem conectar, enviar, sincronizar ou cobrar.</span></div>' +
+      '<span>Consulte o recebimento interno do site e os provedores externos que continuam bloqueados.</span></div>' +
       '<button type="button" data-integracoes-atualizar>Atualizar status</button></header>' +
-      '<aside class="integracoes-safe-note" role="note"><strong>Sem cobrança e sem ativação</strong>' +
-      '<span>Nenhum serviço externo está conectado. Qualquer próxima ativação exigirá credenciais, revisão e autorização explícita dos proprietários.</span></aside>' +
-      '<aside class="integracoes-site-note" role="note"><strong>O site continua funcionando</strong>' +
-      '<span>Os formulários e páginas atuais permanecem como estão. Esta central não altera nem interrompe o recebimento já existente.</span></aside>' +
+      '<aside class="integracoes-safe-note" role="note"><strong>Sem cobrança nova</strong>' +
+      '<span>WhatsApp API, calendário, pagamentos e demais provedores continuam desligados. Nenhuma assinatura ou cobrança foi ativada.</span></aside>' +
+      '<aside class="integracoes-site-note" role="note"><strong>Pedidos do site no CRM</strong>' +
+      '<span>O formulário de agendamento salva o pedido na caixa privada da clínica. O WhatsApp permanece manual e o pedido não reserva horário automaticamente.</span></aside>' +
       '<p id="integracoes-status" class="integracoes-status" role="status" aria-live="polite"></p>' +
       '<div id="integracoes-cards" class="integracoes-cards" aria-live="off"></div>' +
       '<footer class="integracoes-footer"><strong>Próximas etapas, somente quando autorizadas</strong>' +
@@ -110,10 +121,11 @@
     return '<article class="integracoes-card" data-integracao="' + escapeHtml(row.key) + '">' +
       '<header><span class="integracoes-symbol" aria-hidden="true">' + escapeHtml(row.symbol) + '</span>' +
       '<div><h3>' + escapeHtml(row.title) + '</h3><p>' + escapeHtml(row.description) + '</p></div></header>' +
-      '<dl><div><dt>Operação</dt><dd><span class="integracoes-dot" aria-hidden="true"></span>' + escapeHtml(row.operation) + '</dd></div>' +
+      '<dl><div><dt>Operação</dt><dd><span class="integracoes-dot' + (row.active ? ' ativo' : '') + '" aria-hidden="true"></span>' + escapeHtml(row.operation) + '</dd></div>' +
       '<div><dt>Verificação</dt><dd>' + escapeHtml(row.verification) + '</dd></div>' +
       '<div><dt>Conexão externa</dt><dd>' + escapeHtml(row.connection) + '</dd></div></dl>' +
-      '<p class="integracoes-registry">' + (row.registered ? 'Base interna identificada; continua bloqueada.' : 'Aguardando configuração futura; continua bloqueada.') + '</p>' +
+      '<p class="integracoes-registry">' + (row.active ? 'Fluxo interno ativo, sem chamada a provedor externo.' :
+        (row.registered ? 'Base identificada; conexão externa continua bloqueada.' : 'Aguardando configuração futura; continua bloqueada.')) + '</p>' +
       '</article>';
   }
   function render() {
@@ -171,7 +183,7 @@
       state.loaded = true;
       render();
       setStatus('Status atualizado' + (state.checkedAt ? ' em ' + state.checkedAt : '') +
-        '. Nenhuma conexão externa foi ativada.', false);
+        '. A captação do site é interna e nenhuma conexão externa foi ativada.', false);
     } catch (error) {
       if ((error && error.name === 'AbortError') || !requestIsCurrent(generation, controller)) return;
       state.integrations = normalizeIntegrations({});
@@ -237,7 +249,7 @@
   window.AMJIntegracoes = Object.freeze({
     montar: mount, ativar: activate, carregar: load, atualizarAcesso: updateAccess, reset: reset,
     contrato: Object.freeze({ endpoint: API, acao: 'status', somenteLeitura: true, ownerMfa: true,
-      conexoesExternas: false, cobrancas: false, formulariosAtuaisPreservados: true }),
+      captacaoSiteInterna: true, conexoesExternas: false, cobrancasNovas: false, whatsappManual: true }),
     __test: Object.freeze({ normalizeIntegrations: normalizeIntegrations, checkedAtFrom: checkedAtFrom,
       requestIsCurrent: requestIsCurrent })
   });

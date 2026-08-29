@@ -29,6 +29,9 @@ assert.match(js, /intentKey\('save'\)[\s\S]*?clearIntent\('save'\)/,
 for (const action of ['listar', 'salvar_lead', 'arquivar_lead', 'converter_lead']) {
   assert.match(js, new RegExp("'" + action + "'"), 'ação CRM ausente: ' + action);
 }
+for (const action of ['aceitar_solicitacao_site', 'arquivar_solicitacao_site']) {
+  assert.match(js, new RegExp("'" + action + "'"), 'ação da caixa de entrada do site ausente: ' + action);
+}
 for (const field of ['origem', 'suborigem', 'campanha_id', 'interesse', 'responsavel_id', 'estagio',
   'primeira_resposta_em', 'next_action_type', 'proxima_acao_em', 'motivo_perda']) {
   assert.match(js, new RegExp(field), 'campo comercial ausente: ' + field);
@@ -105,13 +108,33 @@ assert.doesNotMatch(js, /criar_cliente|financeiro-fichas|pacientes\.push|leads\.
   'frontend do CRM nunca pode criar paciente diretamente nem escrever em módulo financeiro');
 assert.match(js, /Dados clínicos pertencem ao prontuário/,
   'tela deve orientar separação entre CRM e prontuário');
+assert.match(js, /solicitacoes_site[\s\S]*?solicitacoes_site_pendentes/,
+  'listar deve consumir pedidos e resumo pendente enviados pela API');
+assert.match(js, /id="crm-site-title">Pedidos de agendamento[\s\S]*?id="crm-site-content"/,
+  'CRM deve ter caixa de entrada acessível para pedidos do site');
+assert.match(js, /siteWhatsAppUrl[\s\S]*?target="_blank"[\s\S]*?Abrir WhatsApp/,
+  'WhatsApp dos pedidos deve permanecer uma ação manual');
+assert.match(js, /changeSiteRequest[\s\S]*?await load\(true\)/,
+  'aceitar ou arquivar precisa recarregar a fonte canônica');
+assert.match(js, /if \(accepting\)[\s\S]*?await request\(action,[\s\S]*?else[\s\S]*?await protectedRequest\(action,[\s\S]*?titulo: 'Arquivar pedido do site'[\s\S]*?motivoObrigatorio: true/,
+  'arquivar pedido deve exigir senha recente e motivo, enquanto aceitar permanece direto');
+assert.match(js, /operation_id: proof\.operation_id[\s\S]*?motivo: proof\.motivo/,
+  'fluxo protegido deve enviar operation_id e motivo comprovados pelo desafio de senha');
+assert.match(js, /state\.siteBusy\.has\(id\)[\s\S]*?aria-disabled="true"/,
+  'pedido em processamento deve bloquear novo clique');
 
 assert.match(css, /\.crm-kanban\{[^}]*overflow-x:auto/,
   'Kanban com 13 colunas precisa de rolagem contida');
 assert.match(css, /@media \(max-width:700px\)/,
   'CRM deve ter composição específica para celular');
+assert.match(css, /\.crm-site-list\{[^}]*grid-template-columns:repeat\(2/,
+  'caixa de pedidos deve aproveitar o desktop sem perder a leitura');
+assert.match(css, /@media \(max-width:700px\)[\s\S]*?\.crm-site-actions\{display:grid\}/,
+  'ações dos pedidos devem ocupar uma coluna no celular');
 assert.match(shell, /global: 'AMJCRMLeads'[\s\S]*?root: 'crm-root'/,
   'shell deve registrar o módulo CRM lazy');
+assert.match(shell, /crm\.js\?v=20260829-2[\s\S]*?crm\.css\?v=20260829-2/,
+  'shell deve invalidar o cache do CRM desta fase');
 assert.match(html, /app-shell\.js\?v=20260829-2/,
   'asset do shell deve ser versionado após integrar o CRM');
 assert.doesNotMatch(html, /<script[^>]+crm\.js|<link[^>]+crm\.css/i,
@@ -154,5 +177,14 @@ assert.equal(runtime.dateInput('2026-08-26T17:30:00.000Z'), '2026-08-26T14:30',
 assert.equal(runtime.recordStatus({ stage_code: 'interessada', record_status: 'archived' }), 'archived');
 assert.equal(runtime.isOpen({ stage_code: 'interessada', record_status: 'archived' }), false,
   'arquivado não pode contar como aberto só porque preservou a etapa');
+const siteRows = runtime.responseSiteRequests({
+  solicitacoes_site: [{ solicitacao_id: 'req-1', status: 'pendente' }]
+});
+assert.equal(siteRows.length, 1, 'resposta deve preservar pedidos identificados do site');
+assert.equal(runtime.siteRequestPending(siteRows[0]), true, 'pedido pendente deve liberar as ações da caixa');
+assert.equal(runtime.siteWhatsAppNumber('(31) 99584-4803'), '5531995844803',
+  'WhatsApp manual deve usar número brasileiro normalizado');
+assert.equal(runtime.siteDate('2026-09-05'), '05/09/2026',
+  'data preferida deve ser exibida sem conversão de fuso');
 
 console.log('crm-ui.test.cjs: contrato, funil, conversão e responsividade OK');

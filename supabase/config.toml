@@ -130,8 +130,16 @@ entrypoint = "./functions/ia-copiloto-fichas/index.ts"
 
 [functions.integracoes-fichas]
 enabled = true
-# Fase 5A somente leitura. O handler valida internamente Bearer, sessao ativa,
-# owner e AAL2. Todas as integracoes e chamadas externas seguem desativadas.
+# Fase 5B somente leitura. O handler valida internamente Bearer, sessao ativa,
+# owner e AAL2. O site usa fluxo interno; chamadas externas seguem desativadas.
 verify_jwt = false
-import_map = "./functions/integracoes-fichas/deno.json"
+import_map = "./functions/integracoes-fichas/import_map.json"
 entrypoint = "./functions/integracoes-fichas/index.ts"
+
+[functions.agendamento-submit]
+enabled = true
+# Formulário público sem conta Auth. A Edge restringe origem, tamanho, campos,
+# tempo de preenchimento, rate limit atômico e idempotência antes da RPC privada.
+verify_jwt = false
+import_map = "./functions/agendamento-submit/deno.json"
+entrypoint = "./functions/agendamento-submit/index.ts"

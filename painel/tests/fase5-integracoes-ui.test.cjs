@@ -31,26 +31,28 @@ assert.match(js, /catch \(error\)[\s\S]*!requestIsCurrent\(generation, controlle
 for (const title of ['Formulários do site', 'WhatsApp oficial', 'Calendário', 'Pagamentos online', 'Outras APIs']) {
   assert.ok(js.includes(title), 'cartão ausente: ' + title);
 }
-for (const safeState of ['Desativado', 'Não verificado', 'Sem conexão externa']) {
+for (const safeState of ['Ativo internamente', 'Verificado', 'Somente Supabase da clínica', 'Desativado', 'Não verificado', 'Sem conexão externa']) {
   assert.ok(js.includes(safeState), 'estado seguro ausente: ' + safeState);
 }
-assert.match(js, /Os formulários e páginas atuais permanecem como estão/,
-  'a Central deve afirmar que o site atual continua funcionando');
-assert.match(js, /Sem cobrança e sem ativação/,
-  'a tela deve explicar claramente que não existe cobrança');
+assert.match(js, /O formulário de agendamento salva o pedido na caixa privada da clínica/,
+  'a Central deve explicar a captação interna do site');
+assert.match(js, /Sem cobrança nova/,
+  'a tela deve explicar claramente que não existe cobrança nova');
 assert.match(js, /data-integracoes-atualizar>Atualizar status/,
   'Atualizar status deve ser a única ação disponível');
 assert.doesNotMatch(js, /data-integracoes-(?:conectar|testar|enviar|sincronizar|autorizar|cobrar)/i,
   'a Fase 5A não pode oferecer ações externas');
 assert.doesNotMatch(js, /window\.open\(|wa\.me|googleapis\.com|graph\.facebook\.com|stripe\.com|mercadopago/i,
   'a UI não pode chamar ou abrir provedores externos');
-assert.match(js, /operation: SAFE_STATE\.operation[\s\S]*verification: SAFE_STATE\.verification[\s\S]*connection: SAFE_STATE\.connection/,
-  'o normalizador deve impor o fallback seguro, independentemente da resposta');
+assert.match(js, /raw\.external_calls_allowed === false/,
+  'o site só pode aparecer ativo quando chamadas externas estiverem explicitamente bloqueadas');
 
 assert.match(shell, /integracoes: Object\.freeze\(\{ title: 'Integrações', legacy: 'integracoes', owner: true/,
   'a rota deve ser exclusiva dos proprietários');
 assert.match(shell, /global: 'AMJIntegracoes'[\s\S]*src: '\.\/integracoes\.js\?v=[\s\S]*css: '\.\/integracoes\.css\?v=/,
   'JavaScript e CSS devem ser carregados somente ao abrir a rota');
+assert.match(shell, /integracoes\.js\?v=20260829-2[\s\S]*integracoes\.css\?v=20260829-2/,
+  'shell deve invalidar o cache da Central de Integrações desta fase');
 assert.match(html, /id="aba-bt-integracoes"[\s\S]*aria-controls="aba-integracoes"[\s\S]*hidden/,
   'a aba legada deve nascer escondida');
 assert.match(html, /id="aba-integracoes"[\s\S]*id="integracoes-root"/,
@@ -83,7 +85,7 @@ const sandbox = { window: {}, document: {}, Intl, Date, Set, AbortController, co
 vm.runInNewContext(js, sandbox, { filename: 'integracoes.js' });
 const runtime = sandbox.window.AMJIntegracoes.__test;
 const rows = runtime.normalizeIntegrations({ ok: true, integracoes: [
-  { id: 'site_futuro', state: 'enabled', enabled: true, verified: true, external_calls_allowed: true },
+  { id: 'site_futuro', state: 'internal_active', enabled: true, verified: true, external_calls_allowed: false },
   { id: 'whatsapp_oficial', state: 'disabled', enabled: false, verified: false, external_calls_allowed: false },
   { id: 'calendario' }, { id: 'pagamentos_online' }, { id: 'outras_apis' }
 ] });
@@ -91,11 +93,23 @@ assert.equal(rows.length, 5);
 assert.deepEqual(Array.from(rows, function (row) { return row.key; }),
   ['site', 'whatsapp', 'calendario', 'pagamentos', 'outras_apis']);
 for (const row of rows) {
+  assert.equal(row.registered, true);
+}
+assert.equal(rows[0].operation, 'Ativo internamente');
+assert.equal(rows[0].verification, 'Verificado');
+assert.equal(rows[0].connection, 'Somente Supabase da clínica');
+assert.equal(rows[0].active, true);
+for (const row of rows.slice(1)) {
   assert.equal(row.operation, 'Desativado');
   assert.equal(row.verification, 'Não verificado');
   assert.equal(row.connection, 'Sem conexão externa');
-  assert.equal(row.registered, true);
+  assert.equal(row.active, false);
 }
+const malicious = runtime.normalizeIntegrations({ integracoes: [
+  { id: 'site_futuro', state: 'internal_active', enabled: true, verified: true, external_calls_allowed: true }
+] });
+assert.equal(malicious[0].operation, 'Desativado',
+  'resposta que autoriza chamada externa deve cair no estado bloqueado');
 const fallback = runtime.normalizeIntegrations({ erro: 'indisponível' });
 assert.equal(fallback.length, 5);
 assert.ok(fallback.every(function (row) { return row.operation === 'Desativado' && !row.registered; }));

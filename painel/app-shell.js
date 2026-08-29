@@ -29,8 +29,8 @@
   const MODULES = Object.freeze({
     crm: Object.freeze({
       global: 'AMJCRMLeads',
-      src: './crm.js?v=20260826-1',
-      css: './crm.css?v=20260826-1',
+      src: './crm.js?v=20260829-2',
+      css: './crm.css?v=20260829-2',
       root: 'crm-root'
     }),
     marketing: Object.freeze({
@@ -62,8 +62,8 @@
     }),
     integracoes: Object.freeze({
       global: 'AMJIntegracoes',
-      src: './integracoes.js?v=20260829-1',
-      css: './integracoes.css?v=20260829-1',
+      src: './integracoes.js?v=20260829-2',
+      css: './integracoes.css?v=20260829-2',
       root: 'integracoes-root'
     }),
     copiloto: Object.freeze({

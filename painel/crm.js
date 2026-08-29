@@ -29,6 +29,25 @@
     ['agendar_avaliacao', 'Agendar avaliação'], ['confirmar_agendamento', 'Confirmar agendamento'],
     ['retorno_comercial', 'Fazer retorno comercial'], ['reativar', 'Reativar contato'], ['outro', 'Outra ação']
   ]);
+  const SITE_REQUEST_STATUS = Object.freeze({
+    pending: 'Novo', pendente: 'Novo', new: 'Novo', novo: 'Novo',
+    accepted: 'Aceito', aceito: 'Aceito', converted: 'Aceito', convertido: 'Aceito',
+    archived: 'Arquivado', arquivado: 'Arquivado'
+  });
+  const SITE_FIRST_VISIT = Object.freeze({
+    primeira_avaliacao: 'Primeira avaliação', paciente_atual: 'Já é paciente'
+  });
+  const SITE_PERIODS = Object.freeze({
+    manha: 'Manhã', tarde: 'Tarde', noite: 'Noite', a_combinar: 'A combinar'
+  });
+  const SITE_INTERESTS = Object.freeze({
+    avaliacao_sem_procedimento: 'Avaliação sem procedimento definido', preenchimento_facial: 'Preenchimento facial',
+    skinbooster: 'Skinbooster', toxina_botulinica: 'Toxina botulínica', fios_pdo: 'Fios de PDO',
+    intradermoterapia_facial: 'Intradermoterapia facial', intradermoterapia_capilar: 'Intradermoterapia capilar',
+    peeling: 'Peeling', microagulhamento_facial: 'Microagulhamento facial',
+    microagulhamento_capilar: 'Microagulhamento capilar', harmonizacao_facial: 'Harmonização facial',
+    aplicacao_intramuscular: 'Aplicação intramuscular com prescrição', retorno_acompanhamento: 'Retorno ou acompanhamento'
+  });
   const CLINIC_TIME_ZONE = 'America/Sao_Paulo';
   const DATE_TIME = new Intl.DateTimeFormat('pt-BR', {
     dateStyle: 'short', timeStyle: 'short', timeZone: CLINIC_TIME_ZONE
@@ -39,6 +58,7 @@
   });
   const state = {
     root: null, loaded: false, loading: false, leads: [], owners: [], campaigns: [], summary: {},
+    siteRequests: [], siteBusy: new Set(),
     view: 'list', generation: 0, controllers: new Set(), intentKeys: Object.create(null),
     conversion: null, conversionReturnFocus: null, specialFilter: '', editingId: '', bound: false,
     loadPromise: null, pagination: {}, loadingMore: false
@@ -161,6 +181,42 @@
     const found = NEXT_ACTION_TYPES.find(function (item) { return item[0] === text(value); });
     return found ? found[1] : (text(value) || 'Não definida');
   }
+  function siteRequestId(item) { return text(item && (item.id || item.solicitacao_id || item.request_id)); }
+  function siteRequestVersion(item) {
+    const value = item && (item.version == null ? item.versao : item.version);
+    const parsed = Number(value);
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+  }
+  function siteRequestStatus(item) {
+    return text(item && (item.status || item.record_status || item.estado)).toLowerCase() || 'pendente';
+  }
+  function siteRequestPending(item) {
+    return ['pending', 'pendente', 'new', 'novo'].includes(siteRequestStatus(item));
+  }
+  function siteRequestPhone(item) {
+    return text(item && (item.telefone || item.phone || item.whatsapp));
+  }
+  function siteWhatsAppNumber(value) {
+    let digits = text(value).replace(/\D/g, '');
+    if (digits.startsWith('55') && (digits.length === 12 || digits.length === 13)) digits = digits.slice(2);
+    return digits.length === 10 || digits.length === 11 ? '55' + digits : '';
+  }
+  function siteDate(value) {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(text(value));
+    return match ? match[3] + '/' + match[2] + '/' + match[1] : (text(value) || 'A combinar');
+  }
+  function siteWhatsAppUrl(item) {
+    const number = siteWhatsAppNumber(siteRequestPhone(item));
+    if (!number) return '';
+    const name = text(item.nome || item.full_name || item.name);
+    const firstName = name.split(/\s+/).filter(Boolean)[0] || '';
+    const interestCode = text(item.interesse || item.interest);
+    const interest = SITE_INTERESTS[interestCode] || interestCode || 'avaliação estética';
+    const message = 'Olá' + (firstName ? ', ' + firstName : '') +
+      '! Recebemos sua solicitação pelo site da Ana Maria Jacob Estética sobre ' + interest +
+      '. Vamos conversar para confirmar a melhor disponibilidade?';
+    return 'https://wa.me/' + number + '?text=' + encodeURIComponent(message);
+  }
 
   async function request(action, payload, options) {
     const generation = state.generation;
@@ -246,6 +302,10 @@
       '<button type="button" data-crm-special="vencidos"><span id="crm-kpi-overdue-label">Ações vencidas</span><strong id="crm-kpi-overdue">—</strong></button>' +
       '<div><span id="crm-kpi-unanswered-label">Sem primeira resposta</span><strong id="crm-kpi-unanswered">—</strong></div>' +
       '<div><span id="crm-kpi-total-label">Total visível</span><strong id="crm-kpi-total">—</strong></div></div>' +
+      '<section class="crm-site-inbox" aria-labelledby="crm-site-title"><header><div><p>Captação interna do site</p>' +
+      '<h3 id="crm-site-title">Pedidos de agendamento</h3><span>O pedido é salvo antes de a pessoa abrir o WhatsApp.</span></div>' +
+      '<strong id="crm-site-count" role="status" aria-live="polite" aria-atomic="true">— pendentes</strong></header>' +
+      '<div id="crm-site-content" class="crm-site-content"></div></section>' +
       '<details id="crm-editor" class="crm-editor"><summary>Novo cadastro comercial</summary>' + editorHtml() + '</details>' +
       '<section id="crm-conversion" class="crm-conversion" role="region" aria-label="Revisão de conversão" tabindex="-1" hidden></section>' +
       '<section class="crm-workspace" aria-labelledby="crm-workspace-title"><div class="crm-workspace-title"><div><p>Funil</p>' +
@@ -304,6 +364,21 @@
   function responseCampaigns(data) {
     const rows = data.campanhas_ativas || data.active_campaigns || data.dados && data.dados.campanhas_ativas || [];
     return Array.isArray(rows) ? rows : [];
+  }
+  function responseSiteRequests(data) {
+    const rows = data.solicitacoes_site || data.site_requests ||
+      data.dados && (data.dados.solicitacoes_site || data.dados.site_requests) || [];
+    return Array.isArray(rows) ? rows.filter(function (item) { return siteRequestId(item); }) : [];
+  }
+  function responseSummary(data) {
+    const summary = data.resumo || data.summary || data.dados && (data.dados.resumo || data.dados.summary) || {};
+    return summary && typeof summary === 'object' ? summary : {};
+  }
+  function sitePendingCount() {
+    const explicit = Number(state.summary.solicitacoes_site_pendentes == null
+      ? state.summary.pending_site_requests : state.summary.solicitacoes_site_pendentes);
+    return Number.isInteger(explicit) && explicit >= 0
+      ? explicit : state.siteRequests.filter(siteRequestPending).length;
   }
   function mergeById(current, incoming, idResolver) {
     const result = current.slice();
@@ -439,10 +514,62 @@
       (state.loadingMore ? ' disabled aria-disabled="true"' : '') + '>' +
       (state.loadingMore ? 'Carregando…' : 'Carregar mais leads') + '</button></div>';
   }
+  function siteRequestCard(item) {
+    const id = siteRequestId(item);
+    const version = siteRequestVersion(item);
+    const status = siteRequestStatus(item);
+    const pending = siteRequestPending(item);
+    const busy = state.siteBusy.has(id);
+    const name = text(item.nome || item.full_name || item.name) || 'Contato sem nome';
+    const phone = siteRequestPhone(item) || 'WhatsApp não informado';
+    const interestCode = text(item.interesse || item.interest);
+    const interest = SITE_INTERESTS[interestCode] || interestCode || 'Não informado';
+    const periodCode = text(item.periodo || item.preferred_period);
+    const period = SITE_PERIODS[periodCode] || periodCode || 'A combinar';
+    const firstVisitCode = text(item.primeira_visita || item.first_visit);
+    const firstVisit = SITE_FIRST_VISIT[firstVisitCode] || firstVisitCode || 'Não informado';
+    const preferredDate = siteDate(item.data_preferida || item.preferred_date);
+    const received = safeDateTime(item.recebido_em || item.received_at || item.created_at);
+    const code = text(item.codigo_solicitacao || item.codigo || item.public_code);
+    const whatsappUrl = siteWhatsAppUrl(item);
+    const statusLabel = SITE_REQUEST_STATUS[status] || status.replace(/_/g, ' ');
+    let actions = whatsappUrl
+      ? '<a class="crm-site-whatsapp" href="' + escapeHtml(whatsappUrl) + '" target="_blank" rel="noopener noreferrer">Abrir WhatsApp</a>'
+      : '<span class="crm-site-phone-error">WhatsApp incompleto</span>';
+    if (pending) {
+      actions += '<button type="button" class="crm-primary" data-crm-site-accept="' + escapeHtml(id) + '"' +
+        (version ? ' data-crm-site-version="' + version + '"' : '') + (busy ? ' disabled aria-disabled="true"' : '') +
+        '>Aceitar no CRM</button><button type="button" class="crm-danger" data-crm-site-archive="' + escapeHtml(id) + '"' +
+        (version ? ' data-crm-site-version="' + version + '"' : '') + (busy ? ' disabled aria-disabled="true"' : '') +
+        '>Arquivar com senha</button>';
+    }
+    return '<article class="crm-site-card' + (pending ? ' is-pending' : '') + '" role="listitem" data-crm-site-id="' +
+      escapeHtml(id) + '" aria-busy="' + String(busy) + '"><header><div><h4>' + escapeHtml(name) + '</h4><span>' +
+      escapeHtml(phone) + '</span></div><span class="crm-site-status">' + escapeHtml(statusLabel) + '</span></header>' +
+      '<dl><div><dt>Interesse</dt><dd>' + escapeHtml(interest) + '</dd></div><div><dt>Preferência</dt><dd>' +
+      escapeHtml(preferredDate + ' · ' + period) + '</dd></div><div><dt>Atendimento</dt><dd>' + escapeHtml(firstVisit) +
+      '</dd></div><div><dt>Recebido</dt><dd>' + escapeHtml(received) + '</dd></div>' +
+      (code ? '<div><dt>Código</dt><dd>' + escapeHtml(code) + '</dd></div>' : '') + '</dl>' +
+      '<div class="crm-site-actions">' + actions + '</div></article>';
+  }
+  function renderSiteInbox() {
+    const content = byId('crm-site-content');
+    const count = byId('crm-site-count');
+    if (!content || !count) return;
+    const pending = sitePendingCount();
+    count.textContent = pending + (pending === 1 ? ' pendente' : ' pendentes');
+    if (!state.siteRequests.length) {
+      content.innerHTML = '<div class="crm-site-empty"><strong>Nenhum pedido aguardando</strong>' +
+        '<span>Novas solicitações enviadas pelo site aparecerão aqui.</span></div>';
+      return;
+    }
+    content.innerHTML = '<div class="crm-site-list" role="list">' + state.siteRequests.map(siteRequestCard).join('') + '</div>';
+  }
   function render() {
     const content = byId('crm-content');
     if (!content) return;
     const rows = filteredLeads();
+    renderSiteInbox();
     updateSummary(rows);
     const resultsStatus = byId('crm-results-status');
     if (resultsStatus) resultsStatus.textContent = rows.length === 1 ? '1 lead exibido.' : rows.length + ' leads exibidos.';
@@ -459,7 +586,12 @@
     if (state.loaded && !force) { render(); return; }
     state.loading = true;
     const content = byId('crm-content');
+    const siteContent = byId('crm-site-content');
     if (content) { content.setAttribute('aria-busy', 'true'); content.innerHTML = '<div class="crm-loading">Carregando leads…</div>'; }
+    if (siteContent) {
+      siteContent.setAttribute('aria-busy', 'true');
+      if (!state.loaded) siteContent.innerHTML = '<div class="crm-site-empty"><span>Carregando pedidos do site…</span></div>';
+    }
     setStatus('Atualizando o CRM…', false);
     let promise = null;
     promise = (async function () {
@@ -468,7 +600,8 @@
         state.leads = responseRows(data);
         state.owners = responseOwners(data);
         state.campaigns = responseCampaigns(data);
-        state.summary = data.resumo || data.summary || {};
+        state.siteRequests = responseSiteRequests(data);
+        state.summary = responseSummary(data);
         state.pagination = data.paginacao || data.pagination || {};
         state.loaded = true;
         fillOwners();
@@ -479,12 +612,15 @@
         if (error.code !== 'stale_session' && content) {
           content.innerHTML = '<div class="crm-error"><strong>Não foi possível carregar os leads.</strong><span>' + escapeHtml(error.message) +
             '</span><button type="button" class="crm-secondary" data-crm-action="retry">Tentar novamente</button></div>';
+          if (siteContent) siteContent.innerHTML = '<div class="crm-site-empty"><strong>Pedidos indisponíveis</strong>' +
+            '<span>Use “Tentar novamente” para atualizar a caixa de entrada.</span></div>';
           setStatus(error.message, true);
         }
       } finally {
         state.loading = false;
         if (state.loadPromise === promise) state.loadPromise = null;
         if (content) content.setAttribute('aria-busy', 'false');
+        if (siteContent) siteContent.setAttribute('aria-busy', 'false');
       }
     }());
     state.loadPromise = promise;
@@ -506,6 +642,9 @@
       state.campaigns = mergeById(state.campaigns, responseCampaigns(data), function (campaign) {
         return text(campaign && campaign.id);
       });
+      state.siteRequests = mergeById(state.siteRequests, responseSiteRequests(data), siteRequestId);
+      const incomingSummary = responseSummary(data);
+      if (Object.keys(incomingSummary).length) state.summary = incomingSummary;
       state.pagination = data.paginacao || data.pagination || {};
       fillOwners(); fillCampaigns();
       setStatus(incoming.length ? 'Mais leads carregados.' : 'Não há outros leads disponíveis.', false);
@@ -620,6 +759,36 @@
       await load(true); setStatus('Lead salvo com sucesso.', false);
     } catch (error) { if (error.code !== 'stale_session') setStatus(error.message, true); }
     finally { setBusy(form, false); }
+  }
+  function findSiteRequest(id) {
+    return state.siteRequests.find(function (item) { return siteRequestId(item) === text(id); });
+  }
+  async function changeSiteRequest(action, id) {
+    const item = findSiteRequest(id);
+    if (!item || !siteRequestPending(item) || state.siteBusy.has(id)) return;
+    const accepting = action === 'aceitar_solicitacao_site';
+    const intent = (accepting ? 'site-accept:' : 'site-archive:') + id;
+    state.siteBusy.add(id); renderSiteInbox();
+    setStatus(accepting ? 'Aceitando pedido do site…' : 'Arquivando pedido do site…', false);
+    try {
+      const options = { idempotencyKey: intentKey(intent), expectedVersion: siteRequestVersion(item) };
+      if (accepting) {
+        await request(action, { solicitacao_id: id }, options);
+      } else {
+        await protectedRequest(action, { solicitacao_id: id }, Object.assign({}, options, {
+          titulo: 'Arquivar pedido do site',
+          motivo: 'Informe por que este pedido deve ser arquivado',
+          motivoObrigatorio: true
+        }));
+      }
+      clearIntent(intent);
+      await load(true);
+      setStatus(accepting ? 'Pedido aceito e vinculado ao CRM.' : 'Pedido do site arquivado.', false);
+    } catch (error) {
+      if (error.code !== 'stale_session') setStatus(error.message, true);
+    } finally {
+      state.siteBusy.delete(id); renderSiteInbox();
+    }
   }
   async function archiveLead(id) {
     const lead = findLead(id); if (!lead) return;
@@ -812,6 +981,10 @@
       const special = event.target.closest('[data-crm-special]'); if (special) aplicarFiltro(special.dataset.crmSpecial);
       const edit = event.target.closest('[data-crm-edit]'); if (edit) editLead(edit.dataset.crmEdit);
       const archive = event.target.closest('[data-crm-archive]'); if (archive) void archiveLead(archive.dataset.crmArchive);
+      const siteAccept = event.target.closest('[data-crm-site-accept]');
+      if (siteAccept) void changeSiteRequest('aceitar_solicitacao_site', siteAccept.dataset.crmSiteAccept);
+      const siteArchive = event.target.closest('[data-crm-site-archive]');
+      if (siteArchive) void changeSiteRequest('arquivar_solicitacao_site', siteArchive.dataset.crmSiteArchive);
       const convert = event.target.closest('[data-crm-convert]');
       if (convert) { state.conversionReturnFocus = convert; void startConversion(convert.dataset.crmConvert); }
       const link = event.target.closest('[data-crm-link-patient]'); if (link) void finishConversion('vincular_existente', link.dataset.crmLinkPatient);
@@ -828,21 +1001,24 @@
   function mount() {
     if (state.root) return;
     state.root = byId('crm-root'); if (!state.root) return;
-    state.root.innerHTML = shellHtml(); bind(); updateConditionalFields();
+    state.root.innerHTML = shellHtml(); bind(); updateConditionalFields(); renderSiteInbox();
   }
   function ativar() { mount(); if (ownerAccess()) void load(false); }
   async function abrirLead(id) { ativar(); await load(false); editLead(id); }
   function reset() {
     state.generation += 1; state.controllers.forEach(function (controller) { controller.abort(); }); state.controllers.clear();
     state.loaded = false; state.loading = false; state.leads = []; state.owners = []; state.campaigns = []; state.summary = {};
+    state.siteRequests = []; state.siteBusy = new Set();
     state.pagination = {}; state.loadingMore = false;
     state.loadPromise = null; state.intentKeys = Object.create(null); state.conversion = null; state.conversionReturnFocus = null;
     state.specialFilter = ''; state.editingId = '';
-    if (state.root) { state.root.innerHTML = shellHtml(); updateConditionalFields(); }
+    if (state.root) { state.root.innerHTML = shellHtml(); updateConditionalFields(); renderSiteInbox(); }
   }
 
   window.AMJCRMLeads = Object.freeze({ ativar: ativar, reset: reset, novoLead: novoLead,
     abrirLead: abrirLead, aplicarFiltro: aplicarFiltro,
     __test: Object.freeze({ toClinicIso: toClinicIso, dateInput: dateInput,
-      recordStatus: recordStatus, isOpen: isOpen, isOverdue: isOverdue }) });
+      recordStatus: recordStatus, isOpen: isOpen, isOverdue: isOverdue,
+      responseSiteRequests: responseSiteRequests, siteRequestPending: siteRequestPending,
+      siteWhatsAppNumber: siteWhatsAppNumber, siteDate: siteDate }) });
 }());

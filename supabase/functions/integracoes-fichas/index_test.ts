@@ -56,7 +56,7 @@ function post(body: unknown): Request {
   });
 }
 
-Deno.test("catalogo canonico e DTO expõem somente campos sanitizados e desligados", () => {
+Deno.test("catalogo canonico expõe o site interno ativo e provedores externos desligados", () => {
   const catalog = integrationStatusDto();
   equals(
     catalog.map((item) => item.id),
@@ -77,12 +77,17 @@ Deno.test("catalogo canonico e DTO expõem somente campos sanitizados e desligad
       "verified",
       "external_calls_allowed",
     ]);
-    equals(item.state, "disabled");
-    equals(item.enabled, false);
-    equals(item.verified, false);
     equals(item.external_calls_allowed, false);
     assert(!JSON.stringify(item).includes("secret"), "DTO nao pode expor segredo");
     assert(!JSON.stringify(item).includes("http"), "DTO nao pode expor endpoint");
+  }
+  equals(catalog[0].state, "internal_active");
+  equals(catalog[0].enabled, true);
+  equals(catalog[0].verified, true);
+  for (const item of catalog.slice(1)) {
+    equals(item.state, "disabled");
+    equals(item.enabled, false);
+    equals(item.verified, false);
   }
 });
 

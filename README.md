@@ -24,6 +24,8 @@ Maria Jacob Estética.
   dependente da identificação profissional do dispositivo, região e técnica
 - `/termos/` — central pública para escolher o documento do procedimento,
   mantendo a ficha de anamnese separada
+- `/agendar/` — solicitação pública de atendimento; salva primeiro em uma
+  caixa privada do CRM e depois oferece o WhatsApp manual, sem reservar horário
 - `/painel/` — acesso restrito da equipe, com filtros para anamneses e TCLEs,
   links de convite, QR codes, acesso aos PDFs armazenados e o módulo interno
   **Agenda e retornos**; proprietários autenticados com MFA também recebem a
@@ -51,8 +53,10 @@ apenas os resumos necessários e links temporários para os PDFs.
 O módulo fica na aba **Agenda e retornos** da própria rota protegida `/painel/`.
 Depois de entrar com a senha já usada pelo Fichas, a equipe pode cadastrar e
 editar horários, controlar estados do atendimento e organizar lembretes de
-confirmação, 24 horas, 2 horas e retorno. A página pública `/agendar/` continua
-apenas iniciando uma conversa no WhatsApp e não confirma nem grava um horário.
+confirmação, 24 horas, 2 horas e retorno. A página pública `/agendar/` registra
+uma solicitação estruturada na caixa privada do CRM antes de oferecer a conversa
+manual no WhatsApp. Ela não confirma, não reserva e não grava um horário na
+agenda operacional.
 
 O botão **Ativar alertas do navegador** solicita permissão somente após um
 clique da equipe e a autorização vale para aquele navegador e aparelho. Os
@@ -91,20 +95,22 @@ acesso para `public`, `anon` ou `authenticated` e não armazenam a senha. Dados 
 agenda e credenciais também não devem ser gravados em `localStorage`, exibidos
 em notificações ou registrados em logs.
 
-## Central de integrações — Fase 5A
+## Central de integrações — Fase 5B
 
-A área privada **Integrações** apresenta o inventário das conexões futuras com
-site, WhatsApp oficial, calendário, pagamentos online e outras APIs autorizadas.
-Nesta fase ela é deliberadamente somente leitura: todos os conectores aparecem
-como **Desativados**, **Não verificados** e **Sem conexão externa**.
+A área privada **Integrações** apresenta o recebimento interno dos pedidos do
+site e o inventário das conexões futuras. O item **Formulários do site** aparece
+como ativo internamente porque usa somente o Supabase da clínica. WhatsApp
+oficial, calendário, pagamentos online e outras APIs permanecem **Desativados**,
+**Não verificados** e **Sem conexão externa**.
 
 O catálogo usa um adaptador nulo que interrompe qualquer tentativa antes de um
-transporte externo. A Fase 5A não possui botão de conectar, autorização OAuth,
+transporte externo. A Fase 5B não possui botão de conectar, autorização OAuth,
 webhook público, envio de mensagem, sincronização de calendário, cobrança,
 consulta bancária, SDK de provedor ou segredo de integração. Portanto, ela não
-cria custo externo. O site, a anamnese, os TCLEs, a agenda interna, o financeiro
-administrativo e o modo inteligente gratuito por regras continuam funcionando
-como antes; o item “site” na Central representa apenas uma integração futura.
+cria custo externo. O site recebe pedidos por uma Edge Function própria, com
+limitação de abuso, idempotência e uma caixa privada separada dos cadastros
+canônicos. O nome e o telefone somente são ligados a um lead depois da revisão
+de um proprietário autenticado com MFA.
 
 Arquivos principais:
 
@@ -112,16 +118,23 @@ Arquivos principais:
   somente leitura da Central;
 - `supabase/functions/integracoes-fichas/` — endpoint privado de status,
   protegido por conta individual `owner` e MFA `aal2`, sem chamar provedores;
-- `supabase/config.toml` — registro da Edge Function privada.
+- `supabase/functions/agendamento-submit/` — endpoint público restrito ao site,
+  sem provedor externo, que recebe apenas campos comerciais estruturados;
+- `supabase/migrations/20260829144846_fase5b_solicitacoes_site_privadas.sql` —
+  caixa privada, deduplicação, auditoria e RPCs exclusivas da `service_role`;
+- `supabase/migrations/20260829153230_fase5b_indices_fks.sql` — índices de
+  desempenho para os vínculos de responsável e operador;
+- `supabase/config.toml` — registro das Edge Functions pública e privadas.
 
-Antes da Fase 5B, cada integração exige decisão explícita de provedor, análise
+Antes de qualquer integração externa posterior, cada provedor exige decisão
+explícita, análise
 do contrato oficial vigente, custos conhecidos e autorizados, credenciais em
 secrets do servidor, ambiente de testes e critérios próprios de segurança. Um
 webhook futuro deverá validar assinatura sobre o corpo bruto, deduplicar eventos
 e impedir replay antes de qualquer efeito. Filas futuras deverão ser duráveis,
 carregar preferencialmente referências em vez de dados clínicos e possuir
 reconciliação e tratamento de falhas. Nenhum desses mecanismos está ativo na
-Fase 5A.
+Fase 5B.
 
 ## Financeiro, estoque e operação clínica
 
@@ -255,6 +268,8 @@ individual, à rastreabilidade e à confirmação antes da execução.
 - `supabase/migrations/20260819031852_minimizar_privilegios_fichas.sql` —
   reduz os privilégios internos ao mínimo necessário e mantém operações
   destrutivas fora das Edge Functions
+- `supabase/migrations/20260829144846_fase5b_solicitacoes_site_privadas.sql` —
+  cria a caixa privada de pedidos do site e as operações controladas de revisão
 - `supabase/functions/tcle-submit/index.ts` — endpoint server-side de recepção,
   validação, geração canônica do PDF, integridade e armazenamento do TCLE
 - `supabase/functions/tcle-preenchimento-submit/index.ts` — endpoint isolado do
@@ -269,6 +284,8 @@ individual, à rastreabilidade e à confirmação antes da execução.
   pré-avaliação dos fios de PDO
 - `supabase/functions/agenda-fichas/index.ts` — endpoint isolado da agenda e dos
   retornos, autenticado pelo acesso restrito do Fichas
+- `supabase/functions/agendamento-submit/index.ts` — recepção pública limitada e
+  idempotente dos pedidos do site, sem criar horário ou chamar provedor externo
 - `supabase/functions/painel-fichas/index.ts` — endpoint server-side do painel,
   unificando resumos das anamneses e dos TCLEs e emitindo links assinados
 

@@ -542,3 +542,225 @@ Deno.test("primeira resposta é temporal, monotônica e KPI usa histórico de co
   });
   assertEquals(roundtrip.first_response_at, "2026-08-25T13:20:00.000Z");
 });
+
+Deno.test("Fase 5B conecta listar, aceitar e arquivar somente às RPCs da caixa privada", async () => {
+  const source = await Deno.readTextFile(new URL("./index.ts", import.meta.url));
+
+  for (
+    const action of [
+      "listar_solicitacoes_site",
+      "aceitar_solicitacao_site",
+      "arquivar_solicitacao_site",
+    ]
+  ) {
+    assert(source.includes(`case \"${action}\"`), `Ação Fase 5B ausente: ${action}`);
+  }
+  for (
+    const rpcName of [
+      "crm_site_booking_list",
+      "crm_site_booking_accept",
+      "crm_site_booking_archive",
+    ]
+  ) {
+    assert(source.includes(`rpc(\"${rpcName}\"`), `RPC Fase 5B ausente: ${rpcName}`);
+  }
+
+  const listStart = source.indexOf("async function handleSiteRequestList");
+  const listEnd = source.indexOf("async function handleSiteRequestAccept", listStart);
+  const list = source.slice(listStart, listEnd);
+  assert(listStart >= 0 && listEnd > listStart, "Handler de listagem da caixa privada ausente.");
+  assert(
+    list.includes("listSiteRequests(clinicId, userId"),
+    "Listagem deve fixar o tenant autenticado.",
+  );
+  assert(
+    list.includes("solicitacoes_site: result.items"),
+    "Listagem deve devolver o contrato da inbox.",
+  );
+  assert(
+    list.includes("solicitacoes_site_pendentes: result.pending"),
+    "Listagem deve devolver a contagem pendente.",
+  );
+  assert(
+    list.includes("total: result.total") && list.includes("has_more: result.hasMore"),
+    "Listagem deve preservar a paginação da RPC.",
+  );
+
+  const mainListStart = source.indexOf("async function handleList");
+  const mainListEnd = source.indexOf("function expectedVersion", mainListStart);
+  const mainList = source.slice(mainListStart, mainListEnd);
+  assert(
+    mainList.includes('listSiteRequests(clinicId, userId, "pending", 100, 0)'),
+    "Listagem principal precisa incorporar a inbox pendente.",
+  );
+  assert(
+    mainList.includes("solicitacoes_site: siteInbox.items") &&
+      mainList.includes("solicitacoes_site_pendentes: siteInbox.pending"),
+    "Resposta principal deve expor itens e badge pendente.",
+  );
+});
+
+Deno.test("Fase 5B mantém aceite owner+AAL2 e exige senha recente somente ao arquivar", async () => {
+  const source = await Deno.readTextFile(new URL("./index.ts", import.meta.url));
+  const acceptStart = source.indexOf("async function handleSiteRequestAccept");
+  const acceptEnd = source.indexOf("async function handleSiteRequestArchive", acceptStart);
+  const accept = source.slice(acceptStart, acceptEnd);
+  const archiveStart = acceptEnd;
+  const archiveEnd = source.indexOf("async function handleSave", archiveStart);
+  const archive = source.slice(archiveStart, archiveEnd);
+
+  assert(acceptStart >= 0 && acceptEnd > acceptStart, "Handler de aceite ausente.");
+  assert(archiveStart >= 0 && archiveEnd > archiveStart, "Handler de arquivamento ausente.");
+  assert(
+    accept.includes('rpc("crm_site_booking_accept"') &&
+      accept.includes("p_actor_id: userId") &&
+      accept.includes("p_responsible_user_id: userId"),
+    "Aceite deve usar exclusivamente o owner autenticado como ator e responsável inicial.",
+  );
+  assert(
+    !accept.includes("requireProtected("),
+    "Aceite owner+AAL2 não deve exigir a prova adicional reservada ao arquivamento.",
+  );
+
+  const passwordProof = archive.indexOf(
+    'await requireProtected(req, context, payload, "archive_site_request", siteRequestId)',
+  );
+  const archiveRpc = archive.indexOf('rpc("crm_site_booking_archive"');
+  assert(passwordProof >= 0, "Arquivamento deve exigir prova recente de senha e operation_id.");
+  assert(
+    archiveRpc > passwordProof,
+    "Prova recente precisa ser validada antes de chamar a RPC de arquivamento.",
+  );
+  assert(
+    source.includes('"authorization, apikey, content-type, x-client-info, x-amj-reauthentication"'),
+    "CORS precisa permitir o cabeçalho da prova recente.",
+  );
+});
+
+Deno.test("migration Fase 5B fecha tabelas privadas e concede somente EXECUTE ao service_role", async () => {
+  const migration = await Deno.readTextFile(
+    new URL(
+      "../../migrations/20260829144846_fase5b_solicitacoes_site_privadas.sql",
+      import.meta.url,
+    ),
+  );
+  const privateTables = [
+    "crm_site_booking_requests",
+    "crm_site_booking_replays",
+    "crm_site_booking_operations",
+  ];
+  for (const table of privateTables) {
+    assert(migration.includes(`create table private.${table}`), `Tabela privada ausente: ${table}`);
+    assert(
+      migration.includes(`alter table private.${table} enable row level security;`),
+      `RLS ausente: ${table}`,
+    );
+  }
+
+  const tableRevokeStart = migration.indexOf(
+    "revoke all on table private.crm_site_booking_requests",
+  );
+  const tableRevokeEnd = migration.indexOf("revoke all on function", tableRevokeStart);
+  const tableRevoke = migration.slice(tableRevokeStart, tableRevokeEnd);
+  assert(tableRevokeStart >= 0 && tableRevokeEnd > tableRevokeStart, "REVOKE das tabelas ausente.");
+  for (const table of privateTables) {
+    assert(tableRevoke.includes(`private.${table}`), `REVOKE não cobre ${table}.`);
+  }
+  for (const role of ["public", "anon", "authenticated", "service_role"]) {
+    assert(tableRevoke.includes(role), `REVOKE direto não cobre o papel ${role}.`);
+  }
+  assert(
+    !/grant\s+(?:all|select|insert|update|delete|truncate|references|trigger)(?:\s*,\s*\w+)*\s+on\s+table\s+private\.crm_site_booking_/i
+      .test(migration),
+    "Nenhum papel pode receber privilégio direto nas tabelas privadas.",
+  );
+
+  for (
+    const rpcName of [
+      "crm_site_booking_receive",
+      "crm_site_booking_list",
+      "crm_site_booking_accept",
+      "crm_site_booking_archive",
+    ]
+  ) {
+    const definitionStart = migration.indexOf(`create or replace function public.${rpcName}(`);
+    const definitionEnd = migration.indexOf("$function$;", definitionStart);
+    const definition = migration.slice(definitionStart, definitionEnd);
+    assert(
+      definitionStart >= 0 && definitionEnd > definitionStart,
+      `Definição ausente: ${rpcName}`,
+    );
+    assert(/security definer/i.test(definition), `${rpcName} deve ser SECURITY DEFINER.`);
+    assert(/set search_path = ''/i.test(definition), `${rpcName} deve fixar search_path vazio.`);
+    assert(
+      migration.includes(`revoke all on function public.${rpcName}(`),
+      `REVOKE de EXECUTE ausente: ${rpcName}`,
+    );
+    const grantStart = migration.indexOf(`grant execute on function public.${rpcName}(`);
+    const grantEnd = migration.indexOf(";", grantStart);
+    const grant = migration.slice(grantStart, grantEnd);
+    assert(grantStart >= 0 && grantEnd > grantStart, `GRANT de EXECUTE ausente: ${rpcName}`);
+    assert(
+      /\bto service_role\s*$/i.test(grant.trim()),
+      `${rpcName} deve ser exclusivo do service_role.`,
+    );
+  }
+});
+
+Deno.test("migration Fase 5B não aceita objetivo livre nem cria agenda", async () => {
+  const migration = await Deno.readTextFile(
+    new URL(
+      "../../migrations/20260829144846_fase5b_solicitacoes_site_privadas.sql",
+      import.meta.url,
+    ),
+  );
+  const executableSql = migration.replace(/--.*$/gm, "");
+
+  assert(
+    !/\b(?:p_)?objective\b/i.test(executableSql) &&
+      !/\b(?:p_)?objetivo\b/i.test(executableSql) &&
+      !/["'](?:objective|objetivo)["']/i.test(executableSql),
+    "Caixa privada não pode receber nem persistir objetivo livre.",
+  );
+  assert(
+    !/public\.(?:agendamentos_clinica|agendamento_lembretes|agenda_[a-z0-9_]*)/i.test(
+      executableSql,
+    ),
+    "Aceitar solicitação não pode escrever ou consultar tabelas da agenda.",
+  );
+  assert(
+    !/\b(?:insert\s+into|update|delete\s+from)\s+[^;\n]*(?:agenda|appointment)/i.test(
+      executableSql,
+    ),
+    "Migration não pode criar compromisso por efeito colateral.",
+  );
+  assert(
+    executableSql.includes("public.marketing_crm_salvar_lead("),
+    "Aceite deve terminar somente em lead/interação comercial revisada.",
+  );
+});
+
+Deno.test("aceite Fase 5B serializa a identidade por clínica e telefone antes da deduplicação", async () => {
+  const migration = await Deno.readTextFile(
+    new URL(
+      "../../migrations/20260829144846_fase5b_solicitacoes_site_privadas.sql",
+      import.meta.url,
+    ),
+  );
+  const acceptStart = migration.indexOf(
+    "create or replace function public.crm_site_booking_accept(",
+  );
+  const acceptEnd = migration.indexOf("$function$;", acceptStart);
+  const accept = migration.slice(acceptStart, acceptEnd);
+  const phoneLock = accept.indexOf(
+    "'site-booking:lead-identity:' || p_clinic_id::text || ':' || v_request.phone",
+  );
+  const identityRead = accept.indexOf("pg_catalog.count(*)::integer");
+
+  assert(acceptStart >= 0 && acceptEnd > acceptStart, "RPC de aceite ausente.");
+  assert(phoneLock >= 0, "Aceite deve usar lock clinic+telefone para a identidade pública.");
+  assert(
+    identityRead > phoneLock,
+    "Contagem por telefone não pode ocorrer antes do advisory lock da identidade.",
+  );
+});

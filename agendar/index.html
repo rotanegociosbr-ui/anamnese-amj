@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Solicite uma avaliação na Ana Maria Jacob Estética e envie sua preferência de atendimento pelo WhatsApp.">
+  <meta name="description" content="Solicite uma avaliação na Ana Maria Jacob Estética e registre sua preferência de atendimento com segurança.">
   <meta name="theme-color" content="#FBF6F0">
   <meta property="og:type" content="website">
   <meta property="og:locale" content="pt_BR">
   <meta property="og:site_name" content="Ana Maria Jacob Estética">
   <meta property="og:title" content="Solicitar avaliação | Ana Maria Jacob Estética">
-  <meta property="og:description" content="Conte sua preferência e chegue ao WhatsApp com a mensagem pronta.">
+  <meta property="og:description" content="Registre sua preferência e, se desejar, avise a clínica pelo WhatsApp.">
   <meta property="og:url" content="https://anamariajacob.com.br/agendar/">
   <meta property="og:image" content="https://anamariajacob.com.br/assets/og.png">
   <link rel="canonical" href="https://anamariajacob.com.br/agendar/">
@@ -18,7 +18,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&amp;family=Poppins:wght@300;400;500;600&amp;display=swap" rel="stylesheet">
   <link rel="icon" type="image/png" href="../assets/identidade-visual-transparente-v1.png">
   <link rel="stylesheet" href="../assets/site.css">
-  <link rel="stylesheet" href="agendar.css">
+  <link rel="stylesheet" href="agendar.css?v=20260829-2">
   <title>Solicitar avaliação | Ana Maria Jacob Estética</title>
 </head>
 <body class="booking-page">
@@ -51,10 +51,10 @@
         <div class="booking-intro">
           <p class="eyebrow">Sua jornada começa aqui</p>
           <h1 id="titulo-agendamento">Conte como podemos receber você</h1>
-          <p>Preencha apenas os dados iniciais. No final, o WhatsApp da Ana Maria abrirá com sua mensagem organizada para a equipe confirmar a disponibilidade.</p>
+          <p>Preencha apenas os dados iniciais. Depois que o pedido for registrado, você poderá abrir o WhatsApp com uma mensagem organizada para a equipe confirmar a disponibilidade.</p>
           <ol class="booking-steps" aria-label="Como funciona a solicitação">
             <li><span>1</span><div><strong>Você conta sua preferência</strong><small>Nome, interesse e melhor período.</small></div></li>
-            <li><span>2</span><div><strong>A mensagem fica pronta</strong><small>Você confere antes de enviar.</small></div></li>
+            <li><span>2</span><div><strong>O pedido fica registrado</strong><small>Se desejar, você também avisa a clínica pelo WhatsApp.</small></div></li>
             <li><span>3</span><div><strong>A clínica confirma</strong><small>O horário só fica reservado após resposta.</small></div></li>
           </ol>
           <p class="booking-privacy"><strong>Privacidade:</strong> não informe doenças, medicamentos, fotos ou outros dados de saúde aqui. Essas informações pertencem à ficha de anamnese segura.</p>
@@ -65,6 +65,12 @@
             <img src="../assets/identidade-visual-transparente-v1.png" width="1672" height="941" alt="Ana Maria Jacob Estética">
           </div>
           <form id="form-agendamento" novalidate>
+            <input id="agendamento-idempotency" name="idempotency_key" type="hidden">
+            <input id="agendamento-started-at" name="started_at" type="hidden">
+            <div class="booking-honeypot" aria-hidden="true">
+              <label for="agendamento-website">Deixe este campo vazio</label>
+              <input id="agendamento-website" name="website" type="text" tabindex="-1" autocomplete="off">
+            </div>
             <fieldset>
               <legend>1. Seus dados de contato</legend>
               <div class="field-grid">
@@ -80,8 +86,8 @@
                   <span>Você já foi atendida?</span>
                   <select id="primeira-visita" name="primeira_visita" required>
                     <option value="">Selecione</option>
-                    <option value="É minha primeira avaliação">É minha primeira avaliação</option>
-                    <option value="Já sou paciente">Já sou paciente</option>
+                    <option value="primeira_avaliacao">É minha primeira avaliação</option>
+                    <option value="paciente_atual">Já sou paciente</option>
                   </select>
                 </label>
               </div>
@@ -93,26 +99,26 @@
                 <span>Interesse inicial</span>
                 <select id="interesse" name="interesse" required>
                   <option value="">Escolha uma opção</option>
-                  <option>Quero uma avaliação e ainda não sei o procedimento</option>
-                  <option>Preenchimento facial</option>
-                  <option>Skinbooster</option>
-                  <option>Toxina botulínica</option>
-                  <option>Fios de PDO</option>
-                  <option>Intradermoterapia facial</option>
-                  <option>Intradermoterapia capilar</option>
-                  <option>Peeling</option>
-                  <option>Microagulhamento facial</option>
-                  <option>Microagulhamento capilar</option>
-                  <option>Harmonização facial</option>
-                  <option>Aplicação intramuscular com prescrição</option>
-                  <option>Retorno ou acompanhamento</option>
+                  <option value="avaliacao_sem_procedimento">Quero uma avaliação e ainda não sei o procedimento</option>
+                  <option value="preenchimento_facial">Preenchimento facial</option>
+                  <option value="skinbooster">Skinbooster</option>
+                  <option value="toxina_botulinica">Toxina botulínica</option>
+                  <option value="fios_pdo">Fios de PDO</option>
+                  <option value="intradermoterapia_facial">Intradermoterapia facial</option>
+                  <option value="intradermoterapia_capilar">Intradermoterapia capilar</option>
+                  <option value="peeling">Peeling</option>
+                  <option value="microagulhamento_facial">Microagulhamento facial</option>
+                  <option value="microagulhamento_capilar">Microagulhamento capilar</option>
+                  <option value="harmonizacao_facial">Harmonização facial</option>
+                  <option value="aplicacao_intramuscular">Aplicação intramuscular com prescrição</option>
+                  <option value="retorno_acompanhamento">Retorno ou acompanhamento</option>
                 </select>
               </label>
               <label class="field" for="objetivo">
                 <span>Em poucas palavras, o que você gostaria de conversar? <small>Opcional</small></span>
-                <textarea id="objetivo" name="objetivo" rows="3" maxlength="240" placeholder="Ex.: quero entender opções naturais para linhas de expressão."></textarea>
+                <textarea id="objetivo" name="objetivo" rows="3" maxlength="240" aria-describedby="objetivo-ajuda" placeholder="Ex.: quero entender opções naturais para linhas de expressão."></textarea>
               </label>
-              <p class="field-help">Escreva somente seu objetivo geral. Os dados de saúde serão preenchidos depois, no formulário apropriado.</p>
+              <p class="field-help" id="objetivo-ajuda"><strong>Este texto não é salvo no pedido.</strong> Ele só entra na mensagem que você poderá revisar e decidir enviar pelo WhatsApp. Não informe doenças, medicamentos, fotos ou outros dados de saúde aqui.</p>
             </fieldset>
 
             <fieldset>
@@ -126,10 +132,10 @@
                   <span>Melhor período</span>
                   <select id="periodo" name="periodo" required>
                     <option value="">Selecione</option>
-                    <option>Manhã</option>
-                    <option>Tarde</option>
-                    <option>Noite</option>
-                    <option>Posso combinar</option>
+                    <option value="manha">Manhã</option>
+                    <option value="tarde">Tarde</option>
+                    <option value="noite">Noite</option>
+                    <option value="a_combinar">Posso combinar</option>
                   </select>
                 </label>
               </div>
@@ -141,9 +147,17 @@
             </label>
 
             <p class="booking-notice">O envio não confirma nem reserva automaticamente o horário. A equipe responderá pelo WhatsApp.</p>
-            <button class="button button-primary booking-submit" type="submit">Continuar no WhatsApp</button>
-            <p class="form-status" id="form-status" role="status" aria-live="polite"></p>
+            <button class="button button-primary booking-submit" type="submit">Enviar solicitação</button>
+            <p class="form-status" id="form-status" role="status" aria-live="polite" aria-atomic="true"></p>
           </form>
+          <section class="booking-success" id="agendamento-sucesso" aria-labelledby="agendamento-sucesso-titulo" hidden>
+            <p class="eyebrow">Pedido registrado</p>
+            <h2 id="agendamento-sucesso-titulo" tabindex="-1">Solicitação recebida</h2>
+            <p>Recebemos seus dados para organizar o atendimento. Isso ainda não confirma nem reserva um horário.</p>
+            <p class="booking-success-code" id="agendamento-protocolo" hidden></p>
+            <a class="button button-primary" id="agendamento-whatsapp" href="https://wa.me/5531995844803" target="_blank" rel="noopener noreferrer">Abrir WhatsApp para avisar a clínica</a>
+            <small>O WhatsApp será aberto por você. A clínica só considera a mensagem enviada depois que você confirmar o envio no aplicativo.</small>
+          </section>
         </div>
       </div>
     </section>
@@ -168,6 +182,6 @@
   </footer>
 
   <script src="../assets/site.js" defer></script>
-  <script src="agendar.js" defer></script>
+  <script src="agendar.js?v=20260829-2" defer></script>
 </body>
 </html>

@@ -27,6 +27,7 @@
 .integracoes-card dt{color:#716a63;font-size:.78rem}
 .integracoes-card dd{display:flex;align-items:center;gap:7px;margin:0;color:#684a19;font-size:.8rem;font-weight:600;text-align:right}
 .integracoes-dot{width:8px;height:8px;border-radius:50%;background:#a33a3a;box-shadow:0 0 0 3px rgba(163,58,58,.1)}
+.integracoes-dot.ativo{background:#3c7b49;box-shadow:0 0 0 3px rgba(60,123,73,.12)}
 .integracoes-registry{margin:13px 2px 0;color:#706860;font-size:.75rem;line-height:1.45}
 .integracoes-footer{display:flex;align-items:flex-start;gap:18px;padding:17px 20px;border:1px dashed #d7c8ae;border-radius:14px;background:#fff;color:#625b54}
 .integracoes-footer strong{flex:0 0 270px;color:#443b31}.integracoes-footer span{line-height:1.55}

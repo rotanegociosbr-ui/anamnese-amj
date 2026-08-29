@@ -148,26 +148,28 @@ test("interrompe e falha fechado quando o RPC não responde", async () => {
 });
 
 const HANDLERS = [
-  ["anamnese-submit", "anamnese-submit"],
-  ["tcle-submit", "tcle-submit"],
-  ["tcle-preenchimento-submit", "tcle-submit"],
-  ["tcle-intradermoterapia-submit", "tcle-submit"],
-  ["tcle-bioestimulador-submit", "tcle-submit"],
-  ["tcle-peeling-quimico-submit", "tcle-submit"],
-  ["tcle-fios-pdo-submit", "tcle-submit"],
+  ["anamnese-submit", "anamnese-submit", "Deno.serve", "await consumePublicFormRateLimit"],
+  ["tcle-submit", "tcle-submit", "Deno.serve", "await consumePublicFormRateLimit"],
+  ["tcle-preenchimento-submit", "tcle-submit", "Deno.serve", "await consumePublicFormRateLimit"],
+  ["tcle-intradermoterapia-submit", "tcle-submit", "Deno.serve", "await consumePublicFormRateLimit"],
+  ["tcle-bioestimulador-submit", "tcle-submit", "Deno.serve", "await consumePublicFormRateLimit"],
+  ["tcle-peeling-quimico-submit", "tcle-submit", "Deno.serve", "await consumePublicFormRateLimit"],
+  ["tcle-fios-pdo-submit", "tcle-submit", "Deno.serve", "await consumePublicFormRateLimit"],
+  ["agendamento-submit", "agendamento-submit", "return async (req: Request)", "await rateLimiter(req"],
 ];
 
 test("todos os formulários aplicam o limite antes do corpo e da idempotência", async () => {
-  for (const [directory, scope] of HANDLERS) {
+  for (const [directory, scope, handlerNeedle, limiterNeedle] of HANDLERS) {
     const source = await readFile(
       path.join(FUNCTIONS, directory, "index.ts"),
       "utf8",
     );
-    const handler = source.indexOf("Deno.serve");
-    const limiter = source.indexOf("await consumePublicFormRateLimit", handler);
+    const handler = source.indexOf(handlerNeedle);
+    const limiter = source.indexOf(limiterNeedle, handler);
     const bodyRead = Math.max(
       source.indexOf("await readBody(req)", handler),
       source.indexOf("await req.arrayBuffer()", handler),
+      source.indexOf("await readJsonBody(req)", handler),
     );
     const idempotencyReads = [
       source.indexOf("await findExisting(", handler),
@@ -194,7 +196,7 @@ test("todos os formulários aplicam o limite antes do corpo e da idempotência",
     );
     assert.match(
       source.slice(limiter, bodyRead),
-      /temporary_error[\s\S]*503/,
+      /(?:temporary_error[\s\S]*503|503[\s\S]*rate_limit_unavailable)/,
       `${directory}: indisponibilidade do limitador não falha fechado`,
     );
     assert.match(

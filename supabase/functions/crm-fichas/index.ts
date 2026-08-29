@@ -581,6 +581,42 @@ function mapDatabaseError(result: AdminResult): never {
       "possible_distinct_reason_required",
       "Justifique por que os cadastros são distintos.",
     ],
+    [
+      "site_booking_review_required",
+      409,
+      "site_booking_review_required",
+      "Existe contato com o mesmo telefone e identidade diferente. Revise manualmente sem mesclar.",
+    ],
+    [
+      "site_booking_not_found",
+      404,
+      "site_booking_not_found",
+      "Solicitação do site não encontrada.",
+    ],
+    [
+      "site_booking_version_conflict",
+      409,
+      "site_booking_version_conflict",
+      "A solicitação mudou em outro acesso. Recarregue e tente novamente.",
+    ],
+    [
+      "site_booking_already_handled",
+      409,
+      "site_booking_already_handled",
+      "Esta solicitação já foi tratada.",
+    ],
+    [
+      "site_booking_idempotency_conflict",
+      409,
+      "site_booking_idempotency_conflict",
+      "Use uma nova chave para uma decisão diferente.",
+    ],
+    [
+      "site_booking_invalid_",
+      422,
+      "site_booking_invalid_request",
+      "Confira os dados da solicitação.",
+    ],
   ];
   for (const [needle, status, code, publicMessage] of mappings) {
     if (message.includes(needle)) throw new ApiError(status, code, publicMessage);
@@ -599,7 +635,10 @@ async function rpc(
     | "marketing_crm_salvar_lead"
     | "marketing_crm_campaign_options"
     | "crm_analisar_conversao"
-    | "crm_converter_lead",
+    | "crm_converter_lead"
+    | "crm_site_booking_list"
+    | "crm_site_booking_accept"
+    | "crm_site_booking_archive",
   body: JsonRecord,
 ): Promise<JsonRecord> {
   const result = await admin(`/rest/v1/rpc/${name}`, "POST", body);
@@ -671,6 +710,65 @@ export function leadDto(
     criado_em: row.created_at,
     atualizado_em: row.updated_at,
     historico: history,
+  };
+}
+
+function siteRequestDto(row: JsonRecord): JsonRecord | null {
+  const id = typeof row.id === "string" && validUuid(row.id) ? row.id : null;
+  const version = Number(row.versao ?? row.version);
+  if (!id || !Number.isInteger(version) || version < 1) return null;
+  return {
+    id,
+    solicitacao_id: id,
+    nome: typeof row.nome === "string" ? row.nome : "",
+    telefone: typeof row.telefone === "string" ? row.telefone : "",
+    primeira_visita: typeof row.primeira_visita === "string" ? row.primeira_visita : "",
+    interesse: typeof row.interesse === "string" ? row.interesse : "",
+    data_preferida: typeof row.data_preferida === "string" ? row.data_preferida : null,
+    periodo: typeof row.periodo === "string" ? row.periodo : "",
+    consentimento_contato: row.consentimento_contato === true,
+    consentimento_versao: typeof row.consentimento_versao === "string"
+      ? row.consentimento_versao
+      : null,
+    status: typeof row.status === "string" ? row.status : "pending",
+    lead_id: typeof row.lead_id === "string" && validUuid(row.lead_id) ? row.lead_id : null,
+    decisao: typeof row.decisao === "string" ? row.decisao : null,
+    versao: version,
+    version,
+    recebido_em: typeof row.recebido_em === "string"
+      ? row.recebido_em
+      : typeof row.created_at === "string"
+      ? row.created_at
+      : null,
+    atualizado_em: typeof row.atualizado_em === "string" ? row.atualizado_em : null,
+    tratado_em: typeof row.tratado_em === "string" ? row.tratado_em : null,
+  };
+}
+
+async function listSiteRequests(
+  clinicId: string,
+  userId: string,
+  status = "pending",
+  limit = 100,
+  offset = 0,
+): Promise<{ items: JsonRecord[]; pending: number; total: number; hasMore: boolean }> {
+  const result = await rpc("crm_site_booking_list", {
+    p_clinic_id: clinicId,
+    p_actor_id: userId,
+    p_status: status,
+    p_limit: limit,
+    p_offset: offset,
+  });
+  const items = rows(result.solicitacoes_site).map(siteRequestDto).filter(
+    (item): item is JsonRecord => item !== null,
+  );
+  const pending = Number(result.pendentes);
+  const total = Number(result.total);
+  return {
+    items,
+    pending: Number.isInteger(pending) && pending >= 0 ? pending : 0,
+    total: Number.isInteger(total) && total >= 0 ? total : items.length,
+    hasMore: result.has_more === true,
   };
 }
 
@@ -829,11 +927,12 @@ async function handleList(
     converted_at: "not.is.null",
     limit: "1",
   });
-  const [leadRows, owners, convertedCount, total] = await Promise.all([
+  const [leadRows, owners, convertedCount, total, siteInbox] = await Promise.all([
     selectRows("crm_leads", params),
     ownersForClinic(clinicId),
     countRows("crm_leads", conversionCountParams),
     countRows("crm_leads", totalParams),
+    listSiteRequests(clinicId, userId, "pending", 100, 0),
   ]);
   const currentCampaignIds = Array.from(
     new Set(
@@ -870,9 +969,11 @@ async function handleList(
       ).length,
     sem_primeira_resposta:
       leadRows.filter((lead) => lead.record_status === "active" && !lead.first_response_at).length,
+    solicitacoes_site_pendentes: siteInbox.pending,
   };
   return success(req, context, {
     leads,
+    solicitacoes_site: siteInbox.items,
     responsaveis: owners.rows,
     campanhas_ativas: campaignRows.map((row) => ({
       id: row.id,
@@ -890,6 +991,12 @@ async function handleList(
       offset,
       has_more: offset + leads.length < total,
     },
+    paginacao_solicitacoes_site: {
+      total: siteInbox.total,
+      limit: 100,
+      offset: 0,
+      has_more: siteInbox.hasMore,
+    },
   });
 }
 
@@ -902,6 +1009,101 @@ function expectedVersion(value: unknown, creating = false): number {
     creating ? 0 : 1,
     2_147_483_647,
   );
+}
+
+async function handleSiteRequestList(
+  req: Request,
+  context: DualAuthContext,
+  payload: JsonRecord,
+): Promise<Response> {
+  const { clinicId, userId } = tenantFromContext(context);
+  const status = optionalText(payload.status, "status", 20) || "pending";
+  if (!["pending", "accepted", "archived", "all"].includes(status.toLowerCase())) {
+    throw new ApiError(422, "invalid_status", "Status inválido.");
+  }
+  const limit = integerValue(payload.limit, "limit", 100, 1, MAX_PAGE_SIZE);
+  const offset = integerValue(payload.offset, "offset", 0, 0, MAX_OFFSET);
+  const result = await listSiteRequests(clinicId, userId, status.toLowerCase(), limit, offset);
+  return success(req, context, {
+    solicitacoes_site: result.items,
+    resumo: { solicitacoes_site_pendentes: result.pending },
+    paginacao: {
+      total: result.total,
+      limit,
+      offset,
+      has_more: result.hasMore,
+    },
+  });
+}
+
+async function handleSiteRequestAccept(
+  req: Request,
+  context: DualAuthContext,
+  envelope: JsonRecord,
+  payload: JsonRecord,
+): Promise<Response> {
+  const { clinicId, userId } = tenantFromContext(context);
+  const siteRequestId = requiredUuid(
+    pick(payload, "solicitacao_id", "site_request_id", "request_id", "id"),
+    "solicitacao_id",
+  );
+  const nextActionAt = optionalTimestamp(
+    pick(payload, "proxima_acao_em", "next_action_at"),
+    "proxima_acao_em",
+  ) || new Date().toISOString();
+  const result = await rpc("crm_site_booking_accept", {
+    p_clinic_id: clinicId,
+    p_actor_id: userId,
+    p_site_request_id: siteRequestId,
+    p_expected_version: expectedVersion(envelope.expected_version),
+    // O owner autenticado é também o responsável inicial; não há ator técnico.
+    p_responsible_user_id: userId,
+    p_next_action_at: nextActionAt,
+    p_idempotency_key: requiredUuid(envelope.idempotency_key, "idempotency_key"),
+    p_operation_request_id: context.requestId,
+  });
+  return success(req, context, {
+    solicitacao_id: result.solicitacao_id,
+    status: result.status,
+    lead_id: result.lead_id,
+    lead_version: result.lead_version,
+    decisao: result.decisao,
+    versao: result.versao,
+    version: result.versao,
+    idempotente: result.idempotent === true,
+  }, result.idempotent === true ? 200 : 201);
+}
+
+async function handleSiteRequestArchive(
+  req: Request,
+  context: DualAuthContext,
+  envelope: JsonRecord,
+  payload: JsonRecord,
+): Promise<Response> {
+  const { clinicId, userId } = tenantFromContext(context);
+  const siteRequestId = requiredUuid(
+    pick(payload, "solicitacao_id", "site_request_id", "request_id", "id"),
+    "solicitacao_id",
+  );
+  const reason = requiredText(pick(payload, "motivo", "reason"), "motivo", 3, 500);
+  await requireProtected(req, context, payload, "archive_site_request", siteRequestId);
+  const result = await rpc("crm_site_booking_archive", {
+    p_clinic_id: clinicId,
+    p_actor_id: userId,
+    p_site_request_id: siteRequestId,
+    p_expected_version: expectedVersion(envelope.expected_version),
+    p_reason: reason,
+    p_idempotency_key: requiredUuid(envelope.idempotency_key, "idempotency_key"),
+    p_operation_request_id: context.requestId,
+  });
+  return success(req, context, {
+    solicitacao_id: result.solicitacao_id,
+    status: result.status,
+    decisao: result.decisao,
+    versao: result.versao,
+    version: result.versao,
+    idempotente: result.idempotent === true,
+  });
 }
 
 async function handleSave(
@@ -1285,18 +1487,32 @@ export async function handleRequest(req: Request): Promise<Response> {
 
   let action = "request";
   let entityId: string | null = null;
+  let auditEntity = "crm_lead";
   try {
     const envelope = await readJsonBody(req);
     action = requiredText(pick(envelope, "action", "acao"), "action", 2, 80).toLowerCase();
     if (!SAFE_ACTION.test(action)) throw new ApiError(422, "invalid_action", "Ação inválida.");
     const payload = isRecord(envelope.payload) ? envelope.payload : envelope;
-    entityId = optionalUuid(pick(payload, "lead_id", "id"), "lead_id");
+    entityId = optionalUuid(
+      pick(payload, "solicitacao_id", "site_request_id", "lead_id", "id"),
+      "entity_id",
+    );
+    if (action.includes("solicitacao_site")) auditEntity = "crm_site_booking";
 
     let response: Response;
     switch (action) {
       case "listar":
       case "listar_leads":
         response = await handleList(req, context, payload);
+        break;
+      case "listar_solicitacoes_site":
+        response = await handleSiteRequestList(req, context, payload);
+        break;
+      case "aceitar_solicitacao_site":
+        response = await handleSiteRequestAccept(req, context, envelope, payload);
+        break;
+      case "arquivar_solicitacao_site":
+        response = await handleSiteRequestArchive(req, context, envelope, payload);
         break;
       case "salvar_lead":
         response = await handleSave(req, context, envelope, payload);
@@ -1321,7 +1537,7 @@ export async function handleRequest(req: Request): Promise<Response> {
     }
 
     await writeClinicAudit(AUTH_CONFIG, context, {
-      entity: "crm_lead",
+      entity: auditEntity,
       entityId,
       action,
       outcome: response.ok ? "success" : "error",
@@ -1331,7 +1547,7 @@ export async function handleRequest(req: Request): Promise<Response> {
   } catch (error) {
     if (error instanceof ApiError) {
       await writeClinicAudit(AUTH_CONFIG, context, {
-        entity: "crm_lead",
+        entity: auditEntity,
         entityId,
         action: SAFE_ACTION.test(action) ? action : "request",
         outcome: "error",
@@ -1341,7 +1557,7 @@ export async function handleRequest(req: Request): Promise<Response> {
     }
     console.error("CRM request failed");
     await writeClinicAudit(AUTH_CONFIG, context, {
-      entity: "crm_lead",
+      entity: auditEntity,
       entityId,
       action: SAFE_ACTION.test(action) ? action : "request",
       outcome: "error",

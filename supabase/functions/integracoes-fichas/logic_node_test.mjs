@@ -6,7 +6,7 @@ import {
   NULL_INTEGRATION_ADAPTER,
 } from "./logic.ts";
 
-test("catalogo fica integralmente desativado e o DTO usa allowlist", () => {
+test("catalogo ativa apenas o fluxo interno do site e mantém externos bloqueados", () => {
   const catalog = integrationStatusDto();
   assert.deepEqual(catalog.map((item) => item.id), [
     "site_futuro",
@@ -24,10 +24,15 @@ test("catalogo fica integralmente desativado e o DTO usa allowlist", () => {
       "verified",
       "external_calls_allowed",
     ]);
+    assert.equal(item.external_calls_allowed, false);
+  }
+  assert.equal(catalog[0].state, "internal_active");
+  assert.equal(catalog[0].enabled, true);
+  assert.equal(catalog[0].verified, true);
+  for (const item of catalog.slice(1)) {
     assert.equal(item.state, "disabled");
     assert.equal(item.enabled, false);
     assert.equal(item.verified, false);
-    assert.equal(item.external_calls_allowed, false);
   }
 });
 
