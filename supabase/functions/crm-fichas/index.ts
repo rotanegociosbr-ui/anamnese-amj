@@ -334,7 +334,7 @@ export function normalizeLeadPayload(payload: JsonRecord): JsonRecord {
     email,
     source: requiredText(pick(payload, "origem", "source"), "origem", 2, 80),
     subsource: optionalText(pick(payload, "suborigem", "subsource"), "suborigem", 120),
-    campaign: optionalText(pick(payload, "campanha", "campaign"), "campanha", 160),
+    campaign_id: optionalUuid(pick(payload, "campanha_id", "campaign_id"), "campanha_id"),
     interest: requiredText(pick(payload, "interesse", "interest"), "interesse", 1, 160),
     responsible_user_id: requiredUuid(
       pick(payload, "responsavel_id", "responsible_user_id"),
@@ -595,7 +595,11 @@ function mapDatabaseError(result: AdminResult): never {
 }
 
 async function rpc(
-  name: "crm_salvar_lead" | "crm_analisar_conversao" | "crm_converter_lead",
+  name:
+    | "marketing_crm_salvar_lead"
+    | "marketing_crm_campaign_options"
+    | "crm_analisar_conversao"
+    | "crm_converter_lead",
   body: JsonRecord,
 ): Promise<JsonRecord> {
   const result = await admin(`/rest/v1/rpc/${name}`, "POST", body);
@@ -642,6 +646,8 @@ export function leadDto(
     source: row.source,
     suborigem: row.subsource,
     campanha: row.campaign,
+    campanha_id: row.campaign_id,
+    campaign_id: row.campaign_id,
     interesse: row.interest,
     responsavel_id: row.responsible_user_id,
     owner_id: row.responsible_user_id,
@@ -762,14 +768,16 @@ async function handleList(
   context: DualAuthContext,
   payload: JsonRecord,
 ): Promise<Response> {
-  const { clinicId } = tenantFromContext(context);
+  const { clinicId, userId } = tenantFromContext(context);
+  const limit = integerValue(payload.limit, "limit", 100, 1, MAX_PAGE_SIZE);
+  const offset = integerValue(payload.offset, "offset", 0, 0, MAX_OFFSET);
   const params = new URLSearchParams({
     select:
-      "id,full_name,phone,email,stage_code,source,subsource,campaign,interest,responsible_user_id,first_response_at,next_action_type,next_action_at,loss_reason,commercial_notes,record_status,patient_id,converted_at,version,created_at,updated_at",
+      "id,full_name,phone,email,stage_code,source,subsource,campaign,campaign_id,interest,responsible_user_id,first_response_at,next_action_type,next_action_at,loss_reason,commercial_notes,record_status,patient_id,converted_at,version,created_at,updated_at",
     clinic_id: `eq.${clinicId}`,
     order: "next_action_at.asc.nullslast,updated_at.desc,id.asc",
-    limit: String(integerValue(payload.limit, "limit", 200, 1, MAX_PAGE_SIZE)),
-    offset: String(integerValue(payload.offset, "offset", 0, 0, MAX_OFFSET)),
+    limit: String(limit),
+    offset: String(offset),
   });
   if (payload.incluir_arquivados !== true) {
     params.set("record_status", "not.in.(archived,cancelled)");
@@ -806,6 +814,14 @@ async function handleList(
     );
   }
 
+  // A contagem usa exatamente os mesmos filtros da página. Apenas projeção,
+  // ordenação e janela são removidas para que nenhum lead fique invisível.
+  const totalParams = new URLSearchParams(params);
+  totalParams.set("select", "id");
+  totalParams.delete("order");
+  totalParams.delete("offset");
+  totalParams.set("limit", "1");
+
   const conversionCountParams = new URLSearchParams({
     select: "id",
     clinic_id: `eq.${clinicId}`,
@@ -813,11 +829,25 @@ async function handleList(
     converted_at: "not.is.null",
     limit: "1",
   });
-  const [leadRows, owners, convertedCount] = await Promise.all([
+  const [leadRows, owners, convertedCount, total] = await Promise.all([
     selectRows("crm_leads", params),
     ownersForClinic(clinicId),
     countRows("crm_leads", conversionCountParams),
+    countRows("crm_leads", totalParams),
   ]);
+  const currentCampaignIds = Array.from(
+    new Set(
+      leadRows.map((lead) => String(lead.campaign_id || "")).filter(validUuid),
+    ),
+  );
+  const campaignOptions = await rpc("marketing_crm_campaign_options", {
+    p_clinic_id: clinicId,
+    p_actor_id: userId,
+    p_current_ids: currentCampaignIds,
+  });
+  const campaignRows = Array.isArray(campaignOptions.campanhas_ativas)
+    ? campaignOptions.campanhas_ativas.filter(isRecord)
+    : [];
   const history = await historiesForLeads(
     clinicId,
     leadRows.map((lead) => String(lead.id)).filter((id) => validUuid(id)),
@@ -841,7 +871,26 @@ async function handleList(
     sem_primeira_resposta:
       leadRows.filter((lead) => lead.record_status === "active" && !lead.first_response_at).length,
   };
-  return success(req, context, { leads, responsaveis: owners.rows, resumo: summary });
+  return success(req, context, {
+    leads,
+    responsaveis: owners.rows,
+    campanhas_ativas: campaignRows.map((row) => ({
+      id: row.id,
+      nome: row.nome,
+      codigo: row.codigo,
+      canal: row.canal,
+      status: row.status,
+      selecionavel: row.selecionavel === true,
+      historica: row.historica === true,
+    })),
+    resumo: summary,
+    paginacao: {
+      total,
+      limit,
+      offset,
+      has_more: offset + leads.length < total,
+    },
+  });
 }
 
 function expectedVersion(value: unknown, creating = false): number {
@@ -865,7 +914,7 @@ async function handleSave(
   const leadId = optionalUuid(pick(payload, "lead_id", "id"), "lead_id");
   const creating = !leadId;
   const normalized = normalizeLeadPayload(payload);
-  const result = await rpc("crm_salvar_lead", {
+  const result = await rpc("marketing_crm_salvar_lead", {
     p_action: creating ? "create" : "update",
     p_clinic_id: clinicId,
     p_actor_id: userId,
@@ -928,7 +977,7 @@ async function handleStateChange(
   const { clinicId, userId } = tenantFromContext(context);
   const leadId = requiredUuid(pick(payload, "lead_id", "id"), "lead_id");
   await requireProtected(req, context, payload, action, leadId);
-  const result = await rpc("crm_salvar_lead", {
+  const result = await rpc("marketing_crm_salvar_lead", {
     p_action: action,
     p_clinic_id: clinicId,
     p_actor_id: userId,
@@ -964,7 +1013,7 @@ async function handleStageChange(
     pick(payload, "proxima_acao_em", "next_action_at"),
     "proxima_acao_em",
   );
-  const result = await rpc("crm_salvar_lead", {
+  const result = await rpc("marketing_crm_salvar_lead", {
     p_action: "change_stage",
     p_clinic_id: clinicId,
     p_actor_id: userId,
@@ -1007,7 +1056,7 @@ async function handleInteraction(
     pick(payload, "proxima_acao_em", "next_action_at"),
     "proxima_acao_em",
   );
-  const result = await rpc("crm_salvar_lead", {
+  const result = await rpc("marketing_crm_salvar_lead", {
     p_action: "add_interaction",
     p_clinic_id: clinicId,
     p_actor_id: userId,

@@ -72,7 +72,7 @@ assert.match(ui, /row\.plano_id[\s\S]+row\.versao_plano[\s\S]+row\.versao_fila/)
 assert.match(ui, /row\.elegivel === true[\s\S]+row\.canal/);
 assert.match(ui, /Não envia mensagens/);
 
-const tabNames = ['inicio', 'crm', 'fichas', 'agenda', 'prontuarios', 'financeiro',
+const tabNames = ['inicio', 'crm', 'marketing', 'fichas', 'agenda', 'prontuarios', 'financeiro',
   'operacao', 'acompanhamentos', 'gestao', 'cotacoes'];
 const elements = new Map();
 function classListMock() {
@@ -117,6 +117,12 @@ assert.equal(elements.get('aba-bt-acompanhamentos').focused, true,
   'ativação direta com moverFoco deve focar Acompanhamentos');
 assert.equal(followupsActivated, 1,
   'ativação da aba deve atualizar o módulo de Acompanhamentos');
+assert.match(ui, /state\.responsaveis = \[\][\s\S]*state\.credentials = \[\][\s\S]*state\.consents = \[\][\s\S]*state\.root\.innerHTML = shell\(\)[\s\S]*state\.root\.hidden = true/,
+  'logout deve remover credenciais, consentimentos, responsáveis e nomes renderizados');
+assert.match(html, /AMJAcompanhamentos\) window\.AMJAcompanhamentos\.reset\(\)/,
+  'limpeza central deve resetar Acompanhamentos');
+assert.match(shell, /!authenticated[\s\S]*AMJAcompanhamentos\.reset\(\)[\s\S]*AMJMarketing\.reset\(\)/,
+  'observer do shell deve limpar dados sensíveis de Acompanhamentos e Marketing');
 assert.match(shell,
   /if \(mobile\)[\s\S]*?class="app-mobile-action"[\s\S]*?data-shell-route="[\s\S]*?class="app-shell-nav-button"[\s\S]*?data-shell-route="/,
   'atalhos mobile e desktop devem compartilhar o contrato data-shell-route');

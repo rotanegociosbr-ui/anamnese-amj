@@ -23,8 +23,10 @@ assert.doesNotMatch(html, /<script[^>]+src=["']\.\/crm\.js/i,
   'CRM deve ser carregado sob demanda pelo shell');
 assert.doesNotMatch(html, /<link[^>]+href=["']\.\/crm\.css/i,
   'CSS do CRM deve ser carregado sob demanda pelo shell');
+assert.doesNotMatch(html, /<script[^>]+src=["']\.\/marketing\.js/i,
+  'Marketing deve ser carregado sob demanda pelo shell');
 
-for (const route of ['inicio', 'crm', 'procedimentos', 'clientes', 'produtos', 'marcas', 'fornecedores', 'agenda',
+for (const route of ['inicio', 'crm', 'marketing', 'procedimentos', 'clientes', 'produtos', 'marcas', 'fornecedores', 'agenda',
   'receitas', 'despesas', 'estoque', 'fichas', 'gestao']) {
   assert.match(js, new RegExp('\\b' + route + ': Object\\.freeze'), 'rota principal ausente: ' + route);
 }
@@ -77,11 +79,13 @@ assert.match(css, /\.app-shell-mobile-bar\s*\{[\s\S]*?position:\s*fixed/,
 assert.match(css, /\.app-shell-content\s*\{[\s\S]*?width:\s*min\(100%,\s*1580px\)/,
   'workspace não pode continuar preso ao limite legado de 760px');
 
-assert.match(html, /const abas = \['inicio', 'crm', 'fichas', 'agenda'/,
+assert.match(html, /const abas = \['inicio', 'crm', 'marketing', 'fichas', 'agenda'/,
   'ativador legado deve reconhecer Início');
 assert.match(html, /id="aba-inicio"/, 'painel Início deve existir no HTML');
 assert.match(html, /id="aba-crm"[\s\S]*?id="crm-root"/,
   'painel CRM deve fornecer somente a raiz do módulo lazy');
+assert.match(html, /id="aba-marketing"[\s\S]*?id="marketing-root"/,
+  'painel Marketing deve fornecer somente a raiz do módulo lazy');
 assert.match(html, /data-shell-metric="crm-abertos"[\s\S]*?data-shell-metric="crm-vencidos"/,
   'Início deve mostrar contadores reais do CRM após o módulo carregar');
 assert.match(html, /data-shell-route="crm" data-shell-action="novo-lead"/,

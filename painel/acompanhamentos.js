@@ -228,7 +228,20 @@
     state.root.hidden = !ownerAccess();
     if (ownerAccess() && !state.loaded) load();
   }
-  function reset() { state.generation += 1; state.loaded = false; state.rows = []; state.intents.clear(); }
+  function reset() {
+    state.generation += 1;
+    state.loaded = false;
+    state.loading = false;
+    state.rows = [];
+    state.responsaveis = [];
+    state.credentials = [];
+    state.consents = [];
+    state.intents.clear();
+    if (state.root) {
+      state.root.innerHTML = shell();
+      state.root.hidden = true;
+    }
+  }
 
   window.AMJAcompanhamentos = { montar: mount, ativar: load, carregar: load,
     atualizarAcesso: updateAccess, reset: reset, contrato: { endpoint: API, mensagensAutomaticas: false } };

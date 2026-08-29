@@ -4,6 +4,7 @@
   const ROUTES = Object.freeze({
     inicio: Object.freeze({ title: 'Início', legacy: 'inicio', group: 'principal' }),
     crm: Object.freeze({ title: 'CRM Leads', legacy: 'crm', owner: true, group: 'principal' }),
+    marketing: Object.freeze({ title: 'Marketing', legacy: 'marketing', owner: true, group: 'principal' }),
     procedimentos: Object.freeze({ title: 'Procedimentos', legacy: 'operacao', owner: true, group: 'principal' }),
     acompanhamentos: Object.freeze({ title: 'Acompanhamentos', legacy: 'acompanhamentos', owner: true, group: 'principal' }),
     clientes: Object.freeze({ title: 'Clientes', legacy: 'financeiro', owner: true, financeView: 'clientes', group: 'principal' }),
@@ -20,7 +21,7 @@
     prontuarios: Object.freeze({ title: 'Fotos e prontuários', legacy: 'prontuarios', owner: true, group: 'secondary' })
   });
 
-  const PRIMARY_ORDER = ['inicio', 'crm', 'procedimentos', 'acompanhamentos', 'clientes', 'agenda', 'receitas', 'despesas', 'produtos', 'marcas',
+  const PRIMARY_ORDER = ['inicio', 'crm', 'marketing', 'procedimentos', 'acompanhamentos', 'clientes', 'agenda', 'receitas', 'despesas', 'produtos', 'marcas',
     'fornecedores', 'estoque', 'cotacoes', 'fichas', 'gestao'];
   const SECONDARY_ORDER = ['prontuarios'];
   const STORAGE_ROUTE = 'amj_shell_route';
@@ -30,6 +31,12 @@
       src: './crm.js?v=20260826-1',
       css: './crm.css?v=20260826-1',
       root: 'crm-root'
+    }),
+    marketing: Object.freeze({
+      global: 'AMJMarketing',
+      src: './marketing.js?v=20260829-1',
+      css: './marketing.css?v=20260829-1',
+      root: 'marketing-root'
     }),
     operacao: Object.freeze({
       global: 'AMJOperacaoClinica',
@@ -57,6 +64,7 @@
   const ICONS = Object.freeze({
     inicio: '<path d="M3 10.5 10 4l7 6.5v6.2a1.3 1.3 0 0 1-1.3 1.3H4.3A1.3 1.3 0 0 1 3 16.7Z"/><path d="M7.5 18v-5h5v5"/>',
     crm: '<path d="M3 4h14l-5.5 6v5l-3 1.5V10Z"/><path d="M13.5 13.5h3M15 12v3"/>',
+    marketing: '<path d="M3 15.5V12l9-4.5v12Z"/><path d="M12 9l4-2v9l-4-2M5.5 15.5l1 3h3l-1-4"/>',
     procedimentos: '<path d="M6.5 4.5h7v12h-7z"/><path d="M8.5 2.5h3v3h-3zM8.5 9.5h3M10 8v3M14 7h2.5M14 10h2.5M14 13h2.5"/>',
     clientes: '<circle cx="8" cy="7" r="3"/><path d="M2.8 17c.6-3 2.3-4.5 5.2-4.5s4.6 1.5 5.2 4.5M14 7.5a2.5 2.5 0 0 1 0 5M14.5 13.5c1.5.5 2.4 1.6 2.7 3.5"/>',
     produtos: '<path d="M5 3.5h10v13H5zM7.5 1.8h5v3.5h-5zM7.5 9h5M10 6.5v5"/>',
@@ -225,7 +233,7 @@
       setControlAccess(button, allowed);
     });
 
-    ['crm', 'operacao', 'acompanhamentos', 'gestao', 'cotacoes'].forEach(function (legacy) {
+    ['crm', 'marketing', 'operacao', 'acompanhamentos', 'gestao', 'cotacoes'].forEach(function (legacy) {
       const button = byId('aba-bt-' + legacy);
       if (!button) return;
       const allowed = owner;
@@ -842,6 +850,8 @@
       document.body.classList.toggle('app-shell-authenticated', authenticated);
       if (!authenticated) {
         if (window.AMJCotacoes && typeof window.AMJCotacoes.reset === 'function') window.AMJCotacoes.reset();
+        if (window.AMJAcompanhamentos && typeof window.AMJAcompanhamentos.reset === 'function') window.AMJAcompanhamentos.reset();
+        if (window.AMJMarketing && typeof window.AMJMarketing.reset === 'function') window.AMJMarketing.reset();
         state.restoredForSession = false;
         document.title = 'Fichas, Agenda, Prontuários e Financeiro — Ana Maria Jacob Estética';
         closeDrawer(false);
@@ -867,7 +877,7 @@
     state.accessObserver.observe(list, { attributes: true, attributeFilter: ['class', 'hidden'] });
     const identity = byId('usuario-detalhes');
     if (identity) state.accessObserver.observe(identity, { childList: true, subtree: true });
-    ['aba-bt-crm', 'aba-bt-financeiro', 'aba-bt-prontuarios', 'aba-bt-cotacoes'].forEach(function (id) {
+    ['aba-bt-crm', 'aba-bt-marketing', 'aba-bt-financeiro', 'aba-bt-prontuarios', 'aba-bt-cotacoes'].forEach(function (id) {
       const button = byId(id);
       if (button) state.accessObserver.observe(button, { attributes: true, attributeFilter: ['hidden', 'disabled'] });
     });

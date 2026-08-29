@@ -284,6 +284,39 @@ Deno.test("fonte liga ações UI a RPC única e protege apenas operações crít
   assert(source.includes('"distinct_reason"'), "Alias final distinct_reason deve ser aceito.");
 });
 
+Deno.test("campanhas do CRM permanecem RPC-only e preservam referências históricas", async () => {
+  const source = await Deno.readTextFile(new URL("./index.ts", import.meta.url));
+  assert(
+    !source.includes('selectRows("marketing_campaigns"'),
+    "CRM não pode ler tabela RPC-only diretamente.",
+  );
+  assert(
+    source.includes('rpc("marketing_crm_campaign_options"'),
+    "Opções canônicas devem vir da RPC tenant/owner.",
+  );
+  assert(source.includes("p_current_ids"), "Campanhas históricas da página devem ser preservadas.");
+});
+
+Deno.test("listagem possui paginação exata com os mesmos filtros", async () => {
+  const source = await Deno.readTextFile(new URL("./index.ts", import.meta.url));
+  const listStart = source.indexOf("async function handleList");
+  const listEnd = source.indexOf("function expectedVersion", listStart);
+  const list = source.slice(listStart, listEnd);
+  assert(
+    list.includes("const totalParams = new URLSearchParams(params)"),
+    "Contagem deve clonar os filtros da página.",
+  );
+  assert(list.includes('countRows("crm_leads", totalParams)'), "Total exato deve vir do banco.");
+  assert(
+    list.includes("has_more: offset + leads.length < total"),
+    "Resposta deve informar se ainda existem leads.",
+  );
+  assert(
+    list.includes("total,") && list.includes("limit,") && list.includes("offset,"),
+    "Metadados de paginação estão incompletos.",
+  );
+});
+
 Deno.test("migration preserva helpers legados e incrementa versão da revisão provável", async () => {
   const migration = await Deno.readTextFile(
     new URL("../../migrations/20260826045218_crm_fase1_leads.sql", import.meta.url),

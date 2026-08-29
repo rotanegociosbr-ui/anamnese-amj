@@ -19,8 +19,10 @@
   ]);
   const CLOSED_STAGES = new Set(['convertida', 'nao_convertida', 'arquivada']);
   const ORIGINS = Object.freeze([
-    ['instagram', 'Instagram'], ['whatsapp', 'WhatsApp'], ['google', 'Google'],
-    ['indicacao', 'Indicação'], ['site', 'Site'], ['telefone', 'Telefone'], ['outro', 'Outro']
+    ['instagram_organico', 'Instagram orgânico'], ['instagram_ads', 'Instagram Ads'],
+    ['facebook', 'Facebook'], ['google', 'Google'], ['google_maps', 'Google Maps'],
+    ['indicacao', 'Indicação'], ['paciente_atual', 'Paciente atual'], ['influenciadora', 'Influenciadora'],
+    ['site', 'Site'], ['whatsapp', 'WhatsApp'], ['evento', 'Evento'], ['parceria', 'Parceria'], ['outro', 'Outro']
   ]);
   const NEXT_ACTION_TYPES = Object.freeze([
     ['whatsapp', 'Enviar WhatsApp'], ['ligacao', 'Fazer ligação'], ['email', 'Enviar e-mail'],
@@ -36,10 +38,10 @@
     hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23'
   });
   const state = {
-    root: null, loaded: false, loading: false, leads: [], owners: [], summary: {},
+    root: null, loaded: false, loading: false, leads: [], owners: [], campaigns: [], summary: {},
     view: 'list', generation: 0, controllers: new Set(), intentKeys: Object.create(null),
     conversion: null, conversionReturnFocus: null, specialFilter: '', editingId: '', bound: false,
-    loadPromise: null
+    loadPromise: null, pagination: {}, loadingMore: false
   };
 
   function byId(id) { return document.getElementById(id); }
@@ -82,7 +84,17 @@
   }
   function originLabel(value) {
     const found = ORIGINS.find(function (origin) { return origin[0] === value; });
+    if (value === 'instagram') return 'Instagram (registro legado)';
+    if (value === 'telefone') return 'Telefone (registro legado)';
     return found ? found[1] : (text(value) || 'Não informada');
+  }
+  function preserveLegacyOrigin(select, value) {
+    if (!select) return;
+    select.querySelectorAll('option[data-crm-legacy-origin]').forEach(function (option) { option.remove(); });
+    if (!['instagram', 'telefone'].includes(text(value))) return;
+    const option = document.createElement('option');
+    option.value = text(value); option.textContent = originLabel(value); option.dataset.crmLegacyOrigin = '1';
+    select.appendChild(option);
   }
   function safeDateTime(value) {
     const date = new Date(text(value));
@@ -230,10 +242,10 @@
       '<div class="crm-header-actions"><button type="button" class="crm-secondary" data-crm-action="refresh">Atualizar</button>' +
       '<button type="button" class="crm-primary" data-crm-action="new">Novo lead</button></div></header>' +
       '<p id="crm-status" class="crm-status" role="status" aria-live="polite"></p>' +
-      '<div class="crm-kpis" aria-label="Resumo do CRM"><button type="button" data-crm-special="abertos"><span>Em andamento</span><strong id="crm-kpi-open">—</strong></button>' +
-      '<button type="button" data-crm-special="vencidos"><span>Ações vencidas</span><strong id="crm-kpi-overdue">—</strong></button>' +
-      '<div><span>Sem primeira resposta</span><strong id="crm-kpi-unanswered">—</strong></div>' +
-      '<div><span>Total visível</span><strong id="crm-kpi-total">—</strong></div></div>' +
+      '<div class="crm-kpis" aria-label="Resumo do CRM"><button type="button" data-crm-special="abertos"><span id="crm-kpi-open-label">Em andamento</span><strong id="crm-kpi-open">—</strong></button>' +
+      '<button type="button" data-crm-special="vencidos"><span id="crm-kpi-overdue-label">Ações vencidas</span><strong id="crm-kpi-overdue">—</strong></button>' +
+      '<div><span id="crm-kpi-unanswered-label">Sem primeira resposta</span><strong id="crm-kpi-unanswered">—</strong></div>' +
+      '<div><span id="crm-kpi-total-label">Total visível</span><strong id="crm-kpi-total">—</strong></div></div>' +
       '<details id="crm-editor" class="crm-editor"><summary>Novo cadastro comercial</summary>' + editorHtml() + '</details>' +
       '<section id="crm-conversion" class="crm-conversion" role="region" aria-label="Revisão de conversão" tabindex="-1" hidden></section>' +
       '<section class="crm-workspace" aria-labelledby="crm-workspace-title"><div class="crm-workspace-title"><div><p>Funil</p>' +
@@ -253,7 +265,7 @@
       '<label><span>Etapa</span><select name="estagio" required>' + options(STAGES.filter(function (stage) { return stage[0] !== 'convertida'; }), 'lead_novo') + '</select></label></div>' +
       '<details class="crm-progressive"><summary>Complementar cadastro e acompanhamento</summary><div class="crm-detail-grid">' +
       '<label><span>Suborigem</span><input name="suborigem" maxlength="100" placeholder="Ex.: story, formulário"></label>' +
-      '<label><span>Campanha</span><input name="campanha" maxlength="120"></label>' +
+      '<label><span>Campanha</span><select name="campanha_id" aria-describedby="crm-campaign-help"><option value="">Sem campanha</option></select><small id="crm-campaign-help">Selecione o cadastro canônico do Marketing. Não digite nomes livres.</small></label>' +
       '<label><span>Responsável</span><select name="responsavel_id" required><option value="">Selecione</option></select></label>' +
       '<label><span>Primeira resposta</span><span class="crm-inline"><input name="primeira_resposta_em" type="datetime-local" aria-describedby="crm-first-response-help"><button type="button" data-crm-action="responded-now">Agora</button></span>' +
       '<small id="crm-first-response-help" hidden>A primeira resposta já registrada é uma marca histórica e não pode ser alterada.</small></label>' +
@@ -289,6 +301,19 @@
     const rows = data.responsaveis || data.owners || data.dados && (data.dados.responsaveis || data.dados.owners) || [];
     return Array.isArray(rows) ? rows : [];
   }
+  function responseCampaigns(data) {
+    const rows = data.campanhas_ativas || data.active_campaigns || data.dados && data.dados.campanhas_ativas || [];
+    return Array.isArray(rows) ? rows : [];
+  }
+  function mergeById(current, incoming, idResolver) {
+    const result = current.slice();
+    const known = new Set(result.map(idResolver).filter(Boolean));
+    incoming.forEach(function (item) {
+      const id = idResolver(item);
+      if (id && !known.has(id)) { known.add(id); result.push(item); }
+    });
+    return result;
+  }
   function fillOwners() {
     const rows = state.owners.map(function (owner) {
       return [text(owner.id || owner.user_id), text(owner.nome || owner.name || owner.email)];
@@ -298,6 +323,20 @@
     });
     const formSelect = state.root.querySelector('[name="responsavel_id"]');
     if (formSelect) formSelect.innerHTML = '<option value="">Selecione</option>' + options(rows, formSelect.value);
+  }
+  function fillCampaigns(selected) {
+    const select = state.root && state.root.querySelector('[name="campanha_id"]');
+    if (!select) return;
+    const current = text(selected || select.value);
+    select.innerHTML = '<option value="">Sem campanha</option>' + state.campaigns.map(function (campaign) {
+      const id = text(campaign.id);
+      if (!id) return '';
+      const selectable = campaign.selecionavel !== false;
+      const historical = !selectable ? ' · ' + text(campaign.status || 'histórica') : '';
+      const label = (campaign.codigo ? text(campaign.codigo) + ' · ' : '') + text(campaign.nome || 'Campanha') + historical;
+      return '<option value="' + escapeHtml(id) + '"' + (id === current ? ' selected' : '') +
+        (!selectable && id !== current ? ' disabled' : '') + '>' + escapeHtml(label) + '</option>';
+    }).join('');
   }
 
   function calculateSummary(visibleRows) {
@@ -314,6 +353,11 @@
   }
   function updateSummary(visibleRows) {
     const summary = calculateSummary(visibleRows);
+    const partial = state.pagination && state.pagination.has_more === true;
+    byId('crm-kpi-open-label').textContent = partial ? 'Em andamento (carregados)' : 'Em andamento';
+    byId('crm-kpi-overdue-label').textContent = partial ? 'Ações vencidas (carregadas)' : 'Ações vencidas';
+    byId('crm-kpi-unanswered-label').textContent = partial ? 'Sem resposta (carregados)' : 'Sem primeira resposta';
+    byId('crm-kpi-total-label').textContent = partial ? 'Total visível carregado' : 'Total visível';
     byId('crm-kpi-open').textContent = summary.open;
     byId('crm-kpi-overdue').textContent = summary.overdue;
     byId('crm-kpi-unanswered').textContent = summary.unanswered;
@@ -335,7 +379,7 @@
       if (state.specialFilter === 'abertos' && !isOpen(lead)) return false;
       if (state.specialFilter === 'vencidos' && !isOverdue(lead)) return false;
       if (!query) return true;
-      return normalize([lead.nome, lead.telefone, lead.email, lead.campanha, lead.interesse,
+      return normalize([lead.nome, lead.telefone, lead.email, lead.campanha_nome || lead.campaign_name || lead.campanha, lead.interesse,
         lead.suborigem, ownerName(lead)].join(' ')).includes(query);
     });
   }
@@ -365,7 +409,7 @@
       '<header><div><h4>' + escapeHtml(lead.nome || 'Lead sem nome') + '</h4><span>' + escapeHtml(contact(lead)) + '</span></div>' +
       '<span class="crm-stage">' + escapeHtml(stageLabel(stage)) + '</span></header>' +
       '<dl><div><dt>Origem</dt><dd>' + escapeHtml(source) + '</dd></div><div><dt>Interesse</dt><dd>' + escapeHtml(lead.interesse || 'Não informado') + '</dd></div>' +
-      (compact ? '' : '<div><dt>Campanha</dt><dd>' + escapeHtml(lead.campanha || '—') + '</dd></div>') +
+      (compact ? '' : '<div><dt>Campanha</dt><dd>' + escapeHtml(lead.campanha_nome || lead.campaign_name || lead.campanha || '—') + '</dd></div>') +
       '<div><dt>Responsável</dt><dd>' + escapeHtml(ownerName(lead)) + '</dd></div><div><dt>Primeira resposta</dt><dd>' + escapeHtml(safeDateTime(lead.primeira_resposta_em || lead.first_response_at)) + '</dd></div>' +
       '<div><dt>Próxima ação</dt><dd>' + escapeHtml(nextActionTypeLabel(nextType)) + ' · ' +
       (isOverdue(lead) ? '<strong class="crm-overdue">Vencida · ' : '') + escapeHtml(safeDateTime(lead.proxima_acao_em || lead.next_action_at)) + (isOverdue(lead) ? '</strong>' : '') + '</dd></div>' +
@@ -385,6 +429,16 @@
           (cards.length ? cards.map(function (lead) { return leadCard(lead, true); }).join('') : '<p class="crm-column-empty">Nenhum lead</p>') + '</div></section>';
       }).join('') + '</div>';
   }
+  function paginationHtml() {
+    const page = state.pagination || {};
+    const total = Number(page.total);
+    const totalLabel = Number.isFinite(total) ? total.toLocaleString('pt-BR') : 'mais registros';
+    if (page.has_more !== true) return '';
+    return '<div class="crm-pagination"><span>' + state.leads.length.toLocaleString('pt-BR') + ' de ' +
+      escapeHtml(totalLabel) + ' leads carregados</span><button type="button" class="crm-secondary" data-crm-action="load-more"' +
+      (state.loadingMore ? ' disabled aria-disabled="true"' : '') + '>' +
+      (state.loadingMore ? 'Carregando…' : 'Carregar mais leads') + '</button></div>';
+  }
   function render() {
     const content = byId('crm-content');
     if (!content) return;
@@ -394,10 +448,10 @@
     if (resultsStatus) resultsStatus.textContent = rows.length === 1 ? '1 lead exibido.' : rows.length + ' leads exibidos.';
     if (!rows.length) {
       content.innerHTML = '<div class="crm-empty"><strong>Nenhum lead encontrado</strong><span>Ajuste os filtros ou faça um cadastro comercial.</span>' +
-        '<button type="button" class="crm-primary" data-crm-action="new">Novo lead</button></div>';
+        '<button type="button" class="crm-primary" data-crm-action="new">Novo lead</button></div>' + paginationHtml();
       return;
     }
-    content.innerHTML = state.view === 'kanban' ? renderKanban(rows) : renderList(rows);
+    content.innerHTML = (state.view === 'kanban' ? renderKanban(rows) : renderList(rows)) + paginationHtml();
   }
 
   async function load(force) {
@@ -410,12 +464,15 @@
     let promise = null;
     promise = (async function () {
       try {
-        const data = await request('listar', { incluir_arquivados: true });
+        const data = await request('listar', { incluir_arquivados: true, limit: 100, offset: 0 });
         state.leads = responseRows(data);
         state.owners = responseOwners(data);
+        state.campaigns = responseCampaigns(data);
         state.summary = data.resumo || data.summary || {};
+        state.pagination = data.paginacao || data.pagination || {};
         state.loaded = true;
         fillOwners();
+        fillCampaigns();
         render();
         setStatus('CRM atualizado.', false);
       } catch (error) {
@@ -432,6 +489,31 @@
     }());
     state.loadPromise = promise;
     return promise;
+  }
+
+  async function loadMore() {
+    if (state.loadingMore || state.pagination.has_more !== true) return;
+    state.loadingMore = true; render(); setStatus('Carregando mais leads…', false);
+    try {
+      const currentOffset = Number(state.pagination.offset) || 0;
+      const currentLimit = Number(state.pagination.limit) || 100;
+      const data = await request('listar', { incluir_arquivados: true, limit: 100, offset: currentOffset + currentLimit });
+      const incoming = responseRows(data);
+      state.leads = mergeById(state.leads, incoming, leadId);
+      state.owners = mergeById(state.owners, responseOwners(data), function (owner) {
+        return text(owner && (owner.id || owner.user_id));
+      });
+      state.campaigns = mergeById(state.campaigns, responseCampaigns(data), function (campaign) {
+        return text(campaign && campaign.id);
+      });
+      state.pagination = data.paginacao || data.pagination || {};
+      fillOwners(); fillCampaigns();
+      setStatus(incoming.length ? 'Mais leads carregados.' : 'Não há outros leads disponíveis.', false);
+    } catch (error) {
+      if (error.code !== 'stale_session') setStatus(error.message || 'Não foi possível carregar mais leads.', true);
+    } finally {
+      state.loadingMore = false; render();
+    }
   }
 
   function updateConditionalFields() {
@@ -451,12 +533,15 @@
   function resetForm() {
     const form = byId('crm-form'); if (!form) return;
     form.reset(); form.elements.lead_id.value = ''; form.elements.expected_version.value = '';
+    preserveLegacyOrigin(form.elements.origem, '');
     form.elements.primeira_resposta_em.readOnly = false;
     const respondedNow = form.querySelector('[data-crm-action="responded-now"]');
     if (respondedNow) respondedNow.disabled = false;
     const firstResponseHelp = byId('crm-first-response-help');
     if (firstResponseHelp) firstResponseHelp.hidden = true;
     form.elements.estagio.value = 'lead_novo'; state.editingId = ''; clearIntent('save');
+    form.elements.campanha_id.disabled = false;
+    byId('crm-campaign-help').textContent = 'Selecione o cadastro canônico do Marketing. Não digite nomes livres.';
     updateConditionalFields();
   }
   function novoLead() {
@@ -469,11 +554,19 @@
   function editLead(id) {
     const lead = findLead(id); if (!lead) return;
     const form = byId('crm-form'); resetForm();
-    ['nome', 'telefone', 'email', 'origem', 'suborigem', 'campanha', 'interesse', 'responsavel_id', 'estagio', 'motivo_perda', 'observacoes'].forEach(function (name) {
+    preserveLegacyOrigin(form.elements.origem, lead.origem);
+    ['nome', 'telefone', 'email', 'origem', 'suborigem', 'interesse', 'responsavel_id', 'estagio', 'motivo_perda', 'observacoes'].forEach(function (name) {
       if (form.elements[name]) form.elements[name].value = lead[name] == null ? '' : lead[name];
     });
     form.elements.lead_id.value = leadId(lead);
     form.elements.expected_version.value = leadVersion(lead) == null ? '' : leadVersion(lead);
+    fillCampaigns(text(lead.campanha_id || lead.campaign_id));
+    form.elements.campanha_id.value = text(lead.campanha_id || lead.campaign_id);
+    const campaignLocked = Boolean(lead.campanha_imutavel || lead.campaign_locked || lead.campanha_atribuida || text(lead.estagio) === 'convertida');
+    form.elements.campanha_id.disabled = campaignLocked;
+    byId('crm-campaign-help').textContent = campaignLocked
+      ? 'Campanha preservada: leads convertidos ou já atribuídos não podem ter a origem reescrita.'
+      : 'Selecione o cadastro canônico do Marketing. Não digite nomes livres.';
     const firstResponse = lead.primeira_resposta_em || lead.first_response_at;
     form.elements.primeira_resposta_em.value = dateInput(firstResponse);
     form.elements.primeira_resposta_em.readOnly = Boolean(firstResponse);
@@ -489,7 +582,7 @@
   }
   function formPayload(form) {
     const payload = {};
-    ['lead_id', 'nome', 'telefone', 'email', 'origem', 'suborigem', 'campanha', 'interesse', 'responsavel_id',
+    ['lead_id', 'nome', 'telefone', 'email', 'origem', 'suborigem', 'campanha_id', 'interesse', 'responsavel_id',
       'estagio', 'primeira_resposta_em', 'next_action_type', 'proxima_acao_em', 'motivo_perda', 'observacoes'].forEach(function (name) {
       payload[name] = text(form.elements[name].value) || null;
     });
@@ -698,6 +791,7 @@
         const name = action.dataset.crmAction;
         if (name === 'new') novoLead();
         else if (name === 'refresh' || name === 'retry') void load(true);
+        else if (name === 'load-more') void loadMore();
         else if (name === 'cancel-edit') { resetForm(); byId('crm-editor').open = false; }
         else if (name === 'responded-now') {
           const input = byId('crm-form').elements.primeira_resposta_em;
@@ -740,7 +834,8 @@
   async function abrirLead(id) { ativar(); await load(false); editLead(id); }
   function reset() {
     state.generation += 1; state.controllers.forEach(function (controller) { controller.abort(); }); state.controllers.clear();
-    state.loaded = false; state.loading = false; state.leads = []; state.owners = []; state.summary = {};
+    state.loaded = false; state.loading = false; state.leads = []; state.owners = []; state.campaigns = []; state.summary = {};
+    state.pagination = {}; state.loadingMore = false;
     state.loadPromise = null; state.intentKeys = Object.create(null); state.conversion = null; state.conversionReturnFocus = null;
     state.specialFilter = ''; state.editingId = '';
     if (state.root) { state.root.innerHTML = shellHtml(); updateConditionalFields(); }

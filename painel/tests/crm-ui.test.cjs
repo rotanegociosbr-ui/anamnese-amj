@@ -29,7 +29,7 @@ assert.match(js, /intentKey\('save'\)[\s\S]*?clearIntent\('save'\)/,
 for (const action of ['listar', 'salvar_lead', 'arquivar_lead', 'converter_lead']) {
   assert.match(js, new RegExp("'" + action + "'"), 'ação CRM ausente: ' + action);
 }
-for (const field of ['origem', 'suborigem', 'campanha', 'interesse', 'responsavel_id', 'estagio',
+for (const field of ['origem', 'suborigem', 'campanha_id', 'interesse', 'responsavel_id', 'estagio',
   'primeira_resposta_em', 'next_action_type', 'proxima_acao_em', 'motivo_perda']) {
   assert.match(js, new RegExp(field), 'campo comercial ausente: ' + field);
 }
@@ -112,10 +112,36 @@ assert.match(css, /@media \(max-width:700px\)/,
   'CRM deve ter composição específica para celular');
 assert.match(shell, /global: 'AMJCRMLeads'[\s\S]*?root: 'crm-root'/,
   'shell deve registrar o módulo CRM lazy');
-assert.match(html, /app-shell\.js\?v=20260826-2/,
+assert.match(html, /app-shell\.js\?v=20260829-1/,
   'asset do shell deve ser versionado após integrar o CRM');
 assert.doesNotMatch(html, /<script[^>]+crm\.js|<link[^>]+crm\.css/i,
   'CRM não deve aumentar o carregamento inicial');
+assert.match(js, /campanhas_ativas[\s\S]*?name="campanha_id"/,
+  'CRM deve listar campanhas canônicas por identificador');
+assert.doesNotMatch(js, /<input name="campanha"/,
+  'CRM não pode aceitar nome de campanha em texto livre');
+assert.match(js, /campanha_imutavel[\s\S]*?campanha_atribuida[\s\S]*?campanha_id\.disabled = campaignLocked/,
+  'campanha convertida ou atribuída deve ficar imutável');
+assert.match(js, /preserveLegacyOrigin[\s\S]*?\['instagram', 'telefone'\][\s\S]*?crmLegacyOrigin/,
+  'edição deve preservar origens antigas sem oferecê-las em novos cadastros');
+assert.match(js, /request\('listar', \{ incluir_arquivados: true, limit: 100, offset: 0 \}\)/,
+  'primeira página do CRM deve ter janela explícita');
+assert.match(js, /data-crm-action="load-more"[\s\S]*?Carregar mais leads/,
+  'CRM deve permitir carregar todos os registros progressivamente');
+assert.match(js, /state\.leads = mergeById\(state\.leads, incoming, leadId\)/,
+  'paginação do CRM deve deduplicar leads');
+assert.match(js, /currentOffset \+ currentLimit/,
+  'próxima página deve avançar pelo cursor do servidor, não pela quantidade deduplicada');
+assert.match(js, /Nenhum lead encontrado[\s\S]*?paginationHtml\(\)/,
+  'filtro sem resultado na página atual não pode esconder o botão para buscar páginas antigas');
+assert.match(js, /state\.campaigns = mergeById[\s\S]*?responseCampaigns\(data\)/,
+  'novas páginas devem preservar opções de campanhas históricas');
+assert.match(js, /catch \(error\)[\s\S]*?Não foi possível carregar mais leads/,
+  'falha ao carregar outra página precisa ficar visível');
+assert.match(js, /state\.pagination = \{\}; state\.loadingMore = false/,
+  'logout deve apagar o estado de paginação');
+assert.match(js, /state\.pagination[\s\S]*has_more === true[\s\S]*Em andamento \(carregados\)[\s\S]*Total visível carregado/,
+  'KPIs parciais devem dizer que consideram somente páginas carregadas');
 
 const sandbox = { window: { crypto: require('node:crypto').webcrypto }, document: {},
   Intl, Date, Set, AbortController, console };

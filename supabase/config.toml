@@ -109,5 +109,13 @@ enabled = true
 # Validação interna obrigatória: Bearer, sessão ativa, owner e AAL2.
 # Arquivamento e conversão final também consomem prova recente de senha.
 verify_jwt = false
-import_map = "./functions/crm-fichas/deno.json"
+import_map = "./functions/crm-fichas/import_map.json"
 entrypoint = "./functions/crm-fichas/index.ts"
+
+[functions.marketing-fichas]
+enabled = true
+# Validacao interna obrigatoria: Bearer, sessao ativa, owner e AAL2.
+# Arquivamentos tambem consomem prova recente de senha.
+verify_jwt = false
+import_map = "./functions/marketing-fichas/import_map.json"
+entrypoint = "./functions/marketing-fichas/index.ts"

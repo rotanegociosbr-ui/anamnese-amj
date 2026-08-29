@@ -373,6 +373,7 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
     <div class="abas" role="tablist" aria-label="Áreas do aplicativo Fichas">
       <button class="aba" id="aba-bt-inicio" type="button" role="tab" aria-selected="true" aria-controls="aba-inicio" tabindex="0">Início</button>
       <button class="aba" id="aba-bt-crm" type="button" role="tab" aria-selected="false" aria-controls="aba-crm" tabindex="-1" hidden>CRM Leads</button>
+      <button class="aba" id="aba-bt-marketing" type="button" role="tab" aria-selected="false" aria-controls="aba-marketing" tabindex="-1" hidden>Marketing</button>
       <button class="aba" id="aba-bt-fichas" type="button" role="tab" aria-selected="false" aria-controls="aba-fichas" tabindex="-1">Fichas</button>
       <button class="aba" id="aba-bt-agenda" type="button" role="tab" aria-selected="false" aria-controls="aba-agenda" tabindex="-1">Agenda e retornos</button>
       <button class="aba" id="aba-bt-prontuarios" type="button" role="tab" aria-selected="false" aria-controls="aba-prontuarios" tabindex="-1" hidden>Prontuários</button>
@@ -465,6 +466,10 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
 
     <section class="painel-aba oculto" id="aba-crm" role="tabpanel" aria-labelledby="aba-bt-crm" hidden>
       <div id="crm-root"></div>
+    </section>
+
+    <section class="painel-aba oculto" id="aba-marketing" role="tabpanel" aria-labelledby="aba-bt-marketing" hidden>
+      <div id="marketing-root"></div>
     </section>
 
     <section class="painel-aba oculto" id="aba-acompanhamentos" role="tabpanel" aria-labelledby="aba-bt-acompanhamentos" hidden>
@@ -1033,7 +1038,7 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
 <script src="./auth-mfa.js?v=20260819-3"></script>
 <script src="./financeiro.js?v=20260824-2"></script>
 <script src="./prontuario.js?v=20260826-1"></script>
-<script src="./app-shell.js?v=20260826-2"></script>
+<script src="./app-shell.js?v=20260829-1"></script>
 <script>
 const SUPABASE_URL = 'https://rjxtxoqprnumouqakxbc.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_Ip14p4tUfYFjwUYaWinMlw_Gf9v0YwT';
@@ -1297,6 +1302,8 @@ function atualizarIdentidade(dados) {
   if (window.AMJProntuario) window.AMJProntuario.atualizarAcesso();
   if (window.AMJOperacaoClinica) window.AMJOperacaoClinica.atualizarAcesso();
   if (window.AMJGestaoAdministrativa) window.AMJGestaoAdministrativa.atualizarAcesso();
+  if (window.AMJAcompanhamentos) window.AMJAcompanhamentos.atualizarAcesso();
+  if (window.AMJMarketing) window.AMJMarketing.atualizarAcesso();
 }
 
 async function cabecalhosAcesso(comJson, provaSenha) {
@@ -1765,6 +1772,8 @@ function limparEstadoAplicativo() {
   if (window.AMJProntuario) window.AMJProntuario.reset();
   if (window.AMJOperacaoClinica) window.AMJOperacaoClinica.reset();
   if (window.AMJGestaoAdministrativa) window.AMJGestaoAdministrativa.reset();
+  if (window.AMJAcompanhamentos) window.AMJAcompanhamentos.reset();
+  if (window.AMJMarketing) window.AMJMarketing.reset();
   agendaAtivarAba('inicio', false);
   if (sessaoMonitor) clearInterval(sessaoMonitor);
   sessaoMonitor = null;
@@ -2537,7 +2546,7 @@ function agendaIniciarPolling() {
 }
 
 function agendaAtivarAba(nome, moverFoco) {
-  const abas = ['inicio', 'crm', 'fichas', 'agenda', 'prontuarios', 'financeiro', 'operacao', 'acompanhamentos', 'gestao', 'cotacoes'];
+  const abas = ['inicio', 'crm', 'marketing', 'fichas', 'agenda', 'prontuarios', 'financeiro', 'operacao', 'acompanhamentos', 'gestao', 'cotacoes'];
   let ativa = abas.includes(nome) ? nome : 'inicio';
   if (!['inicio', 'fichas'].includes(ativa)) {
     const botaoSolicitado = el('aba-bt-' + ativa);
@@ -2555,6 +2564,7 @@ function agendaAtivarAba(nome, moverFoco) {
   if (moverFoco) el('aba-bt-' + ativa).focus();
   if (ativa === 'agenda' && !agendaCarregada) carregarAgenda();
   if (ativa === 'crm' && window.AMJCRMLeads) window.AMJCRMLeads.ativar();
+  if (ativa === 'marketing' && window.AMJMarketing) window.AMJMarketing.ativar();
   if (ativa === 'prontuarios' && window.AMJProntuario) window.AMJProntuario.ativar();
   if (ativa === 'financeiro' && window.AMJFinanceiro) window.AMJFinanceiro.ativar();
   if (ativa === 'operacao' && window.AMJOperacaoClinica && typeof window.AMJOperacaoClinica.ativar === 'function') {
@@ -2798,6 +2808,7 @@ async function agendaMarcarLembrete(agendamento, lembrete, botao) {
 
 el('aba-bt-inicio').addEventListener('click', () => agendaAtivarAba('inicio', false));
 el('aba-bt-crm').addEventListener('click', () => agendaAtivarAba('crm', false));
+el('aba-bt-marketing').addEventListener('click', () => agendaAtivarAba('marketing', false));
 el('aba-bt-fichas').addEventListener('click', () => agendaAtivarAba('fichas', false));
 el('aba-bt-agenda').addEventListener('click', () => agendaAtivarAba('agenda', false));
 el('aba-bt-prontuarios').addEventListener('click', () => agendaAtivarAba('prontuarios', false));
