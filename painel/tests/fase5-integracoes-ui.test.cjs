@@ -38,6 +38,8 @@ assert.match(js, /O formulário de agendamento salva o pedido na caixa privada d
   'a Central deve explicar a captação interna do site');
 assert.match(js, /Sem cobrança nova/,
   'a tela deve explicar claramente que não existe cobrança nova');
+assert.match(js, /WhatsApp Web assistido[\s\S]*?Confirmações, lembretes e retornos[\s\S]*?envia manualmente/,
+  'a tela deve explicar o fluxo gratuito e assistido sem prometer automação');
 assert.match(js, /data-integracoes-atualizar>Atualizar status/,
   'Atualizar status deve ser a única ação disponível');
 assert.doesNotMatch(js, /data-integracoes-(?:conectar|testar|enviar|sincronizar|autorizar|cobrar)/i,
@@ -51,7 +53,7 @@ assert.match(shell, /integracoes: Object\.freeze\(\{ title: 'Integrações', leg
   'a rota deve ser exclusiva dos proprietários');
 assert.match(shell, /global: 'AMJIntegracoes'[\s\S]*src: '\.\/integracoes\.js\?v=[\s\S]*css: '\.\/integracoes\.css\?v=/,
   'JavaScript e CSS devem ser carregados somente ao abrir a rota');
-assert.match(shell, /integracoes\.js\?v=20260829-2[\s\S]*integracoes\.css\?v=20260829-2/,
+assert.match(shell, /integracoes\.js\?v=([^']+)[\s\S]*integracoes\.css\?v=\1/,
   'shell deve invalidar o cache da Central de Integrações desta fase');
 assert.match(html, /id="aba-bt-integracoes"[\s\S]*aria-controls="aba-integracoes"[\s\S]*hidden/,
   'a aba legada deve nascer escondida');

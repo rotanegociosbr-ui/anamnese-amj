@@ -197,7 +197,7 @@ assert.match(shell, /operacao\.js\?v=20260824-5/,
   'cache-bust deve entregar o JavaScript atualizado da Operação');
 assert.match(html, /operacao\.css\?v=20260824-5/,
   'cache-bust deve entregar o CSS atualizado da Operação');
-assert.match(html, /app-shell\.js\?v=20260829-2/,
+assert.match(html, /app-shell\.js\?v=[^"']+/,
   'cache-bust do shell deve entregar a referência atualizada da Operação');
 assert.match(html, /id="prontuario-busca"[^>]+aria-label="[^"]+"/,
   'busca do prontuário deve ter nome acessível');

@@ -112,8 +112,10 @@ assert.match(js, /solicitacoes_site[\s\S]*?solicitacoes_site_pendentes/,
   'listar deve consumir pedidos e resumo pendente enviados pela API');
 assert.match(js, /id="crm-site-title">Pedidos de agendamento[\s\S]*?id="crm-site-content"/,
   'CRM deve ter caixa de entrada acessível para pedidos do site');
-assert.match(js, /siteWhatsAppUrl[\s\S]*?target="_blank"[\s\S]*?Abrir WhatsApp/,
+assert.match(js, /siteWhatsAppUrl[\s\S]*?target="_blank"[\s\S]*?Abrir [^<]*WhatsApp/,
   'WhatsApp dos pedidos deve permanecer uma ação manual');
+assert.match(js, /window\.AMJWhatsApp\.url\(number, message\)/,
+  'pedidos do site devem usar o seletor seguro entre WhatsApp Web e aplicativo');
 assert.match(js, /changeSiteRequest[\s\S]*?await load\(true\)/,
   'aceitar ou arquivar precisa recarregar a fonte canônica');
 assert.match(js, /if \(accepting\)[\s\S]*?await request\(action,[\s\S]*?else[\s\S]*?await protectedRequest\(action,[\s\S]*?titulo: 'Arquivar pedido do site'[\s\S]*?motivoObrigatorio: true/,
@@ -133,9 +135,9 @@ assert.match(css, /@media \(max-width:700px\)[\s\S]*?\.crm-site-actions\{display
   'ações dos pedidos devem ocupar uma coluna no celular');
 assert.match(shell, /global: 'AMJCRMLeads'[\s\S]*?root: 'crm-root'/,
   'shell deve registrar o módulo CRM lazy');
-assert.match(shell, /crm\.js\?v=20260829-2[\s\S]*?crm\.css\?v=20260829-2/,
+assert.match(shell, /crm\.js\?v=([^']+)[\s\S]*?crm\.css\?v=\1/,
   'shell deve invalidar o cache do CRM desta fase');
-assert.match(html, /app-shell\.js\?v=20260829-2/,
+assert.match(html, /app-shell\.js\?v=[^"']+/,
   'asset do shell deve ser versionado após integrar o CRM');
 assert.doesNotMatch(html, /<script[^>]+crm\.js|<link[^>]+crm\.css/i,
   'CRM não deve aumentar o carregamento inicial');

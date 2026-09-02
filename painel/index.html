@@ -496,7 +496,7 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
         <input type="tel" id="cv-tel" aria-label="WhatsApp da paciente com DDD" placeholder="WhatsApp com DDD" inputmode="numeric" autocomplete="off">
       </div>
       <div class="cv-acoes">
-        <button id="cv-enviar">Enviar pelo WhatsApp</button>
+        <button id="cv-enviar">Abrir mensagem no WhatsApp</button>
         <button class="alt" id="cv-copiar">Copiar link</button>
         <button class="alt" id="cv-qr" aria-expanded="false" aria-controls="cv-qrbox">Ver QR code</button>
       </div>
@@ -569,7 +569,7 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
 
           <fieldset class="agenda-lembretes">
             <legend>Lembretes</legend>
-            <p class="agenda-transparencia" id="agenda-transparencia">O Fichas cria avisos internos. O WhatsApp somente é aberto pela equipe e nunca é marcado como enviado automaticamente.</p>
+            <p class="agenda-transparencia" id="agenda-transparencia">O Fichas cria avisos internos. No computador, abre o WhatsApp Web conectado; no celular, abre o aplicativo. A equipe confere e envia, e o sistema nunca marca a mensagem como enviada automaticamente.</p>
             <label class="agenda-check" for="agenda-autoriza-lembretes"><input id="agenda-autoriza-lembretes" name="lembretes_autorizados" type="checkbox" aria-describedby="agenda-transparencia"><span>A cliente autorizou lembretes de agendamento pelo WhatsApp.<small>Sem esta confirmação, os lembretes permanecem desligados.</small></span></label>
             <div class="agenda-check-grid">
               <label class="agenda-check" for="agenda-lembrete-24h"><input id="agenda-lembrete-24h" name="lembrete_24h" type="checkbox" disabled><span>Aviso de 24 horas<small>Aparece no Fichas quando estiver na hora de lembrar.</small></span></label>
@@ -1045,7 +1045,7 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
 <script src="./auth-mfa.js?v=20260819-3"></script>
 <script src="./financeiro.js?v=20260824-2"></script>
 <script src="./prontuario.js?v=20260826-1"></script>
-<script src="./app-shell.js?v=20260829-2"></script>
+<script src="./app-shell.js?v=20260901-1"></script>
 <script>
 const SUPABASE_URL = 'https://rjxtxoqprnumouqakxbc.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_Ip14p4tUfYFjwUYaWinMlw_Gf9v0YwT';
@@ -1102,6 +1102,20 @@ function quando(iso) {
 
 function soDigitos(t) { return (t || '').replace(/\D/g, ''); }
 
+function urlWhatsAppAssistido(numero, mensagem) {
+  if (window.AMJWhatsApp && typeof window.AMJWhatsApp.url === 'function') {
+    return window.AMJWhatsApp.url(numero, mensagem);
+  }
+  const digitos = soDigitos(numero);
+  const texto = String(mensagem || '').trim();
+  return 'https://wa.me/' + digitos + (texto ? '?text=' + encodeURIComponent(texto) : '');
+}
+
+function rotuloWhatsAppAssistido() {
+  return window.AMJWhatsApp && typeof window.AMJWhatsApp.label === 'function'
+    ? window.AMJWhatsApp.label() : 'WhatsApp';
+}
+
 function cartao(f) {
   const alertas = (f.alertas_saude || '').split(' | ').filter(Boolean);
   const meds = (f.alertas_medicamentos || '').split(' | ').filter(Boolean);
@@ -1119,7 +1133,7 @@ function cartao(f) {
   const tel = soDigitos(f.telefone);
   if (f.telefone) {
     html += '<p class="meta">' +
-      (tel.length >= 10 ? '<a href="https://wa.me/55' + tel.replace(/^55/, '') + '" target="_blank" rel="noopener">' + esc(f.telefone) + '</a>' : esc(f.telefone)) +
+      (tel.length >= 10 ? '<a href="' + esc(urlWhatsAppAssistido('55' + tel.replace(/^55/, ''))) + '" target="_blank" rel="noopener noreferrer">' + esc(f.telefone) + '</a>' : esc(f.telefone)) +
       (f.veio_fazer ? ' · ' + esc(String(f.veio_fazer).replace(/[\[\]"]/g, '')) : '') + '</p>';
   }
 
@@ -1194,7 +1208,7 @@ function cartaoDocumento(d) {
     '<span class="quando">' + quando(d.recebido_em) + '</span></div>';
   html += '<p class="meta">';
   const tel = soDigitos(d.telefone);
-  if (tel.length >= 10) html += '<a href="https://wa.me/55' + tel.replace(/^55/, '') + '" target="_blank" rel="noopener">' + esc(d.telefone) + '</a> · ';
+  if (tel.length >= 10) html += '<a href="' + esc(urlWhatsAppAssistido('55' + tel.replace(/^55/, ''))) + '" target="_blank" rel="noopener noreferrer">' + esc(d.telefone) + '</a> · ';
   html += 'Código ' + esc(String(d.codigo_verificacao || '').slice(0, 12)) + '</p>';
   html += '<span class="selo tipo">' + esc(d.tipo_label || tipo.label) + '</span>';
   html += '<span class="selo">Aguardando revisão profissional</span>';
@@ -2332,12 +2346,12 @@ async function agendaAbrirWhatsApp(agendamento, lembrete, botao) {
       tipo: lembrete.tipo,
       status: 'pronto'
     });
-    const url = 'https://wa.me/' + numero + '?text=' +
-      encodeURIComponent(agendaMensagemWhatsApp(agendamento, lembrete.tipo));
+    const url = urlWhatsAppAssistido(numero, agendaMensagemWhatsApp(agendamento, lembrete.tipo));
     janela.location.replace(url);
+    const canal = rotuloWhatsAppAssistido();
     status.textContent = resposta.lembretes_sincronizados === false
-      ? 'WhatsApp aberto. Atualize a agenda para conferir os demais lembretes.'
-      : 'WhatsApp aberto. Depois do envio, use “Marcar como enviado”.';
+      ? canal + ' aberto. Atualize a agenda para conferir os demais lembretes.'
+      : canal + ' aberto. Depois do envio, use “Marcar como enviado”.';
   } catch (erro) {
     janela.close();
     status.classList.add('erro');
@@ -2367,7 +2381,7 @@ function agendaCartao(agendamento) {
   const atendimentoIniciado = Number.isFinite(inicioMs) && inicioMs <= agendaAgoraMs();
   let html = '<div class="agenda-card-topo"><div><h3>' + esc(agendamento.nome) + '</h3>' +
     '<p class="agenda-meta">' +
-    (numero && podeEnviarWhatsApp ? '<a href="https://wa.me/' + numero + '" target="_blank" rel="noopener noreferrer">' +
+    (numero && podeEnviarWhatsApp ? '<a href="' + esc(urlWhatsAppAssistido(numero)) + '" target="_blank" rel="noopener noreferrer">' +
       esc(agendaTelefoneFormatado(agendamento.telefone)) + '</a>' : esc(agendaTelefoneFormatado(agendamento.telefone))) +
     '</p></div><time class="agenda-data" datetime="' + esc(agendamento.data_hora) + '">' +
     esc(agendaFormatarDataHora(agendamento.data_hora)) + '</time></div>';
@@ -2398,7 +2412,7 @@ function agendaCartao(agendamento) {
   if (podeEnviarWhatsApp) {
     html += '<button class="agenda-botao" type="button" data-agenda-acao="whatsapp" data-agenda-id="' +
       esc(agendamento.id) + '" data-lembrete-id="' + esc(lembreteAtual.id) +
-      '" data-lembrete-tipo="' + esc(lembrete) + '">Abrir WhatsApp</button>';
+      '" data-lembrete-tipo="' + esc(lembrete) + '">Abrir ' + esc(rotuloWhatsAppAssistido()) + '</button>';
   } else if (!agendamento.lembretes_autorizados) {
     html += '<span class="agenda-selo">Lembretes pelo WhatsApp não autorizados</span>';
   }
@@ -3094,15 +3108,15 @@ el('cv-enviar').addEventListener('click', () => {
   }
   const nome = el('cv-nome').value.trim();
   const tel = el('cv-tel').value.replace(/\D/g, '');
-  const texto = encodeURIComponent(mensagem(nome));
+  const texto = mensagem(nome);
   let url;
   if (tel.length >= 10) {
-    url = 'https://wa.me/55' + tel.replace(/^55/, '') + '?text=' + texto;
+    url = urlWhatsAppAssistido('55' + tel.replace(/^55/, ''), texto);
   } else if (tel.length > 0) {
     aviso('Número incompleto — inclua o DDD');
     return;
   } else {
-    url = 'https://wa.me/?text=' + texto;   // deixa escolher o contato
+    url = urlWhatsAppAssistido('', texto);   // deixa escolher o contato
   }
   window.open(url, '_blank', 'noopener');
 });

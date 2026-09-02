@@ -110,7 +110,9 @@
       '<aside class="integracoes-safe-note" role="note"><strong>Sem cobrança nova</strong>' +
       '<span>WhatsApp API, calendário, pagamentos e demais provedores continuam desligados. Nenhuma assinatura ou cobrança foi ativada.</span></aside>' +
       '<aside class="integracoes-site-note" role="note"><strong>Pedidos do site no CRM</strong>' +
-      '<span>O formulário de agendamento salva o pedido na caixa privada da clínica. O WhatsApp permanece manual e o pedido não reserva horário automaticamente.</span></aside>' +
+      '<span>O formulário de agendamento salva o pedido na caixa privada da clínica. O pedido não reserva horário automaticamente.</span></aside>' +
+      '<aside class="integracoes-site-note" role="note"><strong>WhatsApp Web assistido</strong>' +
+      '<span>Confirmações, lembretes e retornos podem abrir a conversa com texto pronto quando a sessão estiver conectada. A equipe confere e envia manualmente; nenhuma API paga ou robô de envio foi ativado.</span></aside>' +
       '<p id="integracoes-status" class="integracoes-status" role="status" aria-live="polite"></p>' +
       '<div id="integracoes-cards" class="integracoes-cards" aria-live="off"></div>' +
       '<footer class="integracoes-footer"><strong>Próximas etapas, somente quando autorizadas</strong>' +
@@ -249,7 +251,8 @@
   window.AMJIntegracoes = Object.freeze({
     montar: mount, ativar: activate, carregar: load, atualizarAcesso: updateAccess, reset: reset,
     contrato: Object.freeze({ endpoint: API, acao: 'status', somenteLeitura: true, ownerMfa: true,
-      captacaoSiteInterna: true, conexoesExternas: false, cobrancasNovas: false, whatsappManual: true }),
+      captacaoSiteInterna: true, conexoesExternas: false, cobrancasNovas: false,
+      whatsappManual: true, whatsappWebAssistido: true, envioAutomatico: false }),
     __test: Object.freeze({ normalizeIntegrations: normalizeIntegrations, checkedAtFrom: checkedAtFrom,
       requestIsCurrent: requestIsCurrent })
   });

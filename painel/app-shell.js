@@ -29,8 +29,8 @@
   const MODULES = Object.freeze({
     crm: Object.freeze({
       global: 'AMJCRMLeads',
-      src: './crm.js?v=20260829-2',
-      css: './crm.css?v=20260829-2',
+      src: './crm.js?v=20260901-1',
+      css: './crm.css?v=20260901-1',
       root: 'crm-root'
     }),
     marketing: Object.freeze({
@@ -62,8 +62,8 @@
     }),
     integracoes: Object.freeze({
       global: 'AMJIntegracoes',
-      src: './integracoes.js?v=20260829-2',
-      css: './integracoes.css?v=20260829-2',
+      src: './integracoes.js?v=20260901-1',
+      css: './integracoes.css?v=20260901-1',
       root: 'integracoes-root'
     }),
     copiloto: Object.freeze({
@@ -119,6 +119,25 @@
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
+  function whatsappUsesMobileApp() {
+    const browserNavigator = typeof navigator === 'undefined' ? {} : navigator;
+    const userAgentData = browserNavigator.userAgentData;
+    if (userAgentData && typeof userAgentData.mobile === 'boolean') return userAgentData.mobile;
+    if (/Android|iPhone|iPad|iPod|Mobile/i.test(browserNavigator.userAgent || '')) return true;
+    return browserNavigator.platform === 'MacIntel' && Number(browserNavigator.maxTouchPoints) > 1;
+  }
+  function whatsappUrl(phone, message) {
+    const number = String(phone == null ? '' : phone).replace(/\D/g, '');
+    const content = String(message == null ? '' : message).trim();
+    const encoded = content ? encodeURIComponent(content) : '';
+    if (!number) return 'https://wa.me/' + (encoded ? '?text=' + encoded : '');
+    if (whatsappUsesMobileApp()) {
+      return 'https://wa.me/' + number + (encoded ? '?text=' + encoded : '');
+    }
+    return 'https://web.whatsapp.com/send?phone=' + encodeURIComponent(number) +
+      (encoded ? '&text=' + encoded : '');
+  }
+  function whatsappLabel() { return whatsappUsesMobileApp() ? 'WhatsApp' : 'WhatsApp Web'; }
   function icon(name) {
     return '<svg aria-hidden="true" viewBox="0 0 20 20">' + (ICONS[name] || ICONS.mais) + '</svg>';
   }
@@ -978,6 +997,12 @@
       openExistingEvent: 'amj:open-existing',
       duplicateLevels: Object.freeze(['exact', 'possible'])
     })
+  });
+  window.AMJWhatsApp = Object.freeze({
+    url: whatsappUrl,
+    label: whatsappLabel,
+    mode: function () { return whatsappUsesMobileApp() ? 'mobile' : 'web'; },
+    contract: Object.freeze({ assisted: true, automaticSend: false, externalApi: false })
   });
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mount, { once: true });

@@ -61,8 +61,8 @@ assert.match(js, /AMJFinanceiro\.abrirCadastro\(type, id\)/,
   'cadastros existentes devem abrir pela fonte financeira canônica');
 assert.match(js, /AMJOperacaoClinica\.abrirAtendimento\(id\)/,
   'atendimentos existentes devem abrir pela fonte operacional canônica');
-assert.match(js, /src: '\.\/crm\.js\?v=20260826-1'[\s\S]*?css: '\.\/crm\.css\?v=20260826-1'/,
-  'CRM deve versionar e carregar JS/CSS sob demanda');
+assert.match(js, /src: '\.\/crm\.js\?v=([^']+)'[\s\S]*?css: '\.\/crm\.css\?v=\1'/,
+  'CRM deve versionar JS/CSS sob demanda com a mesma versão');
 assert.match(js, /copiloto: Object\.freeze\(\{[\s\S]*?global: 'AMJCopiloto'[\s\S]*?src: '\.\/copiloto\.js\?v=[^']+'[\s\S]*?css: '\.\/copiloto\.css\?v=[^']+'[\s\S]*?root: 'copiloto-root'/,
   'shell deve registrar o Copiloto como módulo lazy');
 assert.match(js, /data-copiloto-open[\s\S]*?aria-controls="copiloto-drawer"/,

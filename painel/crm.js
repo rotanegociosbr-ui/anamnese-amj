@@ -215,7 +215,13 @@
     const message = 'Olá' + (firstName ? ', ' + firstName : '') +
       '! Recebemos sua solicitação pelo site da Ana Maria Jacob Estética sobre ' + interest +
       '. Vamos conversar para confirmar a melhor disponibilidade?';
-    return 'https://wa.me/' + number + '?text=' + encodeURIComponent(message);
+    return window.AMJWhatsApp && typeof window.AMJWhatsApp.url === 'function'
+      ? window.AMJWhatsApp.url(number, message)
+      : 'https://wa.me/' + number + '?text=' + encodeURIComponent(message);
+  }
+  function siteWhatsAppLabel() {
+    return window.AMJWhatsApp && typeof window.AMJWhatsApp.label === 'function'
+      ? window.AMJWhatsApp.label() : 'WhatsApp';
   }
 
   async function request(action, payload, options) {
@@ -534,7 +540,7 @@
     const whatsappUrl = siteWhatsAppUrl(item);
     const statusLabel = SITE_REQUEST_STATUS[status] || status.replace(/_/g, ' ');
     let actions = whatsappUrl
-      ? '<a class="crm-site-whatsapp" href="' + escapeHtml(whatsappUrl) + '" target="_blank" rel="noopener noreferrer">Abrir WhatsApp</a>'
+      ? '<a class="crm-site-whatsapp" href="' + escapeHtml(whatsappUrl) + '" target="_blank" rel="noopener noreferrer">Abrir ' + escapeHtml(siteWhatsAppLabel()) + '</a>'
       : '<span class="crm-site-phone-error">WhatsApp incompleto</span>';
     if (pending) {
       actions += '<button type="button" class="crm-primary" data-crm-site-accept="' + escapeHtml(id) + '"' +

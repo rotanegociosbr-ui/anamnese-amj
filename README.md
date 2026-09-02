@@ -69,11 +69,12 @@ visível e periodicamente enquanto permanece aberto. Sem Web Push e sem um
 serviço de envio, não é possível garantir alertas com o Fichas ou o navegador
 fechado; as pendências reaparecem na próxima abertura.
 
-O WhatsApp permanece **manual**: o sistema apenas prepara e abre o link depois
-de uma ação consciente da equipe. Abrir a conversa não registra envio; a equipe
-precisa usar **Marcar como enviado** depois de realmente enviar a mensagem.
-Nenhuma API externa está ativa, e os textos não incluem procedimento nem dado
-de saúde.
+O WhatsApp permanece **manual e assistido**: no computador, o sistema abre o
+WhatsApp Web já conectado com o texto pronto; no celular, abre o aplicativo. O
+fluxo cobre confirmação, lembrete e retorno. A equipe confere a conversa e faz o
+envio; abrir a conversa não registra envio, e **Marcar como enviado** só deve ser
+usado depois do envio real. Nenhuma API externa ou robô de clique está ativo, e
+os textos não incluem procedimento nem dado de saúde.
 
 Arquivos principais do módulo:
 
@@ -102,6 +103,11 @@ site e o inventário das conexões futuras. O item **Formulários do site** apar
 como ativo internamente porque usa somente o Supabase da clínica. WhatsApp
 oficial, calendário, pagamentos online e outras APIs permanecem **Desativados**,
 **Não verificados** e **Sem conexão externa**.
+
+O **WhatsApp Web assistido** não altera esse estado: ele usa somente um link
+aberto pela equipe em uma sessão já conectada, sem ler a conta, armazenar a
+sessão ou enviar mensagens sozinho. Assim, confirmações, lembretes e retornos
+continuam disponíveis sem contratação de API e sem cobrança nova.
 
 O catálogo usa um adaptador nulo que interrompe qualquer tentativa antes de um
 transporte externo. A Fase 5B não possui botão de conectar, autorização OAuth,
