@@ -193,9 +193,9 @@ const finalizeArchivedCheck = finalizeMigration.indexOf('if v_protocol.archived_
 const finalizeSignedCheck = finalizeMigration.indexOf("if v_protocol.status = 'signed' then");
 assert(finalizeArchivedCheck >= 0 && finalizeArchivedCheck < finalizeSignedCheck,
   'protocolo arquivado deve ser rejeitado antes do retorno signed idempotente');
-assert.match(shell, /operacao\.js\?v=20260824-5/,
+assert.match(shell, /operacao\.js\?v=20260905-1/,
   'cache-bust deve entregar o JavaScript atualizado da Operação');
-assert.match(html, /operacao\.css\?v=20260824-5/,
+assert.match(html, /operacao\.css\?v=20260905-1/,
   'cache-bust deve entregar o CSS atualizado da Operação');
 assert.match(html, /app-shell\.js\?v=[^"']+/,
   'cache-bust do shell deve entregar a referência atualizada da Operação');

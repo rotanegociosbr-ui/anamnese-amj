@@ -7,8 +7,11 @@
   --op-surface: #fffaf6;
   color: var(--op-ink);
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 1.25rem;
 }
+
+.operacao-clinica :where(input, select, textarea) { min-width: 0; max-width: 100%; }
 
 .operacao-clinica[aria-busy="true"] { opacity: .78; }
 .operacao-cabecalho { align-items: flex-start; display: flex; gap: 1rem; justify-content: space-between; }

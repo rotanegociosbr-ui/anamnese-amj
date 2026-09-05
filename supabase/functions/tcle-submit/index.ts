@@ -2,6 +2,7 @@ import "@supabase/functions-js/edge-runtime.d.ts";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import type { PDFFont, PDFPage } from "pdf-lib";
 import { consumePublicFormRateLimit } from "../_shared/public-form-rate-limit.ts";
+import { readLimitedBody, RequestBodyTooLargeError } from "../_shared/read-limited-body.ts";
 
 const TYPE = "tcle_toxina_botulinica";
 const TERM_VERSION = "2026-08-18-v1";
@@ -812,14 +813,17 @@ Deno.serve(async (req: Request) => {
 
   let payload: JsonRecord;
   try {
-    const body = new Uint8Array(await req.arrayBuffer());
+    const body = await readLimitedBody(req, MAX_BODY_BYTES);
     if (body.byteLength > MAX_BODY_BYTES) {
       return fail(req, "payload_too_large", "O documento excedeu o limite permitido.", 413);
     }
     const parsed = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(body));
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("invalid_payload");
     payload = parsed as JsonRecord;
-  } catch {
+  } catch (error) {
+    if (error instanceof RequestBodyTooLargeError) {
+      return fail(req, "payload_too_large", "O documento excedeu o limite permitido.", 413);
+    }
     return fail(req, "invalid_json", "Não foi possível ler o envio.");
   }
 

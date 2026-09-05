@@ -1449,10 +1449,11 @@
 
   async function submit(form, task) {
     if (!form.reportValidity()) return;
+    const generation = state.generation;
     setBusy(true); status('Salvando…');
-    try { await task(); await loadAfterMutation(); }
-    catch (error) { status(error.message || 'Não foi possível salvar.', true); }
-    finally { setBusy(false); }
+    try { await task(); if (generation === state.generation) await loadAfterMutation(); }
+    catch (error) { if (generation === state.generation) status(error.message || 'Não foi possível salvar.', true); }
+    finally { if (generation === state.generation) setBusy(false); }
   }
   function showDuplicate(form, saveButton, type, error) {
     if (!error || !error.existingId || !window.AMJShell ||
@@ -1608,10 +1609,18 @@
         file.size > 25 * 1024 * 1024) {
       throw new Error('Use somente JPEG, PNG ou WebP de até 25 MB por arquivo.');
     }
+    const generation = state.generation;
+    const uploadContext = photoUploadContext(form);
+    function assertCurrentContext() {
+      if (generation !== state.generation || form.isConnected === false || photoUploadContext(form) !== uploadContext) {
+        throw new Error('O contexto da foto ou a sessão mudou. Atualize a galeria da consulta original para conferir o envio.');
+      }
+    }
     const category = formValue(form, 'categoria');
     const phase = category === 'antes' ? 'before' : category === 'durante' ? 'during' :
       category === 'depois' ? 'after' : 'products_used';
     const thumbnail = await thumbnailForPhoto(file);
+    assertCurrentContext();
     const data = new FormData();
     data.append('acao', 'adicionar_foto');
     data.append('protocolo_id', form.dataset.protocoloId);
@@ -1660,12 +1669,15 @@
         data.append('motivo_duplicidade', proof.motivo || reason);
         data.append('operation_id', proof.operation_id);
       }
+      const headers = await cabecalhosAcesso(false, proof);
+      assertCurrentContext();
       const response = await fetch(PRONTUARIO_API, {
-        method: 'POST', headers: await cabecalhosAcesso(false, proof), body: data,
+        method: 'POST', headers: headers, body: data,
         cache: 'no-store', referrerPolicy: 'no-referrer'
       });
       let result = {};
       try { result = await response.json(); } catch (_) { result = {}; }
+      assertCurrentContext();
       if (!response.ok || result.ok === false || result.erro || !result.foto || !result.foto.id) {
         const error = new Error(result.erro || 'Não foi possível guardar uma das fotos.');
         error.code = result.codigo || String(response.status);

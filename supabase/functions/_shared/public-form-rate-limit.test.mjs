@@ -170,6 +170,7 @@ test("todos os formulários aplicam o limite antes do corpo e da idempotência",
       source.indexOf("await readBody(req)", handler),
       source.indexOf("await req.arrayBuffer()", handler),
       source.indexOf("await readJsonBody(req)", handler),
+      source.indexOf("await readLimitedBody(req, MAX_BODY_BYTES)", handler),
     );
     const idempotencyReads = [
       source.indexOf("await findExisting(", handler),

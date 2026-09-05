@@ -1,4 +1,5 @@
 import "@supabase/functions-js/edge-runtime.d.ts";
+import { readLimitedBody, RequestBodyTooLargeError } from "../_shared/read-limited-body.ts";
 import {
   authenticateDual,
   authResponseFields,
@@ -282,13 +283,18 @@ export async function handleRequest(req: Request): Promise<Response> {
     if (req.method !== "POST") {
       throw new ApiError(405, "method_not_allowed", "Método não permitido.");
     }
-    const raw = await req.text();
+    const c = await authenticateDual(req, CFG);
+    // Preserve the existing UTF-16 text limit, including its valid Unicode/BOM
+    // inputs, while bounding the UTF-8 representation before decoding.
+    const raw = new TextDecoder().decode(await readLimitedBody(req, 3 * 65536 + 3));
     if (raw.length > 65536) throw new ApiError(413, "body_too_large", "Solicitação muito grande.");
     const p = JSON.parse(raw);
     if (!obj(p)) throw new Error();
-    const c = await authenticateDual(req, CFG);
     return await route(req, c, p);
   } catch (e) {
+    if (e instanceof RequestBodyTooLargeError) {
+      return json(req, { erro: "Solicitação muito grande.", codigo: "body_too_large" }, 413);
+    }
     if (e instanceof ApiError) {
       return json(req, { erro: e.publicMessage, codigo: e.code }, e.status);
     }

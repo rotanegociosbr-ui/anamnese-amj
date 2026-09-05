@@ -151,7 +151,7 @@ assert.match(source, /prontuario-somente-leitura/);
 assert.match(html, /<h2>Pacientes e consultas<\/h2>/);
 assert.match(html, /<option value="during">Durante<\/option>/);
 assert.match(html, /Limite de 25 MB/);
-assert.match(html, /prontuario\.js\?v=20260826-1/);
+assert.match(html, /prontuario\.js\?v=20260905-1/);
 assert.match(html, /prontuario\.css\?v=20260826-1/);
 assert.match(css, /\.prontuario-paciente-grupo/);
 assert.match(css, /\.prontuario-galerias/);

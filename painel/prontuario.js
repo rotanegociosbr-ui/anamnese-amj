@@ -4,7 +4,7 @@
   const API = 'https://rjxtxoqprnumouqakxbc.supabase.co/functions/v1/prontuario-fichas';
   const FINANCE_API = 'https://rjxtxoqprnumouqakxbc.supabase.co/functions/v1/financeiro-fichas';
   const state = { loaded: false, loading: false, patients: [], brands: [], products: [], inventory: [], protocols: [], generation: 0,
-    pendingPatientId: null, pendingProtocolId: null, originalProductsSignature: null,
+    pendingPatientId: null, pendingProtocolId: null, originalProductsSignature: null, editorGeneration: 0,
     photosByProtocol: new Map(), openProtocolIds: new Set() };
   const DATE = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeZone: 'America/Sao_Paulo' });
   const NUMBER = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 4 });
@@ -16,6 +16,7 @@
   const PROTOCOL_PAGE_SIZE = 100;
   const MAX_PROTOCOL_PAGES = 1000;
   const protocolIntentKeys = new WeakMap();
+  const photoIntentKeys = new WeakMap();
 
   function byId(id) { return document.getElementById(id); }
   function escapeHtml(value) {
@@ -898,11 +899,15 @@
     byId('prontuario-somente-leitura').classList.toggle('oculto', !readOnly);
   }
   function resetForm() {
+    state.editorGeneration += 1;
+    clearDuplicatePhotoChoice();
     const form = byId('prontuario-form');
     protocolIntentKeys.delete(form);
+    setBusy(form, false);
     setProtocolReadOnly(false);
     form.reset();
     if (byId('prontuario-foto-form')) {
+      setBusy(byId('prontuario-foto-form'), false);
       byId('prontuario-foto-form').reset();
       byId('prontuario-foto-data').value = localNow();
       syncPhotoProductContext();
@@ -1030,6 +1035,12 @@
     const form = event.currentTarget;
     clearDuplicatePhotoChoice();
     const protocolId = byId('prontuario-id').value;
+    const generation = state.generation;
+    const editorGeneration = state.editorGeneration;
+    function contextIsCurrent() {
+      return generation === state.generation && editorGeneration === state.editorGeneration &&
+        byId('prontuario-id').value === protocolId;
+    }
     const file = byId('prontuario-foto-arquivo').files[0];
     if (!protocolId || !file) { status('prontuario-foto-status', 'Selecione uma foto.', true); return; }
     if (!byId('prontuario-consentimento-fotos').checked) {
@@ -1040,14 +1051,29 @@
       status('prontuario-foto-status', 'Use uma imagem JPEG, PNG ou WebP de até 25 MB.', true);
       return;
     }
-    setBusy(form, true);
     let thumbnail = null;
-    const idempotencyKey = uuid();
     const phase = byId('prontuario-foto-fase').value;
     const takenAtLocal = byId('prontuario-foto-data').value;
-    const takenAt = takenAtLocal ? new Date(takenAtLocal) : new Date();
+    const parsedTakenAt = takenAtLocal ? new Date(takenAtLocal) : new Date();
+    if (!Number.isFinite(parsedTakenAt.getTime())) {
+      status('prontuario-foto-status', 'Informe corretamente a data da foto.', true);
+      return;
+    }
     const productId = phase === 'products_used' ? byId('prontuario-foto-produto').value : '';
     const lot = phase === 'products_used' ? byId('prontuario-foto-lote').value.trim() : '';
+    const fingerprint = JSON.stringify([generation, protocolId, phase, takenAtLocal, productId, lot]);
+    let intent = photoIntentKeys.get(file);
+    if (intent && intent.fingerprint !== fingerprint) {
+      status('prontuario-foto-status', 'Esta foto já iniciou um envio com outros dados. Atualize a galeria para recuperar o que foi salvo antes de corrigir a foto.', true);
+      return;
+    }
+    if (!intent) {
+      intent = { fingerprint: fingerprint, key: uuid(), takenAt: parsedTakenAt };
+      photoIntentKeys.set(file, intent);
+    }
+    const idempotencyKey = intent.key;
+    const takenAt = intent.takenAt;
+    setBusy(form, true);
     function makeData(extra) {
       const data = new FormData();
       data.append('acao', 'adicionar_foto');
@@ -1067,15 +1093,18 @@
       return data;
     }
     async function sendPhoto(extra, proof) {
+      const headers = await cabecalhosAcesso(false, proof);
+      if (!contextIsCurrent()) throw new Error('O contexto da foto mudou. Reabra a consulta para continuar.');
       const response = await fetch(API, {
         method: 'POST',
-        headers: await cabecalhosAcesso(false, proof),
+        headers: headers,
         body: makeData(extra),
         cache: 'no-store',
         referrerPolicy: 'no-referrer'
       });
       let result = {};
       try { result = await response.json(); } catch (_) { result = {}; }
+      if (!contextIsCurrent()) throw new Error('O contexto da foto mudou. Atualize a galeria da consulta original para conferir o envio.');
       if (!response.ok || result.erro || result.ok === false) {
         const error = new Error(result.erro || 'Não foi possível enviar a foto.');
         error.status = response.status;
@@ -1086,24 +1115,28 @@
       return result;
     }
     async function finishPhoto(message) {
+      if (!contextIsCurrent()) return;
+      photoIntentKeys.delete(file);
       clearDuplicatePhotoChoice();
       form.reset();
       byId('prontuario-foto-data').value = localNow();
       syncPhotoProductContext();
       status('prontuario-foto-status', message, false);
       await load({ silent: true });
+      if (!contextIsCurrent()) return;
       beginEdit(protocolId);
       await loadPhotos(protocolId, false);
     }
     try {
-      if (!Number.isFinite(takenAt.getTime())) throw new Error('Informe corretamente a data da foto.');
       thumbnail = await createPhotoThumbnail(file);
       await sendPhoto(null, null);
       await finishPhoto('Foto adicionada ao armazenamento clínico privado.');
     } catch (error) {
+      if (!contextIsCurrent()) return;
       if (error.code === 'photo_exact_duplicate' && error.data && error.data.candidato) {
         status('prontuario-foto-status', error.message, true);
         showDuplicatePhotoChoice(error.data.candidato, async function () {
+          if (!contextIsCurrent()) return;
           if (!window.AMJProtecao || typeof window.AMJProtecao.solicitarSenhaRecente !== 'function') {
             status('prontuario-foto-status', 'A confirmação por senha não está disponível. Atualize a página.', true);
             return;
@@ -1123,17 +1156,17 @@
             }, proof);
             await finishPhoto('Foto distinta confirmada com senha e motivo auditável.');
           } catch (confirmError) {
-            status('prontuario-foto-status', confirmError.message || 'Não foi possível confirmar a foto distinta.', true);
+            if (contextIsCurrent()) status('prontuario-foto-status', confirmError.message || 'Não foi possível confirmar a foto distinta.', true);
           } finally {
             if (proof && typeof proof.encerrar === 'function') await proof.encerrar();
-            setBusy(form, false);
+            if (contextIsCurrent()) setBusy(form, false);
           }
         });
       } else {
         status('prontuario-foto-status', error.message, true);
       }
     }
-    finally { setBusy(form, false); }
+    finally { if (contextIsCurrent()) setBusy(form, false); }
   }
 
   async function changeState(id, action) {

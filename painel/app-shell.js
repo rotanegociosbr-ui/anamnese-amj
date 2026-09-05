@@ -41,7 +41,7 @@
     }),
     operacao: Object.freeze({
       global: 'AMJOperacaoClinica',
-      src: './operacao.js?v=20260824-5',
+      src: './operacao.js?v=20260905-1',
       root: 'operacao-clinica-root'
     }),
     acompanhamentos: Object.freeze({
@@ -109,6 +109,7 @@
     metricObservers: [],
     restoredForSession: false,
     routeStatusTimer: 0,
+    navigationEpoch: 0,
     mobileMedia: null,
     openingExisting: new Set()
   };
@@ -503,7 +504,7 @@
     try {
       if (['cliente', 'fornecedor', 'marca', 'produto'].includes(type)) {
         const registryRoute = { cliente: 'clientes', fornecedor: 'fornecedores', marca: 'marcas', produto: 'produtos' }[type];
-        await navigate(registryRoute, { source: 'open-existing', focus: false });
+        if (!await navigate(registryRoute, { source: 'open-existing', focus: false })) return false;
         if (window.AMJFinanceiro && typeof window.AMJFinanceiro.abrirCadastro === 'function') {
           await window.AMJFinanceiro.abrirCadastro(type, id);
           return true;
@@ -512,13 +513,13 @@
         const button = await waitForElement(selector, 5000);
         if (button) { button.click(); return true; }
       } else if (type === 'lead') {
-        await navigate('crm', { source: 'open-existing', focus: false });
+        if (!await navigate('crm', { source: 'open-existing', focus: false })) return false;
         if (window.AMJCRMLeads && typeof window.AMJCRMLeads.abrirLead === 'function') {
           await window.AMJCRMLeads.abrirLead(id);
           return true;
         }
       } else if (['atendimento', 'procedimento'].includes(type)) {
-        await navigate('procedimentos', { source: 'open-existing', focus: false });
+        if (!await navigate('procedimentos', { source: 'open-existing', focus: false })) return false;
         if (window.AMJOperacaoClinica && typeof window.AMJOperacaoClinica.abrirAtendimento === 'function') {
           await window.AMJOperacaoClinica.abrirAtendimento(id);
           return true;
@@ -526,7 +527,7 @@
         const button = await waitForElement('[data-atendimento-editar="' + CSS.escape(id) + '"]', 5000);
         if (button) { button.click(); return true; }
       } else if (['prontuario', 'protocolo'].includes(type)) {
-        await navigate('prontuarios', { source: 'open-existing', focus: false });
+        if (!await navigate('prontuarios', { source: 'open-existing', focus: false })) return false;
         const button = await waitForElement('[data-prontuario-editar="' + CSS.escape(id) + '"]', 5000);
         if (button) { button.click(); return true; }
       }
@@ -632,13 +633,20 @@
     const route = ROUTES[routeName];
     const settings = options || {};
     if (!route) return false;
+    if (!state.authenticated) return false;
     if (!routeAllowed(route)) {
       setRouteStatus('Esta área exige a conta proprietária com autenticação em duas etapas.');
       return false;
     }
+    const epoch = ++state.navigationEpoch;
+    const isCurrent = function () {
+      return epoch === state.navigationEpoch && state.authenticated && routeAllowed(route);
+    };
     closeDrawer(false);
     try {
       if (MODULES[route.legacy]) await ensureModule(route.legacy);
+      // A slower module must not replace a newer route or reopen a signed-out session.
+      if (!isCurrent()) return false;
       activateLegacy(route);
       updateRouteChrome(routeName);
       if (route.financeView) ensureFinanceContext(routeName);
@@ -659,8 +667,9 @@
       }
       if (routeName === 'inicio' && isOwner()) {
         void ensureModule('copiloto').then(function (api) {
-          if (api && typeof api.ativar === 'function') api.ativar({ foco: routeName });
+          if (isCurrent() && api && typeof api.ativar === 'function') api.ativar({ foco: routeName });
         }).catch(function () {
+          if (!isCurrent()) return;
           const home = byId('ai-home-root');
           if (home) {
             home.hidden = false;
@@ -671,7 +680,7 @@
       }
       return true;
     } catch (error) {
-      setRouteStatus(error && error.message ? error.message : 'Não foi possível abrir esta área agora.');
+      if (isCurrent()) setRouteStatus(error && error.message ? error.message : 'Não foi possível abrir esta área agora.');
       return false;
     }
   }
@@ -919,6 +928,7 @@
       const authenticated = isVisible(list);
       if (authenticated === state.authenticated) { syncAccess(); return; }
       state.authenticated = authenticated;
+      state.navigationEpoch += 1;
       document.body.classList.toggle('app-shell-authenticated', authenticated);
       if (!authenticated) {
         if (window.AMJCotacoes && typeof window.AMJCotacoes.reset === 'function') window.AMJCotacoes.reset();

@@ -45,13 +45,13 @@ específico antes do procedimento.
 
 A rota `/painel/` corresponde à área interna **Fichas** da clínica. Todas as
 anamneses e todos os termos liberados aparecem nela, com acesso restrito por
-senha à equipe. Os documentos usam armazenamento privado e o painel recebe
+conta individual, permissões e autenticação em duas etapas. Os documentos usam armazenamento privado e o painel recebe
 apenas os resumos necessários e links temporários para os PDFs.
 
 ## Agenda e retornos
 
 O módulo fica na aba **Agenda e retornos** da própria rota protegida `/painel/`.
-Depois de entrar com a senha já usada pelo Fichas, a equipe pode cadastrar e
+Depois de autenticar sua conta individual e confirmar a segunda etapa, a equipe pode cadastrar e
 editar horários, controlar estados do atendimento e organizar lembretes de
 confirmação, 24 horas, 2 horas e retorno. A página pública `/agendar/` registra
 uma solicitação estruturada na caixa privada do CRM antes de oferecer a conversa
@@ -90,7 +90,7 @@ Arquivos principais do módulo:
 - `supabase/config.toml` — registra a Edge Function `agenda-fichas`.
 
 O navegador não acessa as tabelas da agenda diretamente. A Edge Function valida
-origem, senha, conteúdo, transições de estado e idempotência; somente ela usa a
+origem, sessão, permissões, conteúdo, transições de estado e idempotência; somente ela usa a
 `service_role`, mantida no servidor. As tabelas têm RLS habilitada, não possuem
 acesso para `public`, `anon` ou `authenticated` e não armazenam a senha. Dados da
 agenda e credenciais também não devem ser gravados em `localStorage`, exibidos

@@ -435,15 +435,15 @@
     const methodOptions = options(catalog.formas_pagamento, 'Selecione', function (item) {
       return item.nome || item.label;
     });
-    byId('financeiro-lancamento-cliente').innerHTML = clientOptions;
-    byId('financeiro-atendimento-cliente').innerHTML = options(
+    replaceOptions('financeiro-lancamento-cliente', clientOptions);
+    replaceOptions('financeiro-atendimento-cliente', options(
       activeClients, 'Selecione um cliente cadastrado', function (item) {
         return item.nome || item.name || item.full_name || 'Cliente';
       }
-    );
-    byId('financeiro-lancamento-fornecedor').innerHTML = supplierOptions;
-    byId('financeiro-compra-fornecedor').innerHTML = requiredSupplier;
-    byId('financeiro-produto-marca').innerHTML = brandOptions;
+    ));
+    replaceOptions('financeiro-lancamento-fornecedor', supplierOptions);
+    replaceOptions('financeiro-compra-fornecedor', requiredSupplier);
+    replaceOptions('financeiro-produto-marca', brandOptions);
     replaceOptions('financeiro-custo-produto', options(activeProducts, 'Selecione', function (item) {
       return item.nome || item.name;
     }));
@@ -1487,6 +1487,16 @@
     const entry = state.entries.find(function (row) {
       return row.id === byId('financeiro-parcelas-lancamento').value;
     });
+    const container = byId('financeiro-parcelas-lista');
+    const entryId = entry ? String(entry.id) : '';
+    if (container.dataset.entryId !== entryId) {
+      // Card actions change the selection without emitting input/change.
+      // Dates, custom amounts and retry keys belong to the selected entry.
+      container.innerHTML = '';
+      delete container.dataset.signature;
+      container.dataset.entryId = entryId;
+      clearIntent('parcelas');
+    }
     const balance = entry ? num(entryBalance(entry)) : 0;
     byId('financeiro-parcelas-saldo').textContent = money(balance);
     if (!entry || !(balance > 0)) {
