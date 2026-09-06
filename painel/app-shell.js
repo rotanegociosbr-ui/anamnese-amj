@@ -19,14 +19,21 @@
     fichas: Object.freeze({ title: 'Fichas', legacy: 'fichas', group: 'principal' }),
     gestao: Object.freeze({ title: 'Gestão', legacy: 'gestao', owner: true, group: 'principal' }),
     integracoes: Object.freeze({ title: 'Integrações', legacy: 'integracoes', owner: true, group: 'principal' }),
-    prontuarios: Object.freeze({ title: 'Fotos e prontuários', legacy: 'prontuarios', owner: true, group: 'secondary' })
+    prontuarios: Object.freeze({ title: 'Fotos e prontuários', legacy: 'prontuarios', owner: true, group: 'secondary' }),
+    rosto3d: Object.freeze({ title: 'Rosto 3D', legacy: 'rosto3d', owner: true, group: 'secondary' })
   });
 
   const PRIMARY_ORDER = ['inicio', 'crm', 'marketing', 'procedimentos', 'acompanhamentos', 'clientes', 'agenda', 'receitas', 'despesas', 'produtos', 'marcas',
     'fornecedores', 'estoque', 'cotacoes', 'fichas', 'gestao', 'integracoes'];
-  const SECONDARY_ORDER = ['prontuarios'];
+  const SECONDARY_ORDER = ['prontuarios', 'rosto3d'];
   const STORAGE_ROUTE = 'amj_shell_route';
   const MODULES = Object.freeze({
+    rosto3d: Object.freeze({
+      global: 'AMJRosto3D',
+      src: './rosto3d.js?v=20260906-1',
+      css: './rosto3d.css?v=20260906-1',
+      root: 'rosto3d-root'
+    }),
     crm: Object.freeze({
       global: 'AMJCRMLeads',
       src: './crm.js?v=20260901-1',
@@ -75,6 +82,7 @@
   });
 
   const ICONS = Object.freeze({
+    rosto3d: '<path d="M10 2c5 0 7 4 6 8-1 5-4 8-6 8s-5-3-6-8C3 6 5 2 10 2Z"/><path d="M6 8h2M12 8h2M10 9v3h1M8 14h4"/>',
     inicio: '<path d="M3 10.5 10 4l7 6.5v6.2a1.3 1.3 0 0 1-1.3 1.3H4.3A1.3 1.3 0 0 1 3 16.7Z"/><path d="M7.5 18v-5h5v5"/>',
     crm: '<path d="M3 4h14l-5.5 6v5l-3 1.5V10Z"/><path d="M13.5 13.5h3M15 12v3"/>',
     marketing: '<path d="M3 15.5V12l9-4.5v12Z"/><path d="M12 9l4-2v9l-4-2M5.5 15.5l1 3h3l-1-4"/>',
@@ -275,7 +283,7 @@
     });
     if (owner) void ensureModuleStyle('copiloto', MODULES.copiloto).catch(function () {});
 
-    ['crm', 'marketing', 'operacao', 'acompanhamentos', 'gestao', 'cotacoes', 'integracoes'].forEach(function (legacy) {
+    ['crm', 'marketing', 'operacao', 'acompanhamentos', 'gestao', 'cotacoes', 'integracoes', 'rosto3d'].forEach(function (legacy) {
       const button = byId('aba-bt-' + legacy);
       if (!button) return;
       const allowed = owner;
@@ -293,6 +301,7 @@
     if (window.AMJIntegracoes && typeof window.AMJIntegracoes.atualizarAcesso === 'function') {
       window.AMJIntegracoes.atualizarAcesso();
     }
+    if (window.AMJRosto3D) window.AMJRosto3D.atualizarAcesso();
     if (!routeAllowed(ROUTES[state.currentRoute]) && state.authenticated) {
       void navigate('inicio', { source: 'access', focus: false, persist: false });
     }
@@ -931,6 +940,7 @@
       state.navigationEpoch += 1;
       document.body.classList.toggle('app-shell-authenticated', authenticated);
       if (!authenticated) {
+        if (window.AMJRosto3D) window.AMJRosto3D.reset();
         if (window.AMJCotacoes && typeof window.AMJCotacoes.reset === 'function') window.AMJCotacoes.reset();
         if (window.AMJIntegracoes && typeof window.AMJIntegracoes.reset === 'function') window.AMJIntegracoes.reset();
         if (window.AMJAcompanhamentos && typeof window.AMJAcompanhamentos.reset === 'function') window.AMJAcompanhamentos.reset();

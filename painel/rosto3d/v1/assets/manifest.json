@@ -1,0 +1,503 @@
+{
+  "version": 1,
+  "objects": [
+    {
+      "id": "eyes",
+      "name": "Olhos genéricos MakeHuman high-poly",
+      "layer": "eyes",
+      "file": "eyes-amj-v1-uv.json",
+      "objFile": "eyes-amj-v1.obj",
+      "license": "CC0-1.0",
+      "licenseFile": "LICENSE.ASSETS.md",
+      "source": "https://raw.githubusercontent.com/makehumancommunity/makehuman/a8bc2d54ff0ac92e78ff71431b1023eda42bf482/makehuman/data/eyes/high-poly/high-poly.obj",
+      "sourceCommit": "a8bc2d54ff0ac92e78ff71431b1023eda42bf482",
+      "fittingSource": "https://raw.githubusercontent.com/makehumancommunity/makehuman/a8bc2d54ff0ac92e78ff71431b1023eda42bf482/makehuman/data/eyes/high-poly/high-poly.mhclo",
+      "sourceHash": "da2493215b708a344c33dc72f2a9a5b8fa985dcc5a70ad3b208995cf871da8e1",
+      "fittingHash": "b183cfe37120ab726f9b3f2ea6cd3a64c44ce7b4bd91a77c841cf70c04f83a0d",
+      "geometryHash": "9fffaf936a5355deb59f1c16748d7889021eb048c7131be18d6b042a26034d18",
+      "sourceVertexCount": 1064,
+      "vertices": 1076,
+      "sourceFaces": 1020,
+      "triangles": 2040,
+      "degenerateTriangles": 0,
+      "sourceBounds": {
+        "min": [
+          -0.4508,
+          15.5952,
+          1.2212
+        ],
+        "max": [
+          0.4508,
+          15.906,
+          1.4628
+        ]
+      },
+      "fittedHm08Bounds": {
+        "min": [
+          -0.45614049749302277,
+          7.136041232687134,
+          1.1875775297109017
+        ],
+        "max": [
+          0.4561404974930227,
+          7.432095361434792,
+          1.4053986264531695
+        ]
+      },
+      "bounds": {
+        "min": [
+          -0.5002054734168372,
+          -0.070493833453675,
+          0.5960520548729945
+        ],
+        "max": [
+          0.500205473416837,
+          0.25416029491495673,
+          0.8349155309619759
+        ]
+      },
+      "fittingOffsetScaleXYZ": [
+        0.8979492780002426,
+        0.8561349355087644,
+        0.8432112305330116
+      ],
+      "visibleDefault": true,
+      "hideable": true,
+      "doubleSided": false,
+      "materialNotes": "OBJ has no named sclera/iris/pupil groups. UV coordinates are preserved with seam vertices split and original smooth normals preserved; use the provided procedural iris centers/radii. Both eyes remain one hideable mesh.",
+      "hasUVs": true,
+      "materialGroupsPresent": false,
+      "uvReference": {
+        "origin": "bottom-left OBJ UV; do not invert V in a procedural shader",
+        "source": "https://raw.githubusercontent.com/makehumancommunity/makehuman/a8bc2d54ff0ac92e78ff71431b1023eda42bf482/makehuman/data/eyes/materials/brown_eye.png",
+        "sourceHash": "4659691c7295ad6206c78b003e5fd0e5f91dcd53032fa914a229bb48cabe424b",
+        "referenceFile": "eyes-uv-reference-brown.png",
+        "sourceLicense": "CC0-1.0",
+        "materialGroupsPresent": false,
+        "proceduralIrisHint": {
+          "centers": [
+            [
+              0.708,
+              0.702
+            ],
+            [
+              0.291,
+              0.29
+            ]
+          ],
+          "outerRadius": 0.114,
+          "pupilRadius": 0.036,
+          "method": "Approximate center/radii visually read from official 1024x1024 artwork; rendering guide, not measured anatomy",
+          "notice": "Reference artwork is not required for rendering; original iris UV layout retained. If generating a canvas image, invert V when placing centers into image coordinates."
+        }
+      },
+      "eyeUV": true,
+      "texture": "eyes-uv-reference-brown.png"
+    },
+    {
+      "id": "hair",
+      "name": "Cabelo genérico preso MakeHuman ponytail01",
+      "layer": "hair",
+      "file": "hair-ponytail01-amj-v1-uv.json",
+      "objFile": "hair-ponytail01-amj-v1.obj",
+      "license": "CC0-1.0",
+      "licenseFile": "LICENSE.ASSETS.md",
+      "source": "https://files.makehumancommunity.org/asset_packs/makehuman_system_assets/makehuman_system_assets_cc0.zip",
+      "archiveEntry": "hair/ponytail01/ponytail01.obj",
+      "fittingEntry": "hair/ponytail01/ponytail01.mhclo",
+      "sourceHash": "d9f5fe96fbedbc8006220d87aad0e4a33d15286eb6b21f5929661cdc490ebf5a",
+      "fittingHash": "97fc50b12bcb3b1c7b33edddd8d427a2604ffb06fe79b31132bf47f82d7afbac",
+      "geometryHash": "fe96d9c7291fb712be5d855bad4cc0c277b85ce3d40c14305de160b35583d2c1",
+      "sourceVertexCount": 3718,
+      "vertices": 4049,
+      "sourceFaces": 2676,
+      "triangles": 5352,
+      "degenerateTriangles": 0,
+      "sourceBounds": {
+        "min": [
+          -0.762,
+          4.3692,
+          -1.1893
+        ],
+        "max": [
+          0.7413,
+          7.937,
+          1.2631
+        ]
+      },
+      "fittedHm08Bounds": {
+        "min": [
+          -0.8131756180643777,
+          4.700835611354136,
+          -1.2360375632947835
+        ],
+        "max": [
+          0.8019232946652362,
+          8.569467343944847,
+          1.443975088559883
+        ]
+      },
+      "bounds": {
+        "min": [
+          -0.8917315985764737,
+          -2.7409499481398036,
+          -2.0616938406131746
+        ],
+        "max": [
+          0.8793922562382218,
+          1.5014069088185846,
+          0.8772186318637556
+        ]
+      },
+      "fittingOffsetScaleXYZ": [
+        1.0586552217453506,
+        1.0566944847605226,
+        1.0411678673961322
+      ],
+      "visibleDefault": true,
+      "hideable": true,
+      "doubleSided": true,
+      "materialNotes": "Original RGBA hair diffuse. Use map alpha, DoubleSide, alphaTest approximately 0.35–0.5; choose alpha-to-coverage or alpha hashing if supported to soften strand edges. Avoid treating transparent texels as solid surface.",
+      "eyeUV": false,
+      "hasUVs": true,
+      "texture": "ponytail01-original.png",
+      "textureSource": {
+        "file": "ponytail01-original.png",
+        "source": "https://files.makehumancommunity.org/asset_packs/makehuman_system_assets/makehuman_system_assets_cc0.zip",
+        "archiveEntry": "hair/ponytail01/ponytail01_diffuse.png",
+        "sourceHash": "dcb364300cac06ce8bef91b2f7c0970baf310898bbdd06b0c6b884ee9306eb97",
+        "license": "CC0-1.0",
+        "width": 2048,
+        "height": 2048,
+        "colorType": "RGBA",
+        "colorSpace": "sRGB",
+        "flipY": true,
+        "materialNotes": "Original RGBA hair diffuse. Use map alpha, DoubleSide, alphaTest approximately 0.35–0.5; choose alpha-to-coverage or alpha hashing if supported to soften strand edges. Avoid treating transparent texels as solid surface."
+      }
+    },
+    {
+      "id": "zanatomy-23602413",
+      "name": "Corrugador do supercílio — direito",
+      "sourceName": "Corrugator_superciliir",
+      "sourceObjectId": 23602413,
+      "layer": "muscles",
+      "file": "zanatomy-23602413.json",
+      "license": "CC-BY-SA-4.0"
+    },
+    {
+      "id": "zanatomy-726335290",
+      "name": "Corrugador do supercílio — esquerdo",
+      "sourceName": "Corrugator_superciliil",
+      "sourceObjectId": 726335290,
+      "layer": "muscles",
+      "file": "zanatomy-726335290.json",
+      "license": "CC-BY-SA-4.0"
+    },
+    {
+      "id": "zanatomy-763323912",
+      "name": "Depressor do ângulo da boca — direito",
+      "sourceName": "Depressor_anguli_orisr",
+      "sourceObjectId": 763323912,
+      "layer": "muscles",
+      "file": "zanatomy-763323912.json",
+      "license": "CC-BY-SA-4.0"
+    },
+    {
+      "id": "zanatomy-415043050",
+      "name": "Depressor do ângulo da boca — esquerdo",
+      "sourceName": "Depressor_anguli_orisl",
+      "sourceObjectId": 415043050,
+      "layer": "muscles",
+      "file": "zanatomy-415043050.json",
+      "license": "CC-BY-SA-4.0"
+    },
+    {
+      "id": "zanatomy-977642170",
+      "name": "Depressor do lábio inferior — direito",
+      "sourceName": "Depressor_labii_inferiorisr",
+      "sourceObjectId": 977642170,
+      "layer": "muscles",
+      "file": "zanatomy-977642170.json",
+      "license": "CC-BY-SA-4.0"
+    },
+    {
+      "id": "zanatomy-783619419",
+      "name": "Depressor do lábio inferior — esquerdo",
+      "sourceName": "Depressor_labii_inferiorisl",
+      "sourceObjectId": 783619419,
+      "layer": "muscles",
+      "file": "zanatomy-783619419.json",
+      "license": "CC-BY-SA-4.0"
+    },
+    {
+      "id": "zanatomy-926940655",
+      "name": "Levantador do ângulo da boca — direito",
+      "sourceName": "Levator_anguli_orisr",
+      "sourceObjectId": 926940655,
+      "layer": "muscles",
+      "file": "zanatomy-926940655.json",
+      "license": "CC-BY-SA-4.0"
+    },
+    {
+      "id": "zanatomy-833854523",
+      "name": "Levantador do ângulo da boca — esquerdo",
+      "sourceName": "Levator_anguli_orisl",
+      "sourceObjectId": 833854523,
+      "layer": "muscles",
+      "file": "zanatomy-833854523.json",
+      "license": "CC-BY-SA-4.0"
+    },
+    {
+      "id": "zanatomy-412064368",
+      "name": "Levantador do lábio superior — direito",
+      "sourceName": "Levator_labii_superiorisr",
+      "sourceObjectId": 412064368,
+      "layer": "muscles",
+      "file": "zanatomy-412064368.json",
+      "license": "CC-BY-SA-4.0"
+    },
+    {
+      "id": "zanatomy-890613983",
+      "name": "Levantador do lábio superior — esquerdo",
+      "sourceName": "Levator_labii_superiorisl",
+      "sourceObjectId": 890613983,
+      "layer": "muscles",
+      "file": "zanatomy-890613983.json",
+      "license": "CC-BY-SA-4.0"
+    },
+    {
+      "id": "zanatomy-331223255",
+      "name": "Masseter — parte profunda — direito",
+      "sourceName": "Deep_part_of_masseterr",
+      "sourceObjectId": 331223255,
+      "layer": "muscles",
+      "file": "zanatomy-331223255.json",
+      "license": "CC-BY-SA-4.0"
+    },
+    {
+      "id": "zanatomy-533962729",
+      "name": "Masseter — parte profunda — esquerdo",
+      "sourceName": "Deep_part_of_masseterl",
+      "sourceObjectId": 533962729,
+      "layer": "muscles",
+      "file": "zanatomy-533962729.json",
+      "license": "CC-BY-SA-4.0"
+    },
+    {
+      "id": "zanatomy-695240571",
+      "name": "Masseter — parte superficial — direito",
+      "sourceName": "Superficial_part_of_masseterr",
+      "sourceObjectId": 695240571,
+      "layer": "muscles",
+      "file": "zanatomy-695240571.json",
+      "license": "CC-BY-SA-4.0"
+    },
+    {
+      "id": "zanatomy-268652398",
+      "name": "Masseter — parte superficial — esquerdo",
+      "sourceName": "Superficial_part_of_masseterl",
+      "sourceObjectId": 268652398,
+      "layer": "muscles",
+      "file": "zanatomy-268652398.json",
+      "license": "CC-BY-SA-4.0"
+    },
+    {
+      "id": "zanatomy-662526822",
+      "name": "Mentual — direito",
+      "sourceName": "Mentalis_muscler",
+      "sourceObjectId": 662526822,
+      "layer": "muscles",
+      "file": "zanatomy-662526822.json",
+      "license": "CC-BY-SA-4.0"
+    },
+    {
+      "id": "zanatomy-826115562",
+      "name": "Mentual — esquerdo",
+      "sourceName": "Mentalis_musclel",
+      "sourceObjectId": 826115562,
+      "layer": "muscles",
+      "file": "zanatomy-826115562.json",
+      "license": "CC-BY-SA-4.0"
+    },
+    {
+      "id": "zanatomy-517073369",
+      "name": "Músculo frontal — direito",
+      "sourceName": "Frontalis_muscler",
+      "sourceObjectId": 517073369,
+      "layer": "muscles",
+      "file": "zanatomy-517073369.json",
+      "license": "CC-BY-SA-4.0"
+    },
+    {
+      "id": "zanatomy-131002877",
+      "name": "Músculo frontal — esquerdo",
+      "sourceName": "Frontalis_musclel",
+      "sourceObjectId": 131002877,
+      "layer": "muscles",
+      "file": "zanatomy-131002877.json",
+      "license": "CC-BY-SA-4.0"
+    },
+    {
+      "id": "zanatomy-897633611",
+      "name": "Músculo nasal — direito",
+      "sourceName": "Nasalis_muscler",
+      "sourceObjectId": 897633611,
+      "layer": "muscles",
+      "file": "zanatomy-897633611.json",
+      "license": "CC-BY-SA-4.0"
+    },
+    {
+      "id": "zanatomy-247885239",
+      "name": "Músculo nasal — esquerdo",
+      "sourceName": "Nasalis_musclel",
+      "sourceObjectId": 247885239,
+      "layer": "muscles",
+      "file": "zanatomy-247885239.json",
+      "license": "CC-BY-SA-4.0"
+    },
+    {
+      "id": "zanatomy-952924065",
+      "name": "Músculo temporal — direito",
+      "sourceName": "Temporalis_muscler",
+      "sourceObjectId": 952924065,
+      "layer": "muscles",
+      "file": "zanatomy-952924065.json",
+      "license": "CC-BY-SA-4.0"
+    },
+    {
+      "id": "zanatomy-162944253",
+      "name": "Músculo temporal — esquerdo",
+      "sourceName": "Temporalis_musclel",
+      "sourceObjectId": 162944253,
+      "layer": "muscles",
+      "file": "zanatomy-162944253.json",
+      "license": "CC-BY-SA-4.0"
+    },
+    {
+      "id": "zanatomy-434972166",
+      "name": "Orbicular da boca — direito",
+      "sourceName": "Orbicularis_oris_muscler",
+      "sourceObjectId": 434972166,
+      "layer": "muscles",
+      "file": "zanatomy-434972166.json",
+      "license": "CC-BY-SA-4.0"
+    },
+    {
+      "id": "zanatomy-796791312",
+      "name": "Orbicular da boca — esquerdo",
+      "sourceName": "Orbicularis_oris_musclel",
+      "sourceObjectId": 796791312,
+      "layer": "muscles",
+      "file": "zanatomy-796791312.json",
+      "license": "CC-BY-SA-4.0"
+    },
+    {
+      "id": "zanatomy-46005575",
+      "name": "Orbicular do olho — parte orbital — direito",
+      "sourceName": "Orbital_part_of_orbicularis_oculir",
+      "sourceObjectId": 46005575,
+      "layer": "muscles",
+      "file": "zanatomy-46005575.json",
+      "license": "CC-BY-SA-4.0"
+    },
+    {
+      "id": "zanatomy-667750948",
+      "name": "Orbicular do olho — parte orbital — esquerdo",
+      "sourceName": "Orbital_part_of_orbicularis_oculil",
+      "sourceObjectId": 667750948,
+      "layer": "muscles",
+      "file": "zanatomy-667750948.json",
+      "license": "CC-BY-SA-4.0"
+    },
+    {
+      "id": "zanatomy-114442261",
+      "name": "Orbicular do olho — parte palpebral — direito",
+      "sourceName": "Palpebral_part_of_orbicularis_oculir",
+      "sourceObjectId": 114442261,
+      "layer": "muscles",
+      "file": "zanatomy-114442261.json",
+      "license": "CC-BY-SA-4.0"
+    },
+    {
+      "id": "zanatomy-200305276",
+      "name": "Orbicular do olho — parte palpebral — esquerdo",
+      "sourceName": "Palpebral_part_of_orbicularis_oculil",
+      "sourceObjectId": 200305276,
+      "layer": "muscles",
+      "file": "zanatomy-200305276.json",
+      "license": "CC-BY-SA-4.0"
+    },
+    {
+      "id": "zanatomy-907127900",
+      "name": "Prócero — direito",
+      "sourceName": "Procerus_muscler",
+      "sourceObjectId": 907127900,
+      "layer": "muscles",
+      "file": "zanatomy-907127900.json",
+      "license": "CC-BY-SA-4.0"
+    },
+    {
+      "id": "zanatomy-63420266",
+      "name": "Prócero — esquerdo",
+      "sourceName": "Procerus_musclel",
+      "sourceObjectId": 63420266,
+      "layer": "muscles",
+      "file": "zanatomy-63420266.json",
+      "license": "CC-BY-SA-4.0"
+    },
+    {
+      "id": "zanatomy-998988858",
+      "name": "Risório — direito",
+      "sourceName": "Risorius_muscler",
+      "sourceObjectId": 998988858,
+      "layer": "muscles",
+      "file": "zanatomy-998988858.json",
+      "license": "CC-BY-SA-4.0"
+    },
+    {
+      "id": "zanatomy-495262934",
+      "name": "Risório — esquerdo",
+      "sourceName": "Risorius_musclel",
+      "sourceObjectId": 495262934,
+      "layer": "muscles",
+      "file": "zanatomy-495262934.json",
+      "license": "CC-BY-SA-4.0"
+    },
+    {
+      "id": "zanatomy-121742891",
+      "name": "Zigomático maior — direito",
+      "sourceName": "Zygomaticus_major_muscler",
+      "sourceObjectId": 121742891,
+      "layer": "muscles",
+      "file": "zanatomy-121742891.json",
+      "license": "CC-BY-SA-4.0"
+    },
+    {
+      "id": "zanatomy-290510213",
+      "name": "Zigomático maior — esquerdo",
+      "sourceName": "Zygomaticus_major_musclel",
+      "sourceObjectId": 290510213,
+      "layer": "muscles",
+      "file": "zanatomy-290510213.json",
+      "license": "CC-BY-SA-4.0"
+    },
+    {
+      "id": "zanatomy-381066825",
+      "name": "Zigomático menor — direito",
+      "sourceName": "Zygomaticus_minor_muscler",
+      "sourceObjectId": 381066825,
+      "layer": "muscles",
+      "file": "zanatomy-381066825.json",
+      "license": "CC-BY-SA-4.0"
+    },
+    {
+      "id": "zanatomy-510329294",
+      "name": "Zigomático menor — esquerdo",
+      "sourceName": "Zygomaticus_minor_musclel",
+      "sourceObjectId": 510329294,
+      "layer": "muscles",
+      "file": "zanatomy-510329294.json",
+      "license": "CC-BY-SA-4.0"
+    }
+  ]
+}

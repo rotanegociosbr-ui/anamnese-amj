@@ -383,6 +383,7 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
       <button class="aba" id="aba-bt-gestao" type="button" role="tab" aria-selected="false" aria-controls="aba-gestao" tabindex="-1" hidden>Gestão e auditoria</button>
       <button class="aba" id="aba-bt-cotacoes" type="button" role="tab" aria-selected="false" aria-controls="aba-cotacoes" tabindex="-1" hidden>Cotações e preços</button>
       <button class="aba" id="aba-bt-integracoes" type="button" role="tab" aria-selected="false" aria-controls="aba-integracoes" tabindex="-1" hidden>Integrações</button>
+      <button class="aba" id="aba-bt-rosto3d" type="button" role="tab" aria-selected="false" aria-controls="aba-rosto3d" tabindex="-1" hidden>Rosto 3D</button>
     </div>
 
     <section class="painel-aba app-inicio" id="aba-inicio" role="tabpanel" aria-labelledby="aba-bt-inicio">
@@ -441,6 +442,7 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
           <button type="button" data-shell-route="crm" data-shell-action="novo-lead"><strong>Novo lead</strong><span>Cadastro rápido, origem e próxima ação</span></button>
           <button type="button" data-shell-route="procedimentos" data-shell-action="novo-procedimento"><strong>Novo procedimento</strong><span>Paciente, itens, produtos, fotos e retorno</span></button>
           <button type="button" data-shell-route="procedimentos" data-shell-action="fotos-atendimento"><strong>Adicionar ou tirar fotos</strong><span>Escolha a paciente e a consulta certa</span></button>
+          <button type="button" data-shell-route="rosto3d"><strong>Rosto 3D</strong><span>Girar, identificar músculos, marcar e anotar</span></button>
           <button type="button" data-shell-route="clientes" data-shell-action="novo-cliente"><strong>Cadastrar cliente</strong><span>Pesquise antes e abra um cadastro existente</span></button>
           <button type="button" data-shell-route="agenda" data-shell-action="novo-agendamento"><strong>Novo agendamento</strong><span>Horário, confirmação e retorno</span></button>
           <button type="button" data-shell-route="estoque" data-shell-action="nova-compra"><strong>Registrar compra</strong><span>Fornecedor, vários produtos, lotes e frete</span></button>
@@ -983,6 +985,9 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
       <div id="cotacoes-root"></div>
     </section>
 
+    <section class="painel-aba oculto" id="aba-rosto3d" role="tabpanel" aria-labelledby="aba-bt-rosto3d" hidden>
+      <div id="rosto3d-root"></div>
+    </section>
     <section class="painel-aba oculto" id="aba-integracoes" role="tabpanel" aria-labelledby="aba-bt-integracoes" hidden>
       <div id="integracoes-root"></div>
     </section>
@@ -1045,7 +1050,7 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
 <script src="./auth-mfa.js?v=20260819-3"></script>
 <script src="./financeiro.js?v=20260905-1"></script>
 <script src="./prontuario.js?v=20260905-1"></script>
-<script src="./app-shell.js?v=20260905-1"></script>
+<script src="./app-shell.js?v=20260906-1"></script>
 <script>
 const SUPABASE_URL = 'https://rjxtxoqprnumouqakxbc.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_Ip14p4tUfYFjwUYaWinMlw_Gf9v0YwT';
@@ -1326,6 +1331,7 @@ function atualizarIdentidade(dados) {
   if (window.AMJAcompanhamentos) window.AMJAcompanhamentos.atualizarAcesso();
   if (window.AMJMarketing) window.AMJMarketing.atualizarAcesso();
   if (window.AMJIntegracoes) window.AMJIntegracoes.atualizarAcesso();
+  if (window.AMJRosto3D) window.AMJRosto3D.atualizarAcesso();
 }
 
 async function cabecalhosAcesso(comJson, provaSenha) {
@@ -1797,6 +1803,7 @@ function limparEstadoAplicativo() {
   if (window.AMJAcompanhamentos) window.AMJAcompanhamentos.reset();
   if (window.AMJMarketing) window.AMJMarketing.reset();
   if (window.AMJIntegracoes) window.AMJIntegracoes.reset();
+  if (window.AMJRosto3D) window.AMJRosto3D.reset();
   agendaAtivarAba('inicio', false);
   if (sessaoMonitor) clearInterval(sessaoMonitor);
   sessaoMonitor = null;
@@ -2569,7 +2576,7 @@ function agendaIniciarPolling() {
 }
 
 function agendaAtivarAba(nome, moverFoco) {
-  const abas = ['inicio', 'crm', 'marketing', 'fichas', 'agenda', 'prontuarios', 'financeiro', 'operacao', 'acompanhamentos', 'gestao', 'cotacoes', 'integracoes'];
+  const abas = ['inicio', 'crm', 'marketing', 'fichas', 'agenda', 'prontuarios', 'financeiro', 'operacao', 'acompanhamentos', 'gestao', 'cotacoes', 'integracoes', 'rosto3d'];
   let ativa = abas.includes(nome) ? nome : 'inicio';
   if (!['inicio', 'fichas'].includes(ativa)) {
     const botaoSolicitado = el('aba-bt-' + ativa);
@@ -2600,6 +2607,10 @@ function agendaAtivarAba(nome, moverFoco) {
   if (ativa === 'gestao' && window.AMJGestaoAdministrativa) window.AMJGestaoAdministrativa.ativar();
   if (ativa === 'cotacoes' && window.AMJCotacoes) window.AMJCotacoes.ativar();
   if (ativa === 'integracoes' && window.AMJIntegracoes) window.AMJIntegracoes.ativar();
+  if (window.AMJRosto3D) {
+    if (ativa === 'rosto3d') void window.AMJRosto3D.ativar();
+    else window.AMJRosto3D.pausar();
+  }
 }
 
 function agendaAtualizarEstadoCentral() {
@@ -2842,10 +2853,11 @@ el('aba-bt-operacao').addEventListener('click', () => agendaAtivarAba('operacao'
 el('aba-bt-gestao').addEventListener('click', () => agendaAtivarAba('gestao', false));
 el('aba-bt-cotacoes').addEventListener('click', () => agendaAtivarAba('cotacoes', false));
 el('aba-bt-integracoes').addEventListener('click', () => agendaAtivarAba('integracoes', false));
+el('aba-bt-rosto3d').addEventListener('click', () => agendaAtivarAba('rosto3d', false));
 document.querySelector('.abas').addEventListener('keydown', evento => {
   if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(evento.key)) return;
   evento.preventDefault();
-  const disponiveis = ['inicio', 'crm', 'fichas', 'agenda', 'prontuarios', 'financeiro', 'operacao', 'gestao', 'cotacoes', 'integracoes'].filter(chave => {
+  const disponiveis = ['inicio', 'crm', 'fichas', 'agenda', 'prontuarios', 'financeiro', 'operacao', 'gestao', 'cotacoes', 'integracoes', 'rosto3d'].filter(chave => {
     const botao = el('aba-bt-' + chave);
     return !botao.hidden && !botao.disabled;
   });
