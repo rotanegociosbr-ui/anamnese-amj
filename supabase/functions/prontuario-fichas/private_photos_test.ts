@@ -67,4 +67,3 @@ Deno.test("consultation gallery checks owner/MFA and same-clinic protocol; marke
  assert.match(operation,/"operacao.registrar_consentimento_marketing"/);
  assert.match(operation,/rpc\("operacao_registrar_consentimento_marketing"/);
 });
-

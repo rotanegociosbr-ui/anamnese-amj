@@ -129,6 +129,3 @@ end;$photos_and_finalization$;
 set constraints all immediate;
 reset role;
 rollback;
-
-
-
