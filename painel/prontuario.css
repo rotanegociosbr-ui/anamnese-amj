@@ -194,3 +194,5 @@
 @media(max-width:360.98px){
   .prontuario-fotos-grade{grid-template-columns:1fr}
 }
+.prontuario-rascunho-nota{padding:12px;border-left:3px solid #a47b30;background:#fff8e9;color:#594523;line-height:1.6}
+.prontuario-badge.rascunho{background:#fff5df;color:#654600;border:1px solid #d6bd85}

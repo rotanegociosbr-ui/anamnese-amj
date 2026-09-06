@@ -5,7 +5,7 @@ import {
   DualAuthConfig,
   DualAuthContext,
   DualAuthError,
-  requireRecentPasswordProof,
+  requireAdminSessionAction,
   writeClinicAudit,
 } from "../_shared/dual-auth.ts";
 import {
@@ -415,7 +415,7 @@ async function requireProof(
   if (reason.length < 3) {
     throw new ApiError(422, "reason_required", "Informe o motivo da operação.");
   }
-  await requireRecentPasswordProof(req, AUTH_CONFIG, context, {
+  await requireAdminSessionAction(req, AUTH_CONFIG, context, {
     operationId,
     action,
     targetId,
@@ -664,17 +664,17 @@ async function handleAttendancePhotos(
   if (!validUuid(protocolId)) {
     return json(req, { ok: true, atendimento_id: attendanceId, fotos_atendimento: [] });
   }
-  const consent = await rest(
-    `/rest/v1/protocol_consent_current?select=accepted&protocol_id=eq.${
-      encodeURIComponent(protocolId)
-    }` +
-      `&kind=eq.clinical_photography&accepted=eq.true&limit=1`,
+  // tenant() requires owner + MFA. Private clinical access is not a patient
+  // consent and does not authorize public/marketing use.
+  const protocols = await rest(
+    `/rest/v1/protocols?select=id&clinic_id=eq.${clinic}&id=eq.${encodeURIComponent(protocolId)}` +
+      "&archived_at=is.null&status=in.(draft,signed)&limit=1",
   );
-  if (!consent.length) {
+  if (!protocols.length) {
     throw new ApiError(
-      403,
-      "clinical_photography_consent_required",
-      BACKEND_MESSAGES.clinical_photography_consent_required,
+      404,
+      "protocol_not_found",
+      "Prontuário não encontrado ou arquivado.",
     );
   }
   const rows = await rest(

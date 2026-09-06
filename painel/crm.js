@@ -261,7 +261,7 @@
 
   async function protectedRequest(action, payload, options) {
     if (!window.AMJProtecao || typeof window.AMJProtecao.solicitarSenhaRecente !== 'function') {
-      throw new Error('A confirmação segura por senha não está disponível. Atualize a página.');
+      throw new Error('A confirmação administrativa não está disponível. Atualize a página.');
     }
     let proof = null;
     try {
@@ -547,7 +547,7 @@
         (version ? ' data-crm-site-version="' + version + '"' : '') + (busy ? ' disabled aria-disabled="true"' : '') +
         '>Aceitar no CRM</button><button type="button" class="crm-danger" data-crm-site-archive="' + escapeHtml(id) + '"' +
         (version ? ' data-crm-site-version="' + version + '"' : '') + (busy ? ' disabled aria-disabled="true"' : '') +
-        '>Arquivar com senha</button>';
+        '>Arquivar</button>';
     }
     return '<article class="crm-site-card' + (pending ? ' is-pending' : '') + '" role="listitem" data-crm-site-id="' +
       escapeHtml(id) + '" aria-busy="' + String(busy) + '"><header><div><h4>' + escapeHtml(name) + '</h4><span>' +

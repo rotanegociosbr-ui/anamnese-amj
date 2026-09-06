@@ -7,7 +7,7 @@ const js = fs.readFileSync(path.join(root, 'painel', 'prontuario.js'), 'utf8');
 const css = fs.readFileSync(path.join(root, 'painel', 'prontuario.css'), 'utf8');
 
 assert.match(js, /function renderPhotoComparison\(protocol, photos\)/);
-assert.match(js, /consent\(protocol, 'clinical_photography'\)/);
+assert.match(js, /Arquivo clínico privado — publicação exige autorização específica/);
 assert.match(js, /function comparablePhoto\(photo, phase\)[\s\S]+photo\.archived_at/);
 assert.match(js, /safeSignedPhotoUrl\(photo\.miniatura_url\)[\s\S]+safeSignedPhotoUrl\(photo\.url_assinada\)/);
 assert.match(js, /comparisonTimestamp[\s\S]+taken_at[\s\S]+captured_at[\s\S]+created_at/);

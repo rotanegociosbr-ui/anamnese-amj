@@ -10,12 +10,14 @@ const shell = fs.readFileSync(path.join(root, 'painel', 'app-shell.js'), 'utf8')
 const edge = fs.readFileSync(path.join(root, 'supabase', 'functions', 'cotacoes-fichas', 'index.ts'), 'utf8');
 const reviewMigration = fs.readFileSync(path.join(root, 'supabase', 'migrations',
   '20260824061000_cotacoes_revisao_sku_exato.sql'), 'utf8');
+const adminMigration = fs.readFileSync(path.join(root, 'supabase', 'migrations',
+  '20260906212911_cotacoes_admin_session_authorization.sql'), 'utf8');
 
 assert.match(ui, /listar_cotacoes/, 'UI deve consultar as cotações');
 assert.match(ui, /revisar_sku_exato/, 'UI deve oferecer a revisão administrativa explícita');
 assert.match(ui, /Média indisponível até aprovar manualmente a identidade exata/,
   'SKU pendente deve explicar por que não entra na média');
-assert.match(ui, /AMJProtecao\.solicitarSenhaRecente/, 'revisão deve pedir senha one-time');
+assert.match(ui, /AMJProtecao\.solicitarSenhaRecente/, 'revisão deve confirmar a decisão pela API administrativa compatível');
 assert.match(ui, /expected_version/, 'revisão deve usar concorrência otimista');
 assert.match(ui, /Aprovar identidade exata/);
 assert.match(ui, /Rejeitar identidade/);
@@ -63,7 +65,10 @@ assert.match(shell, /\.\/cotacoes\.js\?v=\d{8}-\d+/);
 assert.match(edge, /cotacoes_painel_evidencias/, 'Edge deve listar a view de evidências');
 assert.match(edge, /cotacoes_resumo_referencia/, 'estatística deve vir da RPC exata');
 assert.match(edge, /cotacoes_revisar_sku_exato/, 'revisão deve usar a RPC transacional');
-assert.match(edge, /requireRecentPasswordProof/, 'revisão deve consumir prova de senha one-time');
+assert.match(edge, /await requireAdminSessionAction\(req, AUTH_CONFIG, context,/, 'revisão deve revalidar a sessão administrativa atual');
+assert.doesNotMatch(edge, /requireRecentPasswordProof|requireRoutineEditAuthorization|clinic_consume_password_proof/,
+  'revisão não pode exigir senha secundária nem janela de edição');
+assert.match(edge, /rpc\/cotacoes_revisar_sku_exato_admin_session/, 'Edge deve usar a RPC atual de sessão administrativa');
 assert.match(edge, /clinic_id.*eq\.\$\{clinicId\}/s, 'toda listagem deve filtrar o tenant autenticado');
 assert.match(edge, /allowedRoles:\s*\["owner"\]/);
 assert.match(edge, /requireAal2:\s*true/);
@@ -76,7 +81,24 @@ assert.match(reviewMigration, /item\.review_status\s*=\s*'aprovado_exato'/,
   'estatística deve exigir aprovação humana exata');
 assert.match(reviewMigration, /item\.review_status\s*=\s*'aprovado_exato'[\s\S]*counts_in_statistics/,
   'flag de contagem deve exigir a mesma aprovação');
-assert.match(reviewMigration, /private\.clinic_password_proofs/, 'RPC deve verificar a prova consumida');
+assert.match(adminMigration, /member\.clinic_id = p_clinic_id[\s\S]*member\.user_id = p_actor_id[\s\S]*member\.role = 'owner'[\s\S]*member\.status = 'active'/,
+  'RPC atual deve exigir administradora ativa da clínica');
+assert.match(adminMigration, /session\.id = p_main_session_id and session\.user_id = p_actor_id[\s\S]*session\.aal = 'aal2'[\s\S]*session\.not_after > clock_timestamp\(\)/,
+  'RPC atual deve validar sessão exata, MFA e expiração');
+assert.match(adminMigration, /authorization_mode='admin_session' and proof_id is null and octet_length\(main_session_hmac\)=32/,
+  'auditoria administrativa deve preservar a origem real sem fabricar prova de senha');
+assert.match(adminMigration, /revoke all on function public\.cotacoes_revisar_sku_exato_admin_session[^\n]+from public,anon,authenticated,service_role/,
+  'RPC administrativa não pode ser chamada diretamente por clientes');
+assert.match(adminMigration, /grant execute on function public\.cotacoes_revisar_sku_exato_admin_session[^\n]+to service_role/);
+assert(adminMigration.indexOf('session.id = p_main_session_id') < adminMigration.indexOf('into v_existing'),
+  'revalidação de sessão deve ocorrer antes da recuperação idempotente');
+assert.match(adminMigration, /v_item\.review_version <> p_expected_version/, 'revisão atual deve manter concorrência otimista');
+assert.match(adminMigration, /insert into public\.financeiro_auditoria/, 'revisão atual deve manter trilha de auditoria');
+for (const flag of ['cost_changed', 'stock_changed', 'sale_price_changed', 'product_linked']) {
+  assert.match(adminMigration, new RegExp("'" + flag + "', false"), 'revisão não deve alterar custo, estoque, venda ou vínculo');
+}
+assert.doesNotMatch(adminMigration, /update\s+public\.financeiro_(produto_custos|produtos|estoque_\w+)/i,
+  'autorização nova não pode ampliar os efeitos da revisão');
 assert.match(reviewMigration, /cotacao_item_identity_immutable/, 'fonte e identidade devem ser imutáveis');
 assert.match(reviewMigration, /cotacao_source_identity_immutable/, 'metadados que identificam a fonte devem ser imutáveis');
 assert.match(reviewMigration, /cotacao_evidence_identity_immutable/, 'preço e evidência originais devem ser imutáveis');

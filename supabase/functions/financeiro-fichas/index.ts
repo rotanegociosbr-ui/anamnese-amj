@@ -5,7 +5,7 @@ import {
   DualAuthConfig,
   DualAuthContext,
   DualAuthError,
-  requireRecentPasswordProof,
+  requireAdminSessionAction,
   writeClinicAudit,
 } from "../_shared/dual-auth.ts";
 
@@ -737,7 +737,7 @@ async function requireProtectedOperation(
   // Os session_id seguem transitoriamente às RPCs privadas; somente HMAC e
   // metadados técnicos da operação são persistidos. JWT/senha nunca vão ao banco.
   try {
-    await requireRecentPasswordProof(req, AUTH_CONFIG, context, {
+    await requireAdminSessionAction(req, AUTH_CONFIG, context, {
       operationId: protectedOperationId,
       action: `financeiro.${action}`,
       targetId,
@@ -747,7 +747,7 @@ async function requireProtectedOperation(
       if (error.auditContext) {
         await writeClinicAudit(AUTH_CONFIG, error.auditContext, {
           entity: "financial_protected_operation",
-          action: "reauthenticate",
+          action: "authorize_admin_session",
           outcome: "denied",
           details: { endpoint: "financeiro-fichas", reason_code: error.code },
         });
@@ -757,7 +757,7 @@ async function requireProtectedOperation(
     throw new ApiError(
       503,
       "reauthentication_unavailable",
-      "Não foi possível confirmar sua senha agora.",
+      "Não foi possível validar sua sessão agora.",
     );
   }
 }
@@ -917,6 +917,8 @@ function mapDatabaseError(
     ],
     fornecedor_invalido: [422, "invalid_supplier", "Fornecedor inválido."],
     produto_invalido: [422, "invalid_product", "Produto inválido."],
+    catalog_product_incomplete: [422, "catalog_product_incomplete", "Complete o cadastro do produto antes de utilizá-lo."],
+    product_essentials_required: [422, "product_essentials_required", "Mantenha tipo, unidade e apresentação já cadastrados."],
     itens_invalidos: [422, "invalid_items", "Itens da compra inválidos."],
     total_invalido: [422, "invalid_total", "Total da compra inválido."],
     estorno_invalido: [422, "invalid_refund", "Estorno inválido."],
@@ -2781,6 +2783,11 @@ function presentProduct(row: JsonRecord): JsonRecord {
     registro_anvisa: row.anvisa_registration,
     controla_estoque: row.stock_control,
     ativo: row.active,
+    status_cadastro: row.registration_status === "draft" ? "rascunho" : "completo",
+    pendencias: row.registration_status === "draft"
+      ? [["tipo", row.product_type], ["unidade", row.unit], ["apresentacao", row.presentation]]
+        .filter(([, value]) => !value).map(([field]) => field)
+      : [],
     arquivado_em: row.archived_at,
     versao: row.version,
     criado_em: row.created_at,
@@ -2813,7 +2820,7 @@ async function handleListCatalogs(
     ),
     admin(
       "/rest/v1/financeiro_produtos?select=id,brand_id,name,product_type,unit,presentation,ean,reference_cost," +
-        "sale_price,anvisa_registration,stock_control,active,created_at,updated_at,archived_at,version" +
+        "sale_price,anvisa_registration,stock_control,active,registration_status,created_at,updated_at,archived_at,version" +
         `&clinic_id=eq.${encode(clinicId)}${archiveFilter}&order=name.asc&limit=2000`,
     ),
   ]);
@@ -2824,7 +2831,8 @@ async function handleListCatalogs(
     formas_pagamento: forms,
     fornecedores: rows(suppliers.data).map(presentSupplierList),
     marcas: rows(brands.data).map(presentBrand),
-    produtos: rows(products.data).map(presentProduct),
+    produtos: rows(products.data).filter((row) => row.registration_status !== "draft").map(presentProduct),
+    produtos_rascunho: rows(products.data).filter((row) => row.registration_status === "draft").map(presentProduct),
   });
 }
 
@@ -3032,9 +3040,11 @@ async function handleCreateProduct(
   const brandId = optionalUuid(payload.marca_id, "marca_id");
   if (brandId) await assertParty(clinicId, "financeiro_marcas", brandId, "invalid_brand");
   const name = requiredText(payload.nome, "nome", 2, 160);
-  const type = enumValue(payload.tipo, "tipo", PRODUCT_TYPES);
-  const unit = enumValue(payload.unidade, "unidade", PRODUCT_UNITS);
-  const presentation = requiredText(payload.apresentacao, "apresentacao", 1, 160);
+  const type = optionalText(payload.tipo, "tipo", 40);
+  const unit = optionalText(payload.unidade, "unidade", 20);
+  if (type !== null) enumValue(type, "tipo", PRODUCT_TYPES);
+  if (unit !== null) enumValue(unit, "unidade", PRODUCT_UNITS);
+  const presentation = optionalText(payload.apresentacao, "apresentacao", 160);
   const ean = normalizeEan(payload.ean);
   const referenceCost =
     payload.custo_referencia === undefined || payload.custo_referencia === null ||
@@ -3063,7 +3073,7 @@ async function handleCreateProduct(
       sale_price: salePrice,
       anvisa_registration: anvisa,
       stock_control: stockControl,
-      active: true,
+      active: Boolean(type && unit && presentation),
       created_by: userId,
       updated_by: userId,
     },
@@ -3100,7 +3110,7 @@ const CATALOG_READ_CONFIG: Record<
     table: "financeiro_produtos",
     select:
       "id,brand_id,name,product_type,unit,presentation,ean,reference_cost,sale_price,anvisa_registration," +
-      "stock_control,active,archived_at,version,created_at,updated_at",
+      "stock_control,active,registration_status,archived_at,version,created_at,updated_at",
     responseKey: "produto",
   },
 };
@@ -3198,6 +3208,10 @@ async function handleEditProduct(
   const { clinicId, userId } = tenant(context);
   const brandId = optionalUuid(payload.marca_id, "marca_id");
   if (brandId) await assertParty(clinicId, "financeiro_marcas", brandId, "invalid_brand");
+  const type = optionalText(payload.tipo, "tipo", 40);
+  const unit = optionalText(payload.unidade, "unidade", 20);
+  if (type !== null) enumValue(type, "tipo", PRODUCT_TYPES);
+  if (unit !== null) enumValue(unit, "unidade", PRODUCT_UNITS);
   const result = await rpc("financeiro_editar_produto", {
     p_clinic_id: clinicId,
     p_user_id: userId,
@@ -3205,9 +3219,9 @@ async function handleEditProduct(
     p_expected_version: expectedVersion(payload),
     p_brand_id: brandId,
     p_name: requiredText(payload.nome, "nome", 2, 160),
-    p_product_type: enumValue(payload.tipo, "tipo", PRODUCT_TYPES),
-    p_unit: enumValue(payload.unidade, "unidade", PRODUCT_UNITS),
-    p_presentation: requiredText(payload.apresentacao, "apresentacao", 1, 160),
+    p_product_type: type,
+    p_unit: unit,
+    p_presentation: optionalText(payload.apresentacao, "apresentacao", 160),
     p_ean: normalizeEan(payload.ean),
     p_reference_cost: optionalDecimal(payload.custo_referencia, "custo_referencia", 2),
     p_sale_price: optionalDecimal(payload.preco_venda, "preco_venda", 2),

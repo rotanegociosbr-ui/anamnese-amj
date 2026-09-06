@@ -1,4 +1,4 @@
-import {authenticateDual,authResponseFields,DualAuthError,requireRecentPasswordProof,writeClinicAudit,type DualAuthContext} from '../_shared/dual-auth.ts';
+import {authenticateDual,authResponseFields,DualAuthError,requireAdminSessionAction,writeClinicAudit,type DualAuthContext} from '../_shared/dual-auth.ts';
 import {validateStudy} from '../_shared/facial-study.mjs';
 import registry from '../_shared/facial-registry.json' with {type:'json'};
 const base=(Deno.env.get('SUPABASE_URL')||'').replace(/\/+$/,'');
@@ -68,7 +68,7 @@ export async function handler(req:Request){
     if(previous.protocol_id!==protocol.id||previous.created_by!==ctx.userId||JSON.stringify(validateStudy(previous.document,registry))!==JSON.stringify(document))throw new Failure(409,'version_conflict','Esta operação já foi usada para outro registro. Reabra o estudo.');
     study=previous;
    }else{
-    await requireRecentPasswordProof(req,config,ctx,{operationId:body.operation_id,action:'rosto3d.study.save',targetId:protocol.id});
+    await requireAdminSessionAction(req,config,ctx,{operationId:body.operation_id,action:'rosto3d.study.save',targetId:protocol.id});
     study=await service('rpc/facial_study_save','POST',{p_clinic_id:ctx.clinicId,p_actor_id:ctx.userId,p_protocol_id:protocol.id,p_operation_id:body.operation_id,p_expected_version:body.expected_version,p_document:document,p_reason:reason,p_expected_patient_id:body.expected_patient_id,p_expected_protocol_version:body.expected_protocol_version});
    }
   }

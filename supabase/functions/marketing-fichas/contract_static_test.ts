@@ -17,7 +17,7 @@ Deno.test("contrato proíbe automação externa", () => {
   assertStringIncludes(source, "publicacao_automatica: false");
 });
 
-Deno.test("operações destrutivas exigem prova recente", () => {
+Deno.test("operações destrutivas exigem sessão administradora", () => {
   for (
     const action of [
       "arquivar_campanha",
@@ -27,7 +27,7 @@ Deno.test("operações destrutivas exigem prova recente", () => {
       "arquivar_conteudo",
     ]
   ) assertStringIncludes(source, `"${action}"`);
-  assertStringIncludes(source, "requireRecentPasswordProof");
+  assertStringIncludes(source, "requireAdminSessionAction");
   assertStringIncludes(source, "x-amj-reauthentication");
 });
 

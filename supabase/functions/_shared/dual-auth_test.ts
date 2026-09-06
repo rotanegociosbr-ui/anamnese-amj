@@ -3,6 +3,7 @@ import {
   authResponseFields,
   DualAuthConfig,
   DualAuthError,
+  requireAdminSessionAction,
   writeClinicAudit,
 } from "./dual-auth.ts";
 
@@ -12,6 +13,39 @@ const SESSION_ID = "33333333-3333-4333-8333-333333333333";
 const OTHER_CLINIC_ID = "44444444-4444-4444-8444-444444444444";
 const LEGACY_HASH = "a".repeat(64);
 const SUPABASE_URL = "https://project.supabase.co";
+
+const adminScope={operationId:"55555555-5555-4555-8555-555555555555",action:"prontuario.finalize",targetId:SESSION_ID};
+const adminContext=()=>({authMethod:"supabase_auth" as const,role:"owner" as const,userId:USER_ID,clinicId:CLINIC_ID,
+ displayName:null,aal:"aal2" as const,sessionId:SESSION_ID,requestId:OTHER_CLINIC_ID});
+function adminRequest(aal:"aal1"|"aal2"="aal2"){
+ return new Request("https://edge.test",{headers:{authorization:"Bearer "+token(aal)}});
+}
+
+Deno.test("admin session authorizes critical action without secondary password/proof/window",async()=>{
+ const cfg=config(),calls:string[]=[];const original=cfg.fetchImpl!;
+ cfg.fetchImpl=(input,init)=>{calls.push(String(input));return original(input,init);};
+ const result=await requireAdminSessionAction(adminRequest(),cfg,adminContext(),adminScope);
+ if(result.mode!=="admin_session"||result.sessionId!==SESSION_ID||result.operationId!==adminScope.operationId)throw Error("Wrong session authorization");
+ if(calls.length!==3||calls.some(url=>/password_proof|routine_edit_authorization/.test(url)))throw Error("Unexpected secondary authorization");
+ if("proofId" in result||"passwordAuthenticatedAt" in result)throw Error("Fabricated password proof");
+});
+Deno.test("admin helper rejects revoked login and changed/suspended membership at action time",async()=>{
+ await expectAuthError(requireAdminSessionAction(adminRequest(),config({activeSession:false}),adminContext(),adminScope),"session_revoked");
+ await expectAuthError(requireAdminSessionAction(adminRequest(),config({memberStatus:"suspended"}),adminContext(),adminScope),"membership_inactive");
+ await expectAuthError(requireAdminSessionAction(adminRequest(),config({role:"professional"}),adminContext(),adminScope),"role_forbidden");
+});
+Deno.test("admin helper rejects AAL1 bearer even when supplied context claims owner AAL2",async()=>{
+ await expectAuthError(requireAdminSessionAction(adminRequest("aal1"),{...config(),requireAal2:false},adminContext(),adminScope),"mfa_required");
+});
+Deno.test("admin helper rejects forged context scope or missing primary authorization",async()=>{
+ await expectAuthError(requireAdminSessionAction(adminRequest(),config(),{...adminContext(),clinicId:OTHER_CLINIC_ID},adminScope),"action_context_changed");
+ await expectAuthError(requireAdminSessionAction(adminRequest(),config(),{...adminContext(),sessionId:OTHER_CLINIC_ID},adminScope),"action_context_changed");
+ await expectAuthError(requireAdminSessionAction(adminRequest(),config(),adminContext(),{...adminScope,operationId:"invalid"}),"invalid_action_scope");
+ await expectAuthError(requireAdminSessionAction(new Request("https://edge.test",{headers:{"x-amj-reauthentication":"Bearer legacy"}}),config(),adminContext(),adminScope),"authorization_required");
+});
+Deno.test("admin helper fails closed when fresh auth validation is unavailable",async()=>{
+ await expectAuthError(requireAdminSessionAction(adminRequest(),config({authStatus:500}),adminContext(),adminScope),"auth_unavailable");
+});
 
 function token(aal: "aal1" | "aal2"): string {
   const encode = (value: unknown) =>

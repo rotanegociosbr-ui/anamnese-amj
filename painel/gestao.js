@@ -148,7 +148,7 @@
 
   async function protectedCall(action, payload, options) {
     if (!window.AMJProtecao || typeof window.AMJProtecao.solicitarSenhaRecente !== 'function') {
-      throw new Error('A confirmação por senha não está disponível. Atualize a página.');
+      throw new Error('A confirmação administrativa não está disponível. Atualize a página.');
     }
     let proof = null;
     try {
@@ -261,7 +261,7 @@
       '<label>Valor líquido<input name="valor_liquido" type="number" step="0.01" min="0" required></label>' +
       '<label>Liquidado em<input name="liquidado_em" type="datetime-local" value="' + localDateTime() + '" required></label>' +
       '<label>Referência curta<input name="referencia" maxlength="80" placeholder="Nunca informe conta ou cartão completo"></label>' +
-      '<div class="gestao-form-acoes"><button type="submit">Confirmar com senha</button></div></form></details>';
+      '<div class="gestao-form-acoes"><button type="submit">Confirmar</button></div></form></details>';
   }
 
   function reconciliationForm() {
@@ -275,7 +275,7 @@
       '<label>Saldo externo confirmado<input name="saldo_externo" type="number" step="0.01" required></label>' +
       '<label class="gestao-form-largo">Referência da evidência<input name="evidencia" maxlength="300" required placeholder="Ex.: extrato conferido em DD/MM/AAAA"></label>' +
       '<label class="gestao-form-largo">Observações<textarea name="observacoes" maxlength="800"></textarea></label>' +
-      '<div class="gestao-form-acoes"><button type="submit">Conciliar com senha</button></div></form></details>';
+      '<div class="gestao-form-acoes"><button type="submit">Confirmar conciliação</button></div></form></details>';
   }
 
   function renderTreasury() {
@@ -303,7 +303,7 @@
       return '<tr><td>' + escapeHtml(date(item.settled_at)) + '</td><td>' + escapeHtml(item.movement_kind) +
         '</td><td>' + money(item.gross_amount) + '</td><td>' + money(item.fee_amount) + '</td><td>' +
         money(item.net_amount) + '</td><td>' + (final ? '<span>Histórico final</span>' :
-          '<button type="button" data-gestao-estornar-liquidacao="' + escapeHtml(item.id) + '">Estornar com senha</button>') + '</td></tr>';
+          '<button type="button" data-gestao-estornar-liquidacao="' + escapeHtml(item.id) + '">Estornar</button>') + '</td></tr>';
     }).join('');
     return section('Contas operacionais', 'Somente nome, tipo e últimos quatro opcionais; sem credenciais bancárias.',
       cashAccountForm() + table(['Conta', 'Tipo', 'Identificação', 'Saldo calculado', 'Status', 'Ações'], cashRows)) +
@@ -382,11 +382,11 @@
     const rows = state.closures.map(function (item) {
       return '<tr><td>' + escapeHtml(item.period_start ? item.period_start.slice(0, 7) : '—') + '</td><td>' + escapeHtml(String(item.version)) +
         '</td><td>' + escapeHtml(item.status) + '</td><td>' + money(item.net_cash_flow) + '</td><td>' + money(item.inventory_value) +
-        '</td><td>' + (item.status === 'fechado' ? '<button type="button" data-gestao-reabrir="' + escapeHtml(item.id) + '">Reabrir com senha</button>' : '—') + '</td></tr>';
+        '</td><td>' + (item.status === 'fechado' ? '<button type="button" data-gestao-reabrir="' + escapeHtml(item.id) + '">Reabrir</button>' : '—') + '</td></tr>';
     }).join('');
     return section('Fechamento mensal', 'Cria snapshot imutável. Todas as contas ativas precisam estar conciliadas.',
       '<form id="gestao-form-fechamento" class="gestao-form gestao-form-inline"><label>Mês<input name="mes" type="month" required></label>' +
-      '<button type="submit">Fechar mês com senha</button></form>' +
+      '<button type="submit">Fechar mês</button></form>' +
       table(['Mês', 'Versão', 'Status', 'Fluxo líquido', 'Estoque gerencial', 'Ação'], rows));
   }
 
@@ -406,7 +406,7 @@
       '<label>Ocorrido em<input name="ocorrido_em" type="datetime-local" value="' + localDateTime() + '" required></label>' +
       '<label class="gestao-form-largo">Referência da evidência<input name="evidencia" maxlength="300" required></label>' +
       '<label class="gestao-form-largo">Observações<textarea name="observacoes" maxlength="800"></textarea></label>' +
-      '<div class="gestao-form-acoes"><button type="submit">Registrar com senha</button></div></form></details>' +
+      '<div class="gestao-form-acoes"><button type="submit">Confirmar registro</button></div></form></details>' +
       table(['Evento', 'Escopo', 'Data', 'Resultado', 'Evidência'], backupRows)) +
       section('Dicionário de métricas', 'Cada indicador declara fórmula, dono, status e limitação.',
         table(['Métrica', 'Fórmula', 'Dono', 'Status', 'Limitação'], metricRows));

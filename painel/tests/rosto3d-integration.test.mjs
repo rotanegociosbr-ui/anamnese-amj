@@ -135,7 +135,7 @@ async function clinicalHarness(){
  h.sandbox.cabecalhosAcesso=async()=>({'Content-Type':'application/json'});
  h.binding={protocol_id:testProtocol,patient_id:'33333333-3333-4333-8333-333333333333',protocol_version:1};
  h.sandbox.fetch=async(url,init)=>{const body=JSON.parse(init.body);h.requests.push({url,body});return {ok:true,json:async()=>({ok:true,protocolo_id:body.protocolo_id,binding:{...h.binding,protocol_id:body.protocolo_id},study:body.acao==='salvar'?{version:1,document:body.document}:null})};};
- h.sandbox.window.AMJProtecao={solicitarSenhaRecente:async()=>({operation_id:'22222222-2222-4222-8222-222222222222',motivo:'Teste',encerrar:async()=>{}})};
+ h.sandbox.window.AMJProtecao={solicitarEdicaoRotineira:async()=>({operation_id:'22222222-2222-4222-8222-222222222222',motivo:'Teste',encerrar:async()=>{}})};
  Object.assign(h.frames[0].contentWindow.AMJRostoViewer,{ready:()=>true,unbind(){},loadStudy(study,label){h.loads.push({study,label});},hasChanges:()=>false,isBusy:()=>false});return h;
 }
 const testProtocol='11111111-1111-4111-8111-111111111111';
@@ -153,7 +153,7 @@ test('late context response after logout never restores clinical notes',async()=
  const opening=h.api.abrirProtocolo(testProtocol,'Teste');await new Promise(r=>setTimeout(r,0));h.api.reset();resolve({ok:true,json:async()=>({ok:true,study:{version:1,document:{notes:'synthetic'}}})});await opening;assert.equal(h.loads.length,0);
 });
 test('logout while password prompt is pending prevents the save request',async()=>{
- const h=await clinicalHarness();await h.api.abrirProtocolo(testProtocol,'Teste');let resolve;h.sandbox.window.AMJProtecao.solicitarSenhaRecente=()=>new Promise(r=>resolve=r);
+ const h=await clinicalHarness();await h.api.abrirProtocolo(testProtocol,'Teste');let resolve;h.sandbox.window.AMJProtecao.solicitarEdicaoRotineira=()=>new Promise(r=>resolve=r);
  const saving=h.api.saveStudy(h.frames[0].contentWindow,{},0);h.api.reset();resolve({operation_id:testProtocol,encerrar:async()=>{}});await assert.rejects(saving);assert.equal(h.requests.filter(r=>r.body.acao==='salvar').length,0);
 });
 test('switching consultation with unsaved points requires confirmation',async()=>{
@@ -216,7 +216,7 @@ test('return opens the exact consultation and cannot continue after logout durin
 
 test('return and reload are blocked while a password/save operation is pending',async()=>{
  const h=await clinicalHarness();await h.api.abrirProtocolo(testProtocol,'Teste');let resolve;
- h.sandbox.window.AMJProtecao.solicitarSenhaRecente=()=>new Promise(r=>resolve=r);
+ h.sandbox.window.AMJProtecao.solicitarEdicaoRotineira=()=>new Promise(r=>resolve=r);
  const saving=h.api.saveStudy(h.frames[0].contentWindow,{},0);
  assert.equal(await h.api.recarregar(),false);assert.equal(await h.api.voltarConsulta(),false);
  resolve({operation_id:testProtocol,encerrar:async()=>{}});await saving;

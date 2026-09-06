@@ -4,7 +4,8 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
-const { test } = require('node:test');
+const { test: nodeTest } = require('node:test');
+const test = (name, run) => nodeTest(name, { timeout: 2000 }, run);
 
 function deferred() {
   let resolve;
@@ -32,6 +33,7 @@ function harness(moduleName, fetchImpl) {
       createElement: () => ({ getContext: () => null })
     },
     fetch: fetchImpl, cabecalhosAcesso: async () => ({}),
+    modoAcesso: 'auth', identidadeBackend: { role: 'owner' },
     Intl, Date, Math, Number, String, Array, Object, Set, Map, WeakMap, JSON, URL,
     AbortController, FormData, File, console
   };
@@ -88,6 +90,19 @@ test('retry após resposta perdida mantém a intenção da mesma foto', async ()
   await h.submitPhoto(event);
   assert.equal(keys.length, 2);
   assert.equal(keys[0], keys[1]);
+});
+
+test('envio privado não inicia para sessão ausente ou não proprietária', async () => {
+  let requests = 0;
+  const h = harness('prontuario', async () => { requests += 1; throw new Error('Não deve enviar'); });
+  h.sandbox.identidadeBackend = { role: 'viewer' };
+  await h.submitPhoto(photoEditor(h));
+  assert.equal(requests, 0);
+  assert.match(h.node('prontuario-foto-status').textContent, /conta proprietária e MFA/);
+  h.sandbox.identidadeBackend = { role: 'owner' };
+  h.sandbox.modoAcesso = '';
+  await h.submitPhoto(photoEditor(h));
+  assert.equal(requests, 0);
 });
 
 test('troca de consulta enquanto prepara miniatura impede payload com contextos misturados', async () => {

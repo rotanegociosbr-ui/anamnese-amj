@@ -315,11 +315,15 @@
 
   async function protectedCall(action, payload, options) {
     if (!window.AMJProtecao || typeof window.AMJProtecao.solicitarSenhaRecente !== 'function') {
-      throw new Error('A confirmação segura por senha não está disponível. Atualize a página e tente novamente.');
+      throw new Error('A confirmação administrativa não está disponível. Atualize a página e tente novamente.');
     }
     let proof = null;
+    const generation = state.generation;
     try {
-      proof = await window.AMJProtecao.solicitarSenhaRecente(options || {});
+      const requestProof = options && options.rotina && typeof window.AMJProtecao.solicitarEdicaoRotineira === 'function'
+        ? window.AMJProtecao.solicitarEdicaoRotineira : window.AMJProtecao.solicitarSenhaRecente;
+      proof = await requestProof(options || {});
+      if (generation !== state.generation || !ownerAccess()) throw staleSessionError();
       const securedPayload = Object.assign({}, payload || {}, {
         operation_id: proof.operation_id,
         motivo: proof.motivo || (payload && payload.motivo) || 'Alteração confirmada pelo proprietário'
@@ -355,7 +359,7 @@
     const presentation = document.createElement('label');
     presentation.innerHTML = '<span>Apresentação / concentração</span>' +
       '<input id="financeiro-produto-apresentacao" type="text" minlength="1" maxlength="160" ' +
-      'placeholder="Ex.: 100 U, 1 mL, 210 mg, caixa com 10" required>';
+      'placeholder="Ex.: 100 U, 1 mL, 210 mg, caixa com 10">';
     const ean = document.createElement('label');
     ean.innerHTML = '<span>EAN/GTIN <small>opcional</small></span>' +
       '<input id="financeiro-produto-ean" type="text" inputmode="numeric" maxlength="18" ' +
@@ -382,7 +386,7 @@
       '<option value="resolvido_existente">Resolvidos como já existentes</option>' +
       '<option value="descartado">Alertas descartados</option></select>' +
       '<button class="financeiro-botao secundario" id="financeiro-duplicidades-atualizar" type="button">Atualizar fila</button>' +
-      '</div></div><p class="financeiro-nota">Encerrar uma pendência exige conta proprietária, MFA, senha individual recente e motivo. A trilha de auditoria é imutável.</p>' +
+      '</div></div><p class="financeiro-nota">Encerrar uma pendência exige conta proprietária, MFA, confirmação e motivo. A trilha de auditoria é imutável.</p>' +
       '<p class="financeiro-form-status" id="financeiro-duplicidades-status-msg" role="status" aria-live="polite"></p>' +
       '<div class="financeiro-duplicidades-lista" id="financeiro-duplicidades-lista" aria-live="polite"></div>';
     audit.parentNode.insertBefore(section, audit);
@@ -414,6 +418,19 @@
 
   function activeRows(items) {
     return (Array.isArray(items) ? items : []).filter(function (item) { return !isArchived(item); });
+  }
+
+  function isProductDraft(item) { return Boolean(item && item.status_cadastro === 'rascunho'); }
+  function productRegistry() {
+    const seen = new Set();
+    return [].concat(state.catalogs.produtos || [], state.catalogs.produtos_rascunho || []).filter(function (item) {
+      if (seen.has(item.id)) return false; seen.add(item.id); return true;
+    });
+  }
+  function productPending(item) {
+    const labels = { tipo: 'tipo', unidade: 'unidade', apresentacao: 'apresentação' };
+    const fields = Array.isArray(item.pendencias) ? item.pendencias : ['tipo', 'unidade', 'apresentacao'].filter(function (key) { return !item[key]; });
+    return fields.map(function (key) { return labels[key] || key; });
   }
 
   function populateCatalogs() {
@@ -500,7 +517,11 @@
           return '<li><span>Lote ' + escapeHtml(lot.lote) + '</span><span>' +
             escapeHtml(String(lot.saldo)) + ' ' + escapeHtml(lot.unidade) +
             ' · validade ' + escapeHtml(safeDate(lot.validade)) + '</span></li>';
-        }).join('') + '</ul>' : '<p class="financeiro-vazio">Sem saldo disponível.</p>') + '</article>';
+        }).join('') + '</ul>' : '<p class="financeiro-vazio">Sem saldo disponível.</p>') +
+        (balance === 0 ? '<div class="financeiro-cadastro-acoes"><button type="button" class="perigo" ' +
+          'data-financeiro-registro-acao="arquivar" data-financeiro-entidade="produto" data-financeiro-id="' +
+          escapeHtml(product.id) + '">Arquivar produto sem saldo</button></div>' +
+          '<small>Opcional: retira o produto das listas ativas. Compras, lotes e prontuários são preservados. Você pode confirmar ou cancelar.</small>' : '') + '</article>';
     }).join('');
   }
 
@@ -529,7 +550,7 @@
         '<label><span>Validade</span><input name="validade" type="date" min="' +
         escapeHtml(item.data_compra || '') + '" required></label>' +
         '<label class="financeiro-check"><input name="usar_como_custo_atual" type="checkbox"><span>Usar também como custo atual</span></label>' +
-        '<button class="financeiro-botao" type="submit">Regularizar com senha</button>' +
+        '<button class="financeiro-botao" type="submit">Confirmar regularização</button>' +
         '<p class="financeiro-form-status" role="status"></p></form>';
     }).join('');
   }
@@ -583,9 +604,9 @@
         [item.nome, item.telefone, item.email, item.documento].join(' '))
         .includes(supplierQuery);
     });
-    const products = state.catalogs.produtos.filter(function (item) {
+    const products = productRegistry().filter(function (item) {
       const brand = state.catalogs.marcas.find(function (row) { return row.id === item.marca_id; });
-      return (showArchived || !isArchived(item)) &&
+      return (showArchived || !isArchived(item) || isProductDraft(item) && !item.arquivado_em && !item.archived_at) &&
         normalizeSearch([item.nome, item.tipo, brand && brand.nome].join(' ')).includes(productQuery);
     });
     const brands = state.catalogs.marcas.filter(function (item) {
@@ -593,7 +614,8 @@
     });
     byId('financeiro-clientes-contagem').textContent = String(activeRows(state.clients).length);
     byId('financeiro-fornecedores-contagem').textContent = String(activeRows(state.catalogs.fornecedores).length);
-    byId('financeiro-produtos-contagem').textContent = String(activeRows(state.catalogs.produtos).length);
+    byId('financeiro-produtos-contagem').textContent = String(activeRows(state.catalogs.produtos).length) +
+      ((state.catalogs.produtos_rascunho || []).length ? ' + ' + state.catalogs.produtos_rascunho.length + ' rascunho(s)' : '');
     byId('financeiro-marcas-contagem').textContent = String(activeRows(state.catalogs.marcas).length);
     byId('financeiro-clientes-lista').innerHTML = clients.length ? clients.map(function (item) {
       const contact = [item.telefone, item.email].filter(Boolean).join(' · ');
@@ -635,15 +657,16 @@
     }).join('');
     const productHtml = products.map(function (item) {
       const brand = state.catalogs.marcas.find(function (row) { return row.id === item.marca_id; });
-      const archived = isArchived(item);
+      const draft = isProductDraft(item);
+      const archived = Boolean(item.arquivado_em || item.archived_at || !draft && isArchived(item));
       const values = [brand && brand.nome, productTypeLabel(item.tipo),
         item.custo_referencia != null ? 'Custo ' + money(item.custo_referencia) : '',
         item.preco_venda != null ? 'Venda ' + money(item.preco_venda) : ''].filter(Boolean).join(' · ');
       return '<article class="financeiro-cadastro-item' + (archived ? ' arquivado' : '') + '"><div><strong>' +
         escapeHtml(item.nome) + (archived ? ' · Arquivado' : '') + '</strong><small>' + escapeHtml(values) +
-        '</small></div><div class="financeiro-cadastro-acoes">' +
-        (archived ? '' : '<button type="button" data-financeiro-custo="' + escapeHtml(item.id) + '">Custos</button>') +
-        '<button type="button" data-financeiro-editar="produto" data-financeiro-id="' + escapeHtml(item.id) + '">Editar</button>' +
+        '</small>' + (draft ? '<span class="financeiro-badge-rascunho">Rascunho · completar ' + escapeHtml(productPending(item).join(', ')) + '</span>' : '') + '</div><div class="financeiro-cadastro-acoes">' +
+        (archived || draft ? '' : '<button type="button" data-financeiro-custo="' + escapeHtml(item.id) + '">Custos</button>') +
+        '<button type="button" data-financeiro-editar="produto" data-financeiro-id="' + escapeHtml(item.id) + '">' + (draft ? 'Continuar cadastro' : 'Editar') + '</button>' +
         '<button class="' + (archived ? '' : 'perigo') + '" type="button" data-financeiro-registro-acao="' +
         (archived ? 'restaurar' : 'arquivar') + '" data-financeiro-entidade="produto" data-financeiro-id="' +
         escapeHtml(item.id) + '">' + (archived ? 'Restaurar' : 'Apagar/Arquivar') + '</button></div></article>';
@@ -1670,7 +1693,7 @@
     const source = type === 'cliente' ? state.clients
       : type === 'fornecedor' ? state.catalogs.fornecedores
       : type === 'marca' ? state.catalogs.marcas
-      : type === 'produto' ? state.catalogs.produtos : [];
+      : type === 'produto' ? productRegistry() : [];
     return source.find(function (item) { return String(item.id) === String(id); }) || null;
   }
 
@@ -1701,9 +1724,9 @@
     byId('financeiro-' + type + '-titulo').textContent =
       (type === 'marca' ? 'Nova ' : 'Novo ') + singular;
     byId('financeiro-' + type + '-salvar').textContent =
-      'Salvar ' + singular;
+      type === 'produto' ? 'Salvar e continuar depois' : 'Salvar ' + singular;
     byId('financeiro-' + type + '-cancelar-edicao').classList.add('oculto');
-    if (type === 'produto') byId('financeiro-produto-tipo').value = 'bioestimulador';
+    if (type === 'produto') { byId('financeiro-produto-tipo').value = ''; byId('financeiro-produto-unidade').value = ''; }
     const duplicate = form.querySelector('[data-financeiro-duplicata-exata]');
     removeNode(duplicate);
     clearIntent('criar_' + type);
@@ -1798,14 +1821,16 @@
           ' · arquivada (restaure ou troque)</option>');
       }
       byId('financeiro-produto-marca').value = item.marca_id || '';
-      byId('financeiro-produto-tipo').value = item.tipo || 'outro';
-      byId('financeiro-produto-unidade').value = item.unidade || 'un';
+      byId('financeiro-produto-tipo').value = item.tipo || '';
+      byId('financeiro-produto-unidade').value = item.unidade || '';
       byId('financeiro-produto-apresentacao').value = item.apresentacao || '';
       byId('financeiro-produto-ean').value = item.ean || '';
       byId('financeiro-produto-custo').value = item.custo_referencia == null ? '' : moneyInput(item.custo_referencia);
       byId('financeiro-produto-venda').value = item.preco_venda == null ? '' : moneyInput(item.preco_venda);
       byId('financeiro-produto-anvisa').value = item.registro_anvisa || '';
       byId('financeiro-produto-estoque').checked = Boolean(item.controla_estoque);
+      byId('financeiro-produto-salvar').textContent = isProductDraft(item) ? 'Salvar e continuar depois' : 'Salvar alterações';
+      status('financeiro-produto-status', isProductDraft(item) ? 'Rascunho salvo. Complete ' + productPending(item).join(', ') + ' para usar o produto nas operações.' : '', false);
     }
     byId('financeiro-editor-catalogo').open = true;
     byId('financeiro-editor-catalogo').scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -1869,8 +1894,9 @@
         delete payload.origem_id;
         delete payload.match_method;
         await protectedCall('editar_cliente', payload, {
+          rotina: true,
           titulo: 'Editar cliente',
-          explicacao: 'Confirme com sua senha atual a alteração dos dados de ' + payload.nome + '.',
+          explicacao: 'Confirme a alteração dos dados de ' + payload.nome + '.',
           motivo: 'Atualização cadastral solicitada pela gestão'
         });
       } else {
@@ -1898,21 +1924,28 @@
     setBusy(form, true);
     try {
       const id = byId('financeiro-' + type + '-id').value;
+      let result;
       if (id) {
-        await protectedCall('editar_' + type, Object.assign({}, payload, {
+        result = await protectedCall('editar_' + type, Object.assign({}, payload, {
           id: id,
           version: Number(byId('financeiro-' + type + '-versao').value)
         }), {
+          rotina: true,
           titulo: 'Editar ' + type,
-          explicacao: 'Confirme com sua senha atual a alteração deste cadastro.',
+          explicacao: 'Confirme a alteração deste cadastro.',
           motivo: 'Atualização de ' + type + ' solicitada pela gestão'
         });
       } else {
-        await call('criar_' + type, Object.assign({ idempotency_key: intentKey('criar_' + type) }, payload));
+        result = await call('criar_' + type, Object.assign({ idempotency_key: intentKey('criar_' + type) }, payload));
       }
       clearIntent('criar_' + type);
-      resetCatalogEdit(type);
-      status(statusId, id ? 'Cadastro atualizado.' : success, false);
+      const saved = result && result[type];
+      if (type === 'produto' && saved && saved.id) {
+        byId('financeiro-produto-id').value = saved.id;
+        byId('financeiro-produto-versao').value = versionOf(saved);
+        byId('financeiro-produto-cancelar-edicao').classList.remove('oculto');
+      } else resetCatalogEdit(type);
+      status(statusId, isProductDraft(saved) ? 'Rascunho salvo. Use Continuar cadastro para completar os dados, sem criar outro produto.' : id ? 'Cadastro atualizado.' : success, false);
       await load({ silent: true });
     } catch (error) {
       if (!isStaleSession(error)) {
@@ -2208,7 +2241,7 @@
         ' · total ' + money(candidate.total)) + '</p>' +
       (itemLabels ? '<small>' + escapeHtml(itemLabels) + '</small>' : '') +
       '<div class="financeiro-lancamento-acoes"><button type="button" data-financeiro-abrir-compra-existente>Abrir existente</button>' +
-      (possible ? '<button type="button" data-financeiro-confirmar-compra-distinta>Confirmar compra distinta com senha</button>' : '') +
+      (possible ? '<button type="button" data-financeiro-confirmar-compra-distinta>Confirmar compra distinta</button>' : '') +
       '</div>';
     byId('financeiro-compra-status').insertAdjacentElement('afterend', box);
     box.querySelector('[data-financeiro-abrir-compra-existente]').addEventListener('click', function () {
@@ -2448,6 +2481,10 @@
       'financeiro-marcas-busca']
       .forEach(function (id) { byId(id).addEventListener('input', renderRegistries); });
     byId('financeiro-mostrar-arquivados').addEventListener('change', renderRegistries);
+    byId('financeiro-estoque-resumo').addEventListener('click', function (event) {
+      const button = event.target.closest('[data-financeiro-registro-acao]');
+      if (button) changeRegistryState('produto', button.dataset.financeiroId, 'arquivar');
+    });
     byId('financeiro-cadastros-titulo').closest('.financeiro-cadastros-card').addEventListener('click', function (event) {
       const edit = event.target.closest('[data-financeiro-editar]');
       const stateButton = event.target.closest('[data-financeiro-registro-acao]');
@@ -2500,6 +2537,10 @@
     });
     byId('financeiro-form-produto').addEventListener('submit', function (event) {
       event.preventDefault();
+      if (event.submitter && event.submitter.dataset.completar === 'true') {
+        const missing = ['tipo', 'unidade', 'apresentacao'].find(function (key) { return !byId('financeiro-produto-' + key).value.trim(); });
+        if (missing) { status('financeiro-produto-status', 'Complete tipo, unidade e apresentação para concluir. Ou salve o rascunho.', true); byId('financeiro-produto-' + missing).focus(); return; }
+      }
       const costField = byId('financeiro-produto-custo');
       const saleField = byId('financeiro-produto-venda');
       const rawCost = costField.value.trim();
@@ -2519,9 +2560,9 @@
       saveRegistry(event.currentTarget, 'produto', {
         nome: byId('financeiro-produto-nome').value.trim(),
         marca_id: byId('financeiro-produto-marca').value || null,
-        tipo: byId('financeiro-produto-tipo').value,
-        unidade: byId('financeiro-produto-unidade').value,
-        apresentacao: byId('financeiro-produto-apresentacao').value.trim(),
+        tipo: byId('financeiro-produto-tipo').value || null,
+        unidade: byId('financeiro-produto-unidade').value || null,
+        apresentacao: byId('financeiro-produto-apresentacao').value.trim() || null,
         ean: digits(byId('financeiro-produto-ean').value) || null,
         custo_referencia: Number.isFinite(cost) ? cost : null,
         preco_venda: Number.isFinite(sale) ? sale : null,

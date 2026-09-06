@@ -14,8 +14,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
-<link href="./financeiro.css?v=20260824-2" rel="stylesheet">
-<link href="./prontuario.css?v=20260826-1" rel="stylesheet">
+<link href="./financeiro.css?v=20260906-4" rel="stylesheet">
+<link href="./prontuario.css?v=20260906-4" rel="stylesheet">
 <link href="./operacao.css?v=20260905-1" rel="stylesheet">
 <link href="./gestao.css?v=20260824-2" rel="stylesheet">
 <link href="./cotacoes.css?v=20260824-2" rel="stylesheet">
@@ -620,13 +620,14 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
             <input id="prontuario-id" type="hidden">
             <input id="prontuario-versao" type="hidden">
             <p class="prontuario-somente-leitura oculto" id="prontuario-somente-leitura" role="status">Consulta concluída: dados clínicos, produtos, lotes e quantidades estão disponíveis somente para leitura.</p>
+            <p class="prontuario-rascunho-nota">Comece pela paciente e uma anotação. Você pode salvar dados e produtos incompletos, sair e continuar nesta mesma consulta. Fotos e demais requisitos serão conferidos ao finalizar.</p>
             <div class="prontuario-grid">
               <label class="largo"><span>Paciente cadastrada</span><select id="prontuario-paciente" required><option value="">Selecione</option></select></label>
-              <label><span>Procedimento</span><select id="prontuario-tipo" required><option value="">Selecione</option><option value="toxina_terco_superior">Toxina botulínica · terço superior</option><option value="toxina_full_face">Toxina botulínica · full face</option><option value="preenchimento_facial">Preenchimento facial</option><option value="bioestimulador_colageno">Bioestimulador de colágeno</option><option value="fios_pdo">Fios de PDO</option><option value="peeling_quimico">Peeling químico</option><option value="skinbooster">Skinbooster</option><option value="microagulhamento">Microagulhamento</option><option value="intradermoterapia">Intradermoterapia</option><option value="outro">Outro</option></select></label>
-              <label><span>Data do procedimento</span><input id="prontuario-data" type="date" required></label>
+              <label class="largo"><span>Anotação / registro técnico</span><textarea id="prontuario-notas" maxlength="5000" rows="4"></textarea></label>
+              <label><span>Procedimento <small>complete antes de finalizar</small></span><select id="prontuario-tipo"><option value="">Selecione</option><option value="toxina_terco_superior">Toxina botulínica · terço superior</option><option value="toxina_full_face">Toxina botulínica · full face</option><option value="preenchimento_facial">Preenchimento facial</option><option value="bioestimulador_colageno">Bioestimulador de colágeno</option><option value="fios_pdo">Fios de PDO</option><option value="peeling_quimico">Peeling químico</option><option value="skinbooster">Skinbooster</option><option value="microagulhamento">Microagulhamento</option><option value="intradermoterapia">Intradermoterapia</option><option value="outro">Outro</option></select></label>
+              <label><span>Data do procedimento <small>complete antes de finalizar</small></span><input id="prontuario-data" type="date"></label>
               <label><span>Retorno recomendado <small>opcional</small></span><input id="prontuario-retorno" type="date"></label>
               <label class="largo"><span>Queixa e objetivo relatados</span><textarea id="prontuario-queixa" maxlength="2000" rows="3"></textarea></label>
-              <label class="largo"><span>Registro técnico do atendimento</span><textarea id="prontuario-notas" maxlength="5000" rows="4"></textarea></label>
               <label class="largo"><span>Orientações e cuidados</span><textarea id="prontuario-orientacoes" maxlength="3000" rows="3"></textarea></label>
             </div>
 
@@ -644,7 +645,7 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
             </section>
 
             <div class="prontuario-form-acoes">
-              <button class="prontuario-botao" id="prontuario-salvar" type="submit">Salvar prontuário</button>
+              <button class="prontuario-botao" id="prontuario-salvar" type="submit">Salvar rascunho e continuar depois</button>
               <button class="prontuario-botao secundario oculto" id="prontuario-cancelar-edicao" type="button">Cancelar edição</button>
             </div>
             <p class="prontuario-status" id="prontuario-form-status" role="status" aria-live="polite"></p>
@@ -652,7 +653,7 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
         </details>
 
         <section class="prontuario-fotos-editor oculto" id="prontuario-fotos-editor" aria-labelledby="prontuario-fotos-titulo">
-          <div><h3 id="prontuario-fotos-titulo">Adicionar fotos à consulta</h3><p>O original fica no armazenamento privado. Limite de 25 MB; JPEG, PNG ou WebP.</p></div>
+          <div><h3 id="prontuario-fotos-titulo">Adicionar fotos à consulta</h3><p>Arquivo clínico privado — publicação exige autorização específica. Acesso por conta proprietária com MFA. Limite de 25 MB; JPEG, PNG ou WebP.</p></div>
           <form id="prontuario-foto-form" novalidate>
             <label><span>Categoria</span><select id="prontuario-foto-fase" required><option value="before">Antes</option><option value="during">Durante</option><option value="after">Depois</option><option value="products_used">Produtos utilizados</option></select></label>
             <label><span>Data e hora</span><input id="prontuario-foto-data" type="datetime-local"></label>
@@ -841,11 +842,11 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
             <div class="financeiro-grid">
               <label class="largo"><span>Pesquisar cadastros existentes</span><input id="financeiro-cliente-pesquisa" type="search" maxlength="120" placeholder="Nome, telefone ou CPF"></label>
               <div class="financeiro-candidatos largo" id="financeiro-cliente-candidatos" aria-live="polite"></div>
-              <label class="largo"><span>Nome completo</span><input id="financeiro-cliente-nome" type="text" minlength="2" maxlength="160" autocomplete="name" required></label>
+              <label class="largo"><span>Nome completo <small>único campo obrigatório</small></span><input id="financeiro-cliente-nome" type="text" minlength="2" maxlength="160" autocomplete="name" required></label>
               <label><span>Data de nascimento <small>opcional</small></span><input id="financeiro-cliente-nascimento" type="date" autocomplete="bday"></label>
-              <label><span>Telefone</span><input id="financeiro-cliente-telefone" type="tel" maxlength="18" autocomplete="tel"></label>
-              <label><span>E-mail</span><input id="financeiro-cliente-email" type="email" maxlength="254" autocomplete="email"></label>
-              <label><span>CPF <small>somente números</small></span><input id="financeiro-cliente-cpf" type="text" inputmode="numeric" minlength="11" maxlength="14"></label>
+              <label><span>Telefone <small>opcional</small></span><input id="financeiro-cliente-telefone" type="tel" maxlength="18" autocomplete="tel"></label>
+              <label><span>E-mail <small>opcional</small></span><input id="financeiro-cliente-email" type="email" maxlength="254" autocomplete="email"></label>
+              <label><span>CPF <small>opcional · somente números</small></span><input id="financeiro-cliente-cpf" type="text" inputmode="numeric" minlength="11" maxlength="14"></label>
               <label><span>Telefone de emergência <small>opcional</small></span><input id="financeiro-cliente-emergencia" type="tel" maxlength="18"></label>
             </div>
             <div class="financeiro-form-acoes">
@@ -863,7 +864,7 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
               <input id="financeiro-fornecedor-id" type="hidden">
               <input id="financeiro-fornecedor-versao" type="hidden">
               <h3 id="financeiro-fornecedor-titulo">Novo fornecedor</h3>
-              <label><span>Nome</span><input id="financeiro-fornecedor-nome" type="text" minlength="2" maxlength="160" required></label>
+              <label><span>Nome <small>único campo obrigatório</small></span><input id="financeiro-fornecedor-nome" type="text" minlength="2" maxlength="160" required></label>
               <label><span>CNPJ ou CPF <small>opcional</small></span><input id="financeiro-fornecedor-documento" type="text" inputmode="numeric" maxlength="18"></label>
               <label><span>Telefone <small>opcional</small></span><input id="financeiro-fornecedor-telefone" type="tel" maxlength="18"></label>
               <label><span>E-mail <small>opcional</small></span><input id="financeiro-fornecedor-email" type="email" maxlength="254"></label>
@@ -884,15 +885,17 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
               <input id="financeiro-produto-id" type="hidden">
               <input id="financeiro-produto-versao" type="hidden">
               <h3 id="financeiro-produto-titulo">Novo produto</h3>
+              <p class="financeiro-nota">Comece pelo nome. O rascunho fica salvo para continuar depois e só pode ser usado em operações quando tipo, unidade e apresentação estiverem completos.</p>
               <label><span>Nome</span><input id="financeiro-produto-nome" type="text" minlength="2" maxlength="160" required></label>
               <label><span>Marca</span><select id="financeiro-produto-marca"><option value="">Sem marca</option></select></label>
-              <label><span>Tipo</span><select id="financeiro-produto-tipo" required><option value="bioestimulador">Bioestimulador</option><option value="toxina_botulinica">Toxina botulínica</option><option value="preenchedor">Preenchedor</option><option value="skinbooster">Skinbooster</option><option value="injetavel">Outro injetável</option><option value="medicamento">Medicamento</option><option value="dermocosmetico">Dermocosmético</option><option value="descartavel">Descartável</option><option value="epi">EPI</option><option value="limpeza">Limpeza</option><option value="revenda">Revenda</option><option value="outro">Outro</option></select></label>
-              <label><span>Unidade de custo/consumo</span><select id="financeiro-produto-unidade" required><option value="un">Unidade</option><option value="u">Unidade de toxina (U)</option><option value="cx">Caixa</option><option value="frasco">Frasco</option><option value="seringa">Seringa</option><option value="ampola">Ampola</option><option value="aplicacao">Aplicação/paciente</option><option value="canula">Cânula</option><option value="dose">Dose</option><option value="ml">ml</option><option value="mg">mg</option><option value="g">g</option><option value="kit">Kit</option></select></label>
+              <label><span>Tipo <small>pode completar depois</small></span><select id="financeiro-produto-tipo"><option value="">A completar</option><option value="bioestimulador">Bioestimulador</option><option value="toxina_botulinica">Toxina botulínica</option><option value="preenchedor">Preenchedor</option><option value="skinbooster">Skinbooster</option><option value="injetavel">Outro injetável</option><option value="medicamento">Medicamento</option><option value="dermocosmetico">Dermocosmético</option><option value="descartavel">Descartável</option><option value="epi">EPI</option><option value="limpeza">Limpeza</option><option value="revenda">Revenda</option><option value="outro">Outro</option></select></label>
+              <label><span>Unidade de custo/consumo <small>pode completar depois</small></span><select id="financeiro-produto-unidade"><option value="">A completar</option><option value="un">Unidade</option><option value="u">Unidade de toxina (U)</option><option value="cx">Caixa</option><option value="frasco">Frasco</option><option value="seringa">Seringa</option><option value="ampola">Ampola</option><option value="aplicacao">Aplicação/paciente</option><option value="canula">Cânula</option><option value="dose">Dose</option><option value="ml">ml</option><option value="mg">mg</option><option value="g">g</option><option value="kit">Kit</option></select></label>
               <label><span>Custo de referência</span><input id="financeiro-produto-custo" type="text" inputmode="decimal" placeholder="0,00"></label>
               <label><span>Preço de venda <small>opcional</small></span><input id="financeiro-produto-venda" type="text" inputmode="decimal" placeholder="0,00"></label>
               <label><span>Registro Anvisa <small>quando aplicável</small></span><input id="financeiro-produto-anvisa" type="text" maxlength="80"></label>
               <label class="financeiro-check"><input id="financeiro-produto-estoque" type="checkbox"><span>Controlar estoque deste produto</span></label>
-              <button class="financeiro-botao" id="financeiro-produto-salvar" type="submit">Salvar produto</button>
+              <button class="financeiro-botao" id="financeiro-produto-salvar" type="submit">Salvar e continuar depois</button>
+              <button class="financeiro-botao secundario" id="financeiro-produto-completar" type="submit" data-completar="true">Concluir cadastro</button>
               <button class="financeiro-botao secundario oculto" id="financeiro-produto-cancelar-edicao" type="button">Cancelar edição</button>
               <p class="financeiro-form-status" id="financeiro-produto-status" role="status"></p>
             </form>
@@ -997,14 +1000,11 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
 
 <dialog class="reauth-dialog" id="reauth-dialog" aria-labelledby="reauth-titulo">
   <form class="reauth-form" id="reauth-form" method="dialog" novalidate>
-    <h2 id="reauth-titulo">Confirme com sua senha</h2>
-    <p id="reauth-explicacao">Esta alteração será registrada na auditoria e exige a senha da sua conta individual.</p>
+    <h2 id="reauth-titulo">Confirmar operação</h2>
+    <p id="reauth-explicacao">Confira a operação. A confirmação será registrada na auditoria.</p>
     <label>Motivo da alteração
       <textarea id="reauth-motivo" minlength="3" maxlength="300" rows="2" required
         placeholder="Ex.: corrigir informação cadastrada incorretamente"></textarea>
-    </label>
-    <label>Senha atual da sua conta
-      <input id="reauth-senha" type="password" autocomplete="current-password" minlength="6" maxlength="256" required>
     </label>
     <p class="reauth-status" id="reauth-status" role="alert" aria-live="assertive"></p>
     <div class="reauth-acoes">
@@ -1048,9 +1048,9 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
 
 <script src="./vendor/supabase-js-2.112.3.min.js"></script>
 <script src="./auth-mfa.js?v=20260819-3"></script>
-<script src="./financeiro.js?v=20260905-1"></script>
-<script src="./prontuario.js?v=20260906-3"></script>
-<script src="./app-shell.js?v=20260906-3"></script>
+<script src="./financeiro.js?v=20260906-4"></script>
+<script src="./prontuario.js?v=20260906-4"></script>
+<script src="./app-shell.js?v=20260906-4"></script>
 <script>
 const SUPABASE_URL = 'https://rjxtxoqprnumouqakxbc.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_Ip14p4tUfYFjwUYaWinMlw_Gf9v0YwT';
@@ -1363,152 +1363,69 @@ function operacaoId() {
   });
 }
 
+let cancelarConfirmacaoAdmin = null;
+function contextoAdmin() {
+  if (!sessaoAplicativoAtiva() || !sessaoAindaValida() || String(identidadeBackend && identidadeBackend.role) !== 'owner') {
+    throw new Error('Entre com sua conta de administrador e confirme o autenticador.');
+  }
+  const payload = JSON.parse(atob(authSession.access_token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+  if (!payload.session_id || !authSession.user || !authSession.user.id) throw new Error('Sessão inválida.');
+  // UI race guard only; the server independently verifies the session on each mutation.
+  return authSession.user.id + ':' + payload.session_id;
+}
+function operacaoAdmin(motivo) {
+  contextoAdmin();
+  return {operation_id: operacaoId(), motivo: String(motivo || 'Operação confirmada pela administração').slice(0, 300), encerrar: async function () {}};
+}
+// Legacy API name retained for all app modules; no secondary password is requested.
 async function solicitarSenhaRecente(opcoes) {
-  const config = opcoes && typeof opcoes === 'object' ? opcoes : {};
-  if (modoAcesso !== 'auth' || !authController) {
-    throw new Error('Esta alteração exige uma conta individual com MFA. O acesso temporário não é permitido.');
-  }
-  const role = String(identidadeBackend && identidadeBackend.role || '').toLowerCase();
-  if (role !== 'owner') throw new Error('Somente os proprietários podem realizar esta alteração.');
-
-  const userResult = await authController.client.auth.getUser();
-  const user = userResult && userResult.data && userResult.data.user;
-  const email = String(user && user.email || '').trim().toLowerCase();
-  if (userResult.error || !user || !email) throw new Error('Não foi possível confirmar a identidade da conta.');
-
-  const dialog = el('reauth-dialog');
-  const form = el('reauth-form');
-  const title = el('reauth-titulo');
-  const explanation = el('reauth-explicacao');
-  const reasonField = el('reauth-motivo');
-  const passwordField = el('reauth-senha');
-  const statusField = el('reauth-status');
-  const confirmButton = el('reauth-confirmar');
-  const cancelButton = el('reauth-cancelar');
-  if (!dialog || typeof dialog.showModal !== 'function') {
-    throw new Error('Seu navegador não oferece a confirmação segura necessária. Atualize o navegador e tente novamente.');
-  }
-
-  title.textContent = config.titulo || 'Confirme com sua senha';
-  explanation.textContent = config.explicacao ||
-    'Esta alteração será registrada na auditoria e exige a senha da sua conta individual.';
-  reasonField.value = String(config.motivo || '').slice(0, 300);
-  passwordField.value = '';
-  statusField.textContent = '';
-  confirmButton.disabled = false;
-  cancelButton.disabled = false;
-
-  return await new Promise((resolve, reject) => {
-    let encerrado = false;
-
-    function limpar() {
-      form.removeEventListener('submit', confirmar);
-      cancelButton.removeEventListener('click', cancelar);
-      dialog.removeEventListener('cancel', cancelarDialogo);
-      passwordField.value = '';
-    }
-
-    function finalizarErro(error) {
-      if (encerrado) return;
-      encerrado = true;
-      limpar();
+  const config = opcoes || {}, context = contextoAdmin();
+  const dialog = el('reauth-dialog'), form = el('reauth-form');
+  if (dialog.open) throw new Error('Conclua ou cancele a confirmação aberta.');
+  el('reauth-titulo').textContent = config.titulo || 'Confirmar operação';
+  el('reauth-explicacao').textContent = String(config.explicacao || 'Confira a operação antes de continuar. O histórico será auditado.')
+    .replace(/senha(?: atual| da sua conta individual| individual)?/gi, 'confirmação') + ' Não será solicitada outra senha.';
+  el('reauth-motivo').value = String(config.motivo || 'Operação confirmada pela administração').slice(0, 300);
+  el('reauth-status').textContent = '';
+  el('reauth-confirmar').disabled = false;
+  el('reauth-cancelar').disabled = false;
+  return new Promise((resolve, reject) => {
+    let done = false;
+    function finish(error, value) {
+      if (done) return; done = true;
+      form.removeEventListener('submit', confirm);
+      el('reauth-cancelar').removeEventListener('click', cancel);
+      dialog.removeEventListener('cancel', cancel);
+      cancelarConfirmacaoAdmin = null;
       if (dialog.open) dialog.close();
-      reject(error);
+      if (error) reject(error); else resolve(value);
     }
-
-    function cancelar() {
-      const error = new Error('Operação cancelada.');
-      error.code = 'operation_cancelled';
-      finalizarErro(error);
+    function cancel(event) {
+      if (event) event.preventDefault();
+      const error = new Error('Operação cancelada.'); error.code = 'operation_cancelled';
+      finish(error);
     }
-
-    function cancelarDialogo(event) {
+    function confirm(event) {
       event.preventDefault();
-      cancelar();
-    }
-
-    async function confirmar(event) {
-      event.preventDefault();
-      const motivo = reasonField.value.trim();
-      const password = passwordField.value;
-      if (motivo.length < 3 || motivo.length > 300) {
-        statusField.textContent = 'Informe um motivo entre 3 e 300 caracteres.';
-        reasonField.focus();
-        return;
-      }
-      if (password.length < 6) {
-        statusField.textContent = 'Digite a senha atual da sua conta.';
-        passwordField.focus();
-        return;
-      }
-
-      confirmButton.disabled = true;
-      cancelButton.disabled = true;
-      statusField.textContent = 'Confirmando sua identidade…';
       try {
-        const response = await fetch(SUPABASE_URL + '/auth/v1/token?grant_type=password', {
-          method: 'POST',
-          cache: 'no-store',
-          headers: {
-            apikey: SUPABASE_PUBLISHABLE_KEY,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ email, password })
-        });
-        passwordField.value = '';
-        const data = await response.json().catch(() => ({}));
-        if (!response.ok || !data.access_token) {
-          statusField.textContent = response.status === 429
-            ? 'Muitas tentativas. Aguarde alguns minutos e tente novamente.'
-            : 'A senha não confere. Verifique e tente novamente.';
-          confirmButton.disabled = false;
-          cancelButton.disabled = false;
-          passwordField.focus();
-          return;
+        if (contextoAdmin() !== context) throw new Error('A sessão mudou. Reabra a operação.');
+        const reason = el('reauth-motivo').value.trim();
+        if (reason.length < 3 || reason.length > 300) {
+          el('reauth-status').textContent = 'Informe o motivo da operação (3 a 300 caracteres).'; return;
         }
-
-        const secondaryToken = String(data.access_token);
-        const proof = {
-          token: secondaryToken,
-          operation_id: operacaoId(),
-          motivo,
-          encerrar: async function () {
-            try {
-              await fetch(SUPABASE_URL + '/auth/v1/logout?scope=local', {
-                method: 'POST',
-                cache: 'no-store',
-                headers: {
-                  apikey: SUPABASE_PUBLISHABLE_KEY,
-                  Authorization: 'Bearer ' + secondaryToken
-                }
-              });
-            } catch (_) {
-              // A prova também é de uso único e expira rapidamente no backend.
-            }
-          }
-        };
-        encerrado = true;
-        limpar();
-        if (dialog.open) dialog.close();
-        resolve(proof);
-      } catch (_) {
-        passwordField.value = '';
-        statusField.textContent = 'Não foi possível confirmar agora. Verifique a conexão e tente novamente.';
-        confirmButton.disabled = false;
-        cancelButton.disabled = false;
-      }
+        finish(null, operacaoAdmin(reason));
+      } catch (error) { finish(error); }
     }
-
-    form.addEventListener('submit', confirmar);
-    cancelButton.addEventListener('click', cancelar);
-    dialog.addEventListener('cancel', cancelarDialogo);
+    cancelarConfirmacaoAdmin = cancel;
+    form.addEventListener('submit', confirm);
+    el('reauth-cancelar').addEventListener('click', cancel);
+    dialog.addEventListener('cancel', cancel);
     dialog.showModal();
-    setTimeout(() => reasonField.focus(), 0);
   });
 }
-
 window.AMJProtecao = Object.freeze({
-  solicitarSenhaRecente
+  solicitarSenhaRecente,
+  solicitarEdicaoRotineira: async (options) => operacaoAdmin(options && options.motivo)
 });
 
 async function acessoNegado() {
@@ -1790,6 +1707,7 @@ function mensagemAuth(erro, padrao) {
 
 function limparEstadoAplicativo() {
   aplicativoLiberado = false;
+  if (cancelarConfirmacaoAdmin) cancelarConfirmacaoAdmin();
   agendaPararPolling();
   agendaCache = [];
   agendaLembretes = [];

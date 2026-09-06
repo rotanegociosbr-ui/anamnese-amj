@@ -274,3 +274,4 @@
   .financeiro-parcela-linha label:last-child{grid-column:auto}
   .financeiro-parcela-numero{min-height:30px}
 }
+.financeiro-badge-rascunho{display:inline-block;margin-top:6px;padding:4px 8px;border:1px solid #d6bd85;border-radius:7px;background:#fff5df;color:#654600;font-size:12px;line-height:1.5}

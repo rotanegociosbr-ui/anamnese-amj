@@ -48,6 +48,21 @@ anamneses e todos os termos liberados aparecem nela, com acesso restrito por
 conta individual, permissões e autenticação em duas etapas. Os documentos usam armazenamento privado e o painel recebe
 apenas os resumos necessários e links temporários para os PDFs.
 
+### Operação administrativa — atualização de 6 de setembro de 2026
+
+Após login e MFA, os administradores usam a sessão ativa para cadastrar, editar e
+salvar: não há uma segunda senha nem janela de autorização de 30 minutos. Ações
+críticas continuam com confirmação/cancelamento, motivo e auditoria. Sessões
+expiradas ou revogadas continuam bloqueadas pelo servidor.
+
+Cadastros progressivos, produtos e prontuários podem ser salvos como rascunhos.
+Pendências são sinalizadas sem inventar dados; finalizar continua exigindo os
+elementos necessários. Lotes existentes podem ser selecionados também na edição.
+Fotos enviadas pela administração ficam no arquivo clínico privado e não geram
+autorização de divulgação. Produtos sem saldo têm arquivamento opcional,
+preservando o histórico. Detalhes e limites dos testes estão em
+[registro desta entrega](docs/SESSAO-ADMIN-E-CADASTROS-2026-09-06.md).
+
 ## Agenda e retornos
 
 O módulo fica na aba **Agenda e retornos** da própria rota protegida `/painel/`.

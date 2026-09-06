@@ -131,7 +131,7 @@
       (candidate && safeSignedPhotoUrl(candidate.url_assinada) ? '<a class="botao" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer" href="' +
         escapeHtml(safeSignedPhotoUrl(candidate.url_assinada)) + '">Abrir existente</a>' :
         '<button type="button" data-abrir-foto-existente>Abrir existente na lista</button>') +
-      '<button type="button" class="perigo" data-confirmar-foto-distinta>Confirmar cópia distinta com senha</button></div>';
+      '<button type="button" class="perigo" data-confirmar-foto-distinta>Confirmar cópia distinta</button></div>';
     statusNode.insertAdjacentElement('afterend', box);
     const openList = box.querySelector('[data-abrir-foto-existente]');
     if (openList) openList.addEventListener('click', function () {
@@ -175,11 +175,15 @@
 
   async function protectedRequest(action, payload, options) {
     if (!window.AMJProtecao || typeof window.AMJProtecao.solicitarSenhaRecente !== 'function') {
-      throw new Error('A confirmação segura por senha não está disponível. Atualize a página.');
+      throw new Error('A confirmação administrativa não está disponível. Atualize a página.');
     }
     let proof = null;
+    const generation = state.generation;
     try {
-      proof = await window.AMJProtecao.solicitarSenhaRecente(options || {});
+      const requestProof = options && options.rotina && typeof window.AMJProtecao.solicitarEdicaoRotineira === 'function'
+        ? window.AMJProtecao.solicitarEdicaoRotineira : window.AMJProtecao.solicitarSenhaRecente;
+      proof = await requestProof(options || {});
+      if (generation !== state.generation || !ownerAccess()) throw new Error('Sessão do prontuário encerrada.');
       return await jsonRequest(API, action, Object.assign({}, payload || {}, {
         operation_id: proof.operation_id,
         motivo: proof.motivo || 'Alteração clínica confirmada pela gestão'
@@ -240,6 +244,9 @@
       replaceOptions(select, '<option value="">Selecione</option>' + available.map(function (item) {
         return '<option value="' + escapeHtml(item.id) + '">' + escapeHtml(productName(item)) + '</option>';
       }).join(''));
+      if (selectedId && !Array.from(select.options).some(function (option) { return option.value === selectedId; })) {
+        const retained = document.createElement('option');retained.value = selectedId;retained.textContent = 'Produto vinculado · completar cadastro';select.appendChild(retained);
+      }
       if (selectedId) select.value = selectedId;
     });
     populatePhotoProductOptions();
@@ -255,7 +262,7 @@
     const lotList = byId('prontuario-foto-lotes');
     if (!select || !lotInput || !lotList) return;
     const protocol = currentProtocol();
-    const used = protocol && Array.isArray(protocol.produtos) ? protocol.produtos : [];
+    const used = protocolProducts(protocol).filter(function (item) { return item.product_id && String(item.lot || '').trim(); });
     const selectedId = select.value;
     const unique = [];
     const seen = new Set();
@@ -349,7 +356,7 @@
   }
 
   function unitOptions(selected) {
-    return ['un', 'U', 'mL', 'mg', 'g', 'frasco', 'seringa', 'ampola', 'aplicacao', 'canula', 'dose', 'kit', 'cx'].map(function (unit) {
+    return '<option value="">A completar</option>' + ['un', 'U', 'mL', 'mg', 'g', 'frasco', 'seringa', 'ampola', 'aplicacao', 'canula', 'dose', 'kit', 'cx'].map(function (unit) {
       return '<option value="' + unit + '"' + (String(selected || '') === unit ? ' selected' : '') + '>' + unit + '</option>';
     }).join('');
   }
@@ -358,10 +365,11 @@
     const row = document.createElement('div');
     row.className = 'prontuario-produto-linha';
     row.innerHTML = '<label><span>Produto</span><select class="prontuario-produto-select"><option value="">Selecione</option></select></label>' +
-      '<label><span>Lote</span><input class="prontuario-produto-lote" type="text" maxlength="100"><datalist></datalist></label>' +
+      '<label><span>Lote já cadastrado</span><select class="prontuario-produto-lote-select"><option value="">Selecione o produto</option></select></label>' +
+      '<label><span>Lote manual / preservado</span><input class="prontuario-produto-lote" type="text" maxlength="100"><datalist></datalist></label>' +
       '<label><span>Validade</span><input class="prontuario-produto-validade" type="date"></label>' +
       '<label><span>Quantidade</span><input class="prontuario-produto-quantidade" type="number" min="0.0001" max="1000000" step="0.0001"></label>' +
-      '<label><span>Unidade</span><select class="prontuario-produto-unidade">' + unitOptions(item.unit || 'un') + '</select></label>' +
+      '<label><span>Unidade</span><select class="prontuario-produto-unidade">' + unitOptions(item.unit || '') + '</select></label>' +
       '<p class="prontuario-produto-estoque"></p>' +
       '<button class="prontuario-botao perigo" type="button">Remover</button>';
     byId('prontuario-produtos-lista').appendChild(row);
@@ -375,6 +383,22 @@
     row.querySelector('.prontuario-produto-lote').value = item.lot || '';
     row.querySelector('.prontuario-produto-validade').value = item.expiry || '';
     row.querySelector('.prontuario-produto-quantidade').value = item.amount == null ? '' : item.amount;
+    row.querySelector('.prontuario-produto-lote-select').addEventListener('change', function () {
+      const choice = row.querySelector('.prontuario-produto-lote-select').value;
+      const selectedLot = inventoryForProduct(row.querySelector('.prontuario-produto-select').value)[Number(choice)];
+      const manual = choice === 'manual';
+      row.querySelector('.prontuario-produto-lote').closest('label').hidden = !manual;
+      row.querySelector('.prontuario-produto-validade').readOnly = Boolean(!manual && choice !== '' && selectedLot && selectedLot.validade);
+      if (!manual) {
+        row.querySelector('.prontuario-produto-lote').value = choice !== '' && selectedLot ? selectedLot.lote : '';
+        row.querySelector('.prontuario-produto-validade').value = choice !== '' && selectedLot ? selectedLot.validade || '' : '';
+      } else {
+        // A new manual lot cannot inherit expiry metadata from the previously selected lot.
+        row.querySelector('.prontuario-produto-lote').value = '';
+        row.querySelector('.prontuario-produto-validade').value = '';
+        row.querySelector('.prontuario-produto-lote').focus();
+      }
+    });
     row.querySelector('.prontuario-produto-lote').addEventListener('change', function () {
       const productId = row.querySelector('.prontuario-produto-select').value;
       const selectedLot = inventoryForProduct(productId).find(function (lot) {
@@ -393,6 +417,8 @@
     const product = state.products.find(function (item) { return String(item.id) === String(productId); });
     const lots = inventoryForProduct(productId);
     const lotInput = row.querySelector('.prontuario-produto-lote');
+    const lotSelect = row.querySelector('.prontuario-produto-lote-select');
+    const expiryInput = row.querySelector('.prontuario-produto-validade');
     const datalist = row.querySelector('datalist');
     const hint = row.querySelector('.prontuario-produto-estoque');
     const listId = 'prontuario-lotes-' + uuid();
@@ -402,12 +428,26 @@
       return '<option value="' + escapeHtml(lot.lote) + '">' + escapeHtml(String(lot.saldo)) +
         ' ' + escapeHtml(lot.unidade) + ' · validade ' + escapeHtml(lot.validade) + '</option>';
     }).join('');
-    if (!product) { hint.textContent = ''; return; }
+    if (changedProduct) {
+      lotInput.value = '';expiryInput.value = '';
+      if (lots.length === 1) { lotInput.value = lots[0].lote;expiryInput.value = lots[0].validade || ''; }
+    }
+    const savedIndex = lots.findIndex(function (lot) { return String(lot.lote) === lotInput.value && String(lot.validade || '') === expiryInput.value; });
+    lotSelect.innerHTML = '<option value="">' + (lots.length ? 'Escolha um lote cadastrado' : 'Nenhum lote disponível') + '</option>' + lots.map(function (lot, index) {
+      return '<option value="' + index + '">' + escapeHtml(lot.lote + ' · validade ' + safeDate(lot.validade) + ' · saldo ' + lot.saldo + ' ' + (lot.unidade || '')) + '</option>';
+    }).join('') + '<option value="manual">Informar outro lote / completar depois</option>';
+    lotSelect.value = savedIndex >= 0 ? String(savedIndex) : lotInput.value || !lots.length ? 'manual' : '';
+    lotInput.closest('label').hidden = lotSelect.value !== 'manual';
+    expiryInput.readOnly = savedIndex >= 0 && Boolean(lots[savedIndex].validade);
+    if (!product) { hint.textContent = 'Você pode guardar o lote no rascunho e selecionar o produto depois.'; return; }
     if (changedProduct) row.querySelector('.prontuario-produto-unidade').value = displayUnit(product.unidade);
     const balance = lots.reduce(function (sum, lot) { return sum + Number(lot.saldo || 0); }, 0);
-    hint.textContent = product.controla_estoque
-      ? 'Disponível: ' + balance + ' ' + (product.unidade || '') + ' em ' + lots.length + ' lote(s). Selecione um lote existente.'
-      : 'Este produto não baixa estoque automaticamente.';
+    hint.textContent = lots.length === 1
+      ? 'Um lote disponível no cadastro. Ao escolher o produto, lote e validade são preenchidos com os dados já registrados.'
+      : lots.length > 1 ? 'Há ' + lots.length + ' lotes cadastrados. Escolha o lote usado; a validade será preenchida sem redigitar.'
+      : 'Sem lote disponível no estoque. Você pode informar um lote manual no rascunho; o estoque será verificado ao finalizar.';
+    if (lotInput.value && savedIndex < 0) hint.textContent += ' O lote digitado ou salvo foi preservado; confira-o antes de finalizar.';
+    if (product.controla_estoque) hint.textContent += ' Saldo total: ' + balance + ' ' + (product.unidade || '') + '.';
   }
   function collectProducts() {
     const rows = Array.from(byId('prontuario-produtos-lista').querySelectorAll('.prontuario-produto-linha'));
@@ -418,21 +458,30 @@
       const lot = row.querySelector('.prontuario-produto-lote').value.trim();
       const expiry = row.querySelector('.prontuario-produto-validade').value;
       const rawAmount = row.querySelector('.prontuario-produto-quantidade').value;
-      if (!productId && !lot && !expiry && !rawAmount) continue;
+      const unit = row.querySelector('.prontuario-produto-unidade').value;
+      if (!productId && !lot && !expiry && !rawAmount && !unit) continue;
       const amount = Number(rawAmount);
-      if (!productId || !lot || !expiry || !Number.isFinite(amount) || !(amount > 0) || amount > 1000000) {
-        throw new Error('Complete produto, lote, validade e quantidade em cada item utilizado.');
+      if (rawAmount && (!Number.isFinite(amount) || !(amount > 0) || amount > 1000000)) {
+        throw new Error('Revise a quantidade informada. Ela deve ser positiva e no máximo 1.000.000; pode ficar em branco no rascunho.');
       }
-      products.push({ product_id: productId, lot: lot, expiry: expiry, amount: amount,
-        unit: row.querySelector('.prontuario-produto-unidade').value, position: products.length + 1 });
+      products.push({ product_id: productId || null, lot: lot || null, expiry: expiry || null, amount: rawAmount ? amount : null,
+        unit: unit || null, position: products.length + 1 });
     }
     return products;
   }
   function productSignature(products) {
     return JSON.stringify((products || []).map(function (item, index) {
       return { product_id: item.product_id, lot: item.lot, expiry: item.expiry,
-        amount: Number(item.amount), unit: item.unit, position: Number(item.position) || index + 1 };
+        amount: item.amount == null ? null : Number(item.amount), unit: item.unit, position: Number(item.position) || index + 1 };
     }));
+  }
+  function protocolProducts(item) { return Array.isArray(item && item.produtos_rascunho) ? item.produtos_rascunho : (item && item.produtos) || []; }
+  function protocolPending(item) {
+    const missing = [];
+    if (!item.procedure_kind) missing.push('procedimento');
+    if (!item.procedure_date) missing.push('data');
+    if (protocolProducts(item).some(function (p) { return !p.product_id || !p.lot || !p.expiry || !(Number(p.amount) > 0) || !p.unit; })) missing.push('dados dos produtos');
+    return missing;
   }
 
   function procedureLabel(value) {
@@ -510,6 +559,9 @@
   }
   function photoPageNeedsRefresh(protocolId) {
     const page = photoPage(protocolId);
+    // Rendering open details fires toggle again: failed requests require an
+    // explicit retry, never an automatic render/fetch loop.
+    if (page && page.error) return false;
     return !page || (!page.loading && Date.now() - Number(page.loadedAt || 0) > 4 * 60 * 1000);
   }
   function renderPhotoCard(photo, protocol, showArchived) {
@@ -566,9 +618,6 @@
       escapeHtml(label) + '</strong><span>' + escapeHtml(safeDate(rawDate)) + '</span></figcaption></figure>';
   }
   function renderPhotoComparison(protocol, photos) {
-    if (!consent(protocol, 'clinical_photography')) {
-      return '<aside class="prontuario-comparacao-pendente">Registre o consentimento clínico de fotografia para visualizar a comparação.</aside>';
-    }
     const latest = function (phase) {
       return (photos || []).filter(function (photo) { return comparablePhoto(photo, phase); })
         .sort(function (left, right) {
@@ -609,7 +658,7 @@
       (page.hasMore && !page.loading ? '<button type="button" data-prontuario-mais-fotos="' +
         escapeHtml(protocol.id) + '">Carregar mais fotos</button>' : '') +
       (!page.loading ? '<button type="button" data-prontuario-recarregar-fotos="' + escapeHtml(protocol.id) +
-        '">Atualizar galeria (' + count + ')</button>' : '') + '</div>';
+        '">' + (page.error ? 'Tentar carregar novamente' : 'Atualizar galeria (' + count + ')') + '</button>' : '') + '</div>';
     return renderPhotoComparison(protocol, photos) + '<div class="prontuario-galerias">' +
       galleries + '</div>' + controls;
   }
@@ -642,16 +691,17 @@
     return Boolean(latest && latest.accepted === true && !latest.revoked_at);
   }
   function renderProducts(protocol) {
-    const products = Array.isArray(protocol.produtos) ? protocol.produtos : [];
+    const products = protocolProducts(protocol);
     if (!products.length) return '<p class="prontuario-produtos-vazio">Nenhum produto registrado nesta consulta.</p>';
     return '<ul class="prontuario-produtos-resumo">' + products.map(function (product) {
-      const name = [product.product_name_snapshot || productLabel(product.product_id), product.brand_name_snapshot]
+      const name = [product.product_name_snapshot || (product.product_id ? productLabel(product.product_id) : 'Produto a selecionar'), product.brand_name_snapshot]
         .filter(Boolean).join(' · ') || 'Produto utilizado';
       const details = [];
       if (product.lot) details.push('Lote ' + product.lot);
       if (Number(product.amount) > 0) details.push('Quantidade ' + NUMBER.format(Number(product.amount)) + ' ' + displayUnit(product.unit));
       if (product.expiry) details.push('Validade ' + safeDate(product.expiry));
-      return '<li><strong>' + escapeHtml(name) + '</strong>' +
+      const incomplete = !product.product_id || !product.lot || !product.expiry || !(Number(product.amount) > 0) || !product.unit;
+      return '<li><strong>' + escapeHtml(name) + '</strong>' + (incomplete ? '<span class="prontuario-badge rascunho">Item incompleto · continuar depois</span>' : '') +
         (details.length ? '<span>' + escapeHtml(details.join(' · ')) + '</span>' : '') + '</li>';
     }).join('') + '</ul>';
   }
@@ -662,12 +712,12 @@
     const photoCount = clinicalPhotoCount(item);
     const open = state.openProtocolIds.has(String(item.id));
     const statusBadge = completed ? '<span class="prontuario-badge concluida">Consulta concluída</span>' :
-      '<span class="prontuario-badge andamento">Em andamento</span>';
+      '<span class="prontuario-badge andamento">Em andamento · Rascunho</span>' + (protocolPending(item).length ? '<span class="prontuario-badge rascunho">Completar: ' + escapeHtml(protocolPending(item).join(', ')) + '</span>' : '');
     const photoBadge = photoCount > 0 ? '<span class="prontuario-badge foto-ok">Foto registrada</span>' :
       '<span class="prontuario-badge foto-pendente">Foto pendente</span>';
     const consentBadge = photographyConsent
-      ? '<span class="prontuario-badge consentimento-ok">Fotos clínicas autorizadas</span>'
-      : '<span class="prontuario-badge consentimento-revogado">Fotos clínicas não autorizadas</span>';
+      ? '<span class="prontuario-badge consentimento-ok">Consentimento fotográfico registrado</span>'
+      : '<span class="prontuario-badge consentimento-revogado">Consentimento fotográfico não registrado</span>';
     const archiveBadge = archived ? '<span class="prontuario-badge arquivada">Arquivada</span>' : '';
     const consentAction = archived ? '' : '<button class="' + (photographyConsent ? 'perigo' : 'destaque') +
       '" type="button" data-prontuario-consentimento-fotos="' + escapeHtml(item.id) +
@@ -676,10 +726,9 @@
     const editActions = archived ? '' : ((completed
       ? '<button type="button" data-prontuario-editar="' + escapeHtml(item.id) + '">Abrir dados e fotos</button>'
       : '<button type="button" data-prontuario-editar="' + escapeHtml(item.id) +
-        '">Editar dados</button>' + (photographyConsent
-          ? '<button class="destaque" type="button" data-prontuario-adicionar-fotos="' +
+        '">Continuar rascunho</button>' + '<button class="destaque" type="button" data-prontuario-adicionar-fotos="' +
             escapeHtml(item.id) + '">Adicionar fotos</button>'
-          : '') + '<button class="concluir" type="button" data-prontuario-finalizar="' +
+          + '<button class="concluir" type="button" data-prontuario-finalizar="' +
         escapeHtml(item.id) + '">Finalizar consulta</button>') + consentAction);
     return '<details class="prontuario-consulta' + (archived ? ' arquivada' : '') + '" data-prontuario-consulta="' +
       escapeHtml(item.id) + '"' + (open ? ' open' : '') + '><summary><span class="prontuario-consulta-resumo"><strong>' +
@@ -690,15 +739,15 @@
       '" type="button" data-prontuario-estado="' + (archived ? 'restaurar' : 'arquivar') +
       '" data-prontuario-id="' + escapeHtml(item.id) + '">' + (archived ? 'Restaurar' : 'Arquivar') + '</button></div>' +
       '<section class="prontuario-consulta-produtos" aria-label="Produtos, lotes e quantidades"><h5>Produtos, lotes e quantidades</h5>' +
-      renderProducts(item) + '</section><section class="prontuario-consulta-fotos" aria-label="Galeria desta consulta"><div class="prontuario-consulta-fotos-topo"><div><h5>Galeria da consulta</h5><p>Antes, Durante, Depois e Produtos.</p></div>' +
-      (!archived && photographyConsent ? '<button type="button" data-prontuario-adicionar-fotos="' + escapeHtml(item.id) + '">Adicionar fotos</button>' : '') +
+      renderProducts(item) + '</section><section class="prontuario-consulta-fotos" aria-label="Galeria desta consulta"><div class="prontuario-consulta-fotos-topo"><div><h5>Galeria da consulta</h5><p>Arquivo clínico privado — publicação exige autorização específica.</p></div>' +
+      (!archived ? '<button type="button" data-prontuario-adicionar-fotos="' + escapeHtml(item.id) + '">Adicionar fotos</button>' : '') +
       '</div>' + renderPhotoSection(item, showArchived) + '</section></div></details>';
   }
   function render() {
     const query = normalize(byId('prontuario-busca').value);
     const showArchived = byId('prontuario-mostrar-arquivados').checked;
     const rows = state.protocols.filter(function (item) {
-      const productText = (item.produtos || []).map(function (product) {
+      const productText = protocolProducts(item).map(function (product) {
         return [product.product_name_snapshot, product.brand_name_snapshot, product.lot].filter(Boolean).join(' ');
       }).join(' ');
       const text = normalize([(item.paciente && item.paciente.nome) || '', procedureLabel(item.procedure_kind),
@@ -793,7 +842,11 @@
       if (!requestIsCurrent()) return;
       state.photosByProtocol.set(key, Object.assign({}, loadingPage, {
         loading: false,
-        error: error.message || 'Não foi possível carregar as fotos privadas.'
+        error: error.code === 'clinical_photography_consent_required'
+          ? 'Galeria privada indisponível nesta versão do servidor. Atualize a página e tente novamente. O rascunho pode ser salvo sem fotos.'
+          : error.message || 'Não foi possível carregar as fotos privadas. Use Tentar carregar novamente quando quiser.',
+        errorCode: error.code || '',
+        loadedAt: Date.now()
       }));
     }
     if (byId('prontuario-mostrar-arquivados').checked === showArchived) renderPhotoState();
@@ -873,8 +926,10 @@
         byId('prontuario-editor').open = true;
         byId('prontuario-editor').scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
+      return true;
     } catch (error) {
       status('prontuario-status', error.message, true);
+      return false;
     } finally {
       state.loading = false;
       byId('prontuario-lista').setAttribute('aria-busy', 'false');
@@ -917,7 +972,7 @@
     byId('prontuario-versao').value = '';
     byId('prontuario-data').value = today();
     byId('prontuario-form-titulo').textContent = 'Novo registro de procedimento';
-    byId('prontuario-salvar').textContent = 'Salvar prontuário';
+    byId('prontuario-salvar').textContent = 'Salvar rascunho e continuar depois';
     byId('prontuario-salvar').classList.remove('oculto');
     byId('prontuario-cancelar-edicao').classList.add('oculto');
     byId('prontuario-fotos-editor').classList.add('oculto');
@@ -936,7 +991,7 @@
     byId('prontuario-versao').value = expectedVersion(item);
     byId('prontuario-paciente').value = item.patient_id || '';
     selectProcedure(item.procedure_kind);
-    byId('prontuario-data').value = item.procedure_date || today();
+    byId('prontuario-data').value = item.procedure_date || '';
     byId('prontuario-retorno').value = item.return_date || '';
     byId('prontuario-queixa').value = item.complaint || '';
     byId('prontuario-notas').value = item.technique_notes || '';
@@ -945,12 +1000,12 @@
     byId('prontuario-consentimento-fotos').checked = consent(item, 'clinical_photography');
     byId('prontuario-consentimento-marketing').checked = false;
     byId('prontuario-produtos-lista').innerHTML = '';
-    (item.produtos || []).forEach(addProductRow);
-    if (!(item.produtos || []).length) addProductRow();
-    state.originalProductsSignature = productSignature(item.produtos || []);
+    protocolProducts(item).forEach(addProductRow);
+    if (!protocolProducts(item).length) addProductRow();
+    state.originalProductsSignature = productSignature(protocolProducts(item));
     byId('prontuario-form-titulo').textContent = (completed ? 'Consulta concluída de ' : 'Editar registro de ') +
       ((item.paciente && item.paciente.nome) || 'paciente');
-    byId('prontuario-salvar').textContent = 'Salvar alterações';
+    byId('prontuario-salvar').textContent = 'Salvar rascunho e continuar depois';
     byId('prontuario-cancelar-edicao').classList.remove('oculto');
     byId('prontuario-fotos-editor').classList.remove('oculto');
     byId('prontuario-fotos-editor').classList.toggle('etapa-obrigatoria', Boolean(options && options.requiredPhoto));
@@ -958,7 +1013,7 @@
     populatePhotoProductOptions();
     setProtocolReadOnly(completed);
     if (completed && !(options && options.photoMessage)) {
-      status('prontuario-foto-status', 'Consulta concluída: os dados clínicos estão somente para leitura; novas fotos autorizadas ainda podem ser anexadas.', false);
+      status('prontuario-foto-status', 'Consulta concluída: os dados clínicos estão somente para leitura; fotos podem ser anexadas ao arquivo privado. Publicação exige autorização específica.', false);
     }
     if (options && options.photoMessage) status('prontuario-foto-status', options.photoMessage, false);
     byId('prontuario-editor').open = true;
@@ -989,14 +1044,15 @@
     let products;
     try { products = collectProducts(); } catch (error) { status('prontuario-form-status', error.message, true); return; }
     const protocolId = byId('prontuario-id').value;
+    const current = currentProtocol();
     const payload = {
       protocolo_id: protocolId || null,
       versao_esperada: protocolId ? Number(byId('prontuario-versao').value) : undefined,
       paciente_id: byId('prontuario-paciente').value,
-      agendamento_id: null,
-      tipo_procedimento: byId('prontuario-tipo').value,
+      agendamento_id: current && (current.appointment_id || current.agendamento_id) || null,
+      tipo_procedimento: byId('prontuario-tipo').value || null,
       queixa: byId('prontuario-queixa').value.trim() || null,
-      anamnese: {},
+      anamnese: current && current.anamnesis || {},
       notas_tecnica: byId('prontuario-notas').value.trim() || null,
       data_procedimento: byId('prontuario-data').value || null,
       data_retorno: byId('prontuario-retorno').value || null,
@@ -1006,28 +1062,33 @@
         clinical_photography: byId('prontuario-consentimento-fotos').checked
       }
     };
+    const consentChanged = byId('prontuario-consentimento-fotos').checked !== consent(current, 'clinical_photography');
+    if (!consentChanged) delete payload.consentimentos;
+    const routine = Boolean(protocolId && current && String(current.patient_id) === String(payload.paciente_id) && !consentChanged);
     if (protocolId && productSignature(products) === state.originalProductsSignature) delete payload.produtos;
     const intentKey = protocolId ? uuid() : protocolIntentKey(form, payload);
     payload.idempotency_key = intentKey;
+    const generation = state.generation, editorGeneration = state.editorGeneration;
     setBusy(form, true);
     try {
-      const result = protocolId ? await protectedRequest('criar_atualizar', payload, {
-        titulo: 'Editar prontuário',
-        explicacao: 'A alteração clínica ficará registrada na auditoria e exige sua senha atual.',
+      const result = protocolId || consentChanged ? await protectedRequest('criar_atualizar', payload, {
+        rotina: routine,
+        titulo: consentChanged ? 'Confirmar consentimento fotográfico' : 'Salvar rascunho do prontuário',
+        explicacao: consentChanged ? 'Confirme a autorização ou revogação de fotografia clínica. A decisão ficará registrada na auditoria.' : 'A complementação do rascunho ficará registrada na auditoria.',
         motivo: 'Correção ou complementação de prontuário pela gestão'
       }) : await jsonRequest(API, 'criar_atualizar', payload);
-      status('prontuario-form-status', protocolId ? 'Prontuário atualizado com auditoria.' :
-        'Consulta criada. Complete agora o registro fotográfico autorizado.', false);
+      if (generation !== state.generation || editorGeneration !== state.editorGeneration) return;
+      const savedId = result.protocolo_id || result.id || protocolId;
+      byId('prontuario-id').value = savedId;
+      byId('prontuario-versao').value = result.versao || result.version || (protocolId ? Number(payload.versao_esperada) + 1 : 1);
       if (!protocolId) confirmProtocolIntent(form, intentKey);
-      await load({ silent: true });
-      beginEdit(result.protocolo_id || result.id, protocolId ? null : {
-        focusPhotos: true,
-        requiredPhoto: true,
-        photoMessage: 'Etapa obrigatória: adicione ao menos uma foto clínica autorizada (Antes, Durante ou Depois) antes de finalizar a consulta.'
-      });
+      const refreshed = await load({ silent: true });
+      if (generation !== state.generation || editorGeneration !== state.editorGeneration) return;
+      if (refreshed) beginEdit(savedId);
+      status('prontuario-form-status', 'Rascunho salvo nesta consulta. Você pode sair e usar Continuar rascunho para completar depois. Fotos e requisitos serão conferidos somente ao finalizar.', false);
     } catch (error) {
-      status('prontuario-form-status', error.message, true);
-    } finally { setBusy(form, false); }
+      if (generation === state.generation && editorGeneration === state.editorGeneration) status('prontuario-form-status', error.message, true);
+    } finally { if (generation === state.generation && editorGeneration === state.editorGeneration) setBusy(form, false); }
   }
 
   async function submitPhoto(event) {
@@ -1043,10 +1104,7 @@
     }
     const file = byId('prontuario-foto-arquivo').files[0];
     if (!protocolId || !file) { status('prontuario-foto-status', 'Selecione uma foto.', true); return; }
-    if (!byId('prontuario-consentimento-fotos').checked) {
-      status('prontuario-foto-status', 'Registre primeiro a autorização atual de fotografia clínica.', true);
-      return;
-    }
+    if (!ownerAccess()) { status('prontuario-foto-status', 'Entre com a conta proprietária e MFA para anexar ao arquivo clínico privado.', true); return; }
     if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size < 1 || file.size > 25 * 1024 * 1024) {
       status('prontuario-foto-status', 'Use uma imagem JPEG, PNG ou WebP de até 25 MB.', true);
       return;
@@ -1124,7 +1182,7 @@
       status('prontuario-foto-status', message, false);
       await load({ silent: true });
       if (!contextIsCurrent()) return;
-      beginEdit(protocolId);
+      beginEdit(protocolId, { photoMessage: message });
       await loadPhotos(protocolId, false);
     }
     try {
@@ -1138,7 +1196,7 @@
         showDuplicatePhotoChoice(error.data.candidato, async function () {
           if (!contextIsCurrent()) return;
           if (!window.AMJProtecao || typeof window.AMJProtecao.solicitarSenhaRecente !== 'function') {
-            status('prontuario-foto-status', 'A confirmação por senha não está disponível. Atualize a página.', true);
+            status('prontuario-foto-status', 'A confirmação administrativa não está disponível. Atualize a página.', true);
             return;
           }
           let proof = null;
@@ -1154,7 +1212,7 @@
               motivo_duplicidade: proof.motivo || 'Arquivo idêntico mantido como registro clínico distinto',
               operation_id: proof.operation_id
             }, proof);
-            await finishPhoto('Foto distinta confirmada com senha e motivo auditável.');
+            await finishPhoto('Foto distinta confirmada com motivo auditável.');
           } catch (confirmError) {
             if (contextIsCurrent()) status('prontuario-foto-status', confirmError.message || 'Não foi possível confirmar a foto distinta.', true);
           } finally {
@@ -1209,14 +1267,14 @@
         titulo: accepted ? 'Registrar autorização de fotos clínicas' : 'Revogar autorização de fotos clínicas',
         explicacao: accepted
           ? 'Confirme somente se a paciente autorizou fotografias para o registro clínico privado. Isso não autoriza marketing.'
-          : 'A revogação bloqueia novos uploads imediatamente e preserva o histórico clínico já registrado.',
+          : 'A revogação deste consentimento ficará registrada. O arquivo clínico permanece privado; publicação exige autorização específica.',
         motivo: accepted
           ? 'Autorização atual de fotografia clínica atestada pela gestão'
           : 'Revogação da autorização de fotografia clínica confirmada pela gestão'
       });
       status('prontuario-status', accepted
         ? 'Autorização de fotos clínicas registrada com auditoria.'
-        : 'Autorização de fotos clínicas revogada; novos uploads foram bloqueados.', false);
+        : 'Consentimento fotográfico revogado e histórico preservado. O arquivo clínico continua privado.', false);
       await load({ silent: true });
       if (editorWasOpen) beginEdit(id);
       else focusConsultationSummary(id);
@@ -1227,6 +1285,8 @@
   async function finalizeProtocol(id) {
     const item = state.protocols.find(function (row) { return String(row.id) === String(id); });
     if (!item || isArchived(item) || isCompleted(item)) return;
+    const missing = protocolPending(item);
+    if (missing.length) { status('prontuario-status', 'Antes de finalizar, abra Continuar rascunho e complete: ' + missing.join(', ') + '.', true); return; }
     status('prontuario-status', 'Aguardando confirmação protegida para finalizar a consulta…', false);
     try {
       await protectedRequest('finalizar', {
@@ -1248,7 +1308,7 @@
     try {
       await protectedRequest('remover_foto', { foto_id: photoId }, {
         titulo: 'Arquivar foto clínica',
-        explicacao: 'A foto e o arquivo privado serão arquivados sem apagar o histórico e poderão ser restaurados com senha.',
+        explicacao: 'A foto e o arquivo privado serão arquivados sem apagar o histórico e poderão ser restaurados mediante confirmação.',
         motivo: 'Arquivamento de foto clínica solicitado pela gestão'
       });
       status('prontuario-status', 'Foto arquivada com auditoria.', false);
@@ -1279,7 +1339,7 @@
       item_procedimento_id: procedureItemId || null
     }, {
       titulo: 'Vincular foto ao atendimento',
-      explicacao: 'O vínculo entre a foto privada e o atendimento ficará registrado na auditoria e exige sua senha atual.',
+      explicacao: 'Confirme o vínculo entre a foto privada e o atendimento. A decisão ficará registrada na auditoria.',
       motivo: 'Vínculo de foto clínica ao atendimento confirmado pela gestão'
     });
     const photo = Array.from(state.photosByProtocol.values()).reduce(function (found, page) {
@@ -1388,7 +1448,7 @@
       if (edit) beginEdit(edit.dataset.prontuarioEditar);
       else if (addPhotos) beginEdit(addPhotos.dataset.prontuarioAdicionarFotos, {
         focusPhotos: true,
-        photoMessage: 'Escolha a categoria correta e envie uma foto autorizada para esta consulta.'
+        photoMessage: 'Arquivo clínico privado — publicação exige autorização específica. Escolha a categoria correta e confira produto e lote quando aplicável.'
       });
       else if (finalize) finalizeProtocol(finalize.dataset.prontuarioFinalizar);
       else if (photographyConsent) changePhotographyConsent(
@@ -1421,6 +1481,12 @@
       renderConsultation: renderConsultation,
       renderPhotoCard: renderPhotoCard,
       renderPhotoComparison: renderPhotoComparison,
+      collectProducts: collectProducts,
+      protocolProducts: protocolProducts,
+      protocolPending: protocolPending,
+      photoPageNeedsRefresh: photoPageNeedsRefresh,
+      submitProtocol: submitProtocol,
+      finalizeProtocol: finalizeProtocol,
       setPhotoPage: function (protocolId, page) { state.photosByProtocol.set(String(protocolId), page); },
       clearPhotoPages: function () { state.photosByProtocol.clear(); }
     };

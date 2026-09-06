@@ -30,23 +30,25 @@ assert.match(ui, /data-fotos-atalho[^>]*aria-labelledby="operacao-fotos-atalho-t
   'atalho direto deve ficar no topo de Procedimentos e possuir nome acessível');
 assert.match(ui, /data-fotos-atalho-atendimento[^>]*aria-label="Paciente e atendimento para adicionar fotos"/,
   'atalho deve exigir a consulta exata antes de abrir a galeria');
-assert.match(ui, /function updatePhotoShortcut\(\)[\s\S]*?clinical_photography_consented === true/,
-  'atalho deve explicar prontuário, consentimento e galeria sem pular etapas');
+assert.match(ui, /function updatePhotoShortcut\(\)[\s\S]*?if \(!visit\.protocol_id \|\| !protocol\)/,
+  'atalho deve exigir o protocolo confirmado antes de abrir o arquivo privado');
 assert.match(ui, /function openPhotoShortcutFlow\(id\)[\s\S]*?prepareAttendanceProtocol\(visit\.id, visit\.version\)/,
   'preparo iniciado pelo atalho deve usar a versão e proteção canônicas');
-assert.match(ui, /function openPhotoShortcutFlow\(id\)[\s\S]*?AMJProntuario\.abrirProtocolo\(visit\.protocol_id\)/,
-  'sem autorização, o atalho deve conduzir ao prontuário correto');
+assert.match(ui, /function openPhotoShortcutFlow\(id\)[\s\S]*?if \(!ownerAccess\(\)\) throw/,
+  'atalho privado deve continuar restrito à administradora com MFA');
+assert.match(ui, /function openPhotoShortcutFlow\(id\)[\s\S]*?if \(!protocol\) throw[\s\S]*?protocol\.archived_at/,
+  'atalho não pode enviar foto sem confirmar o protocolo ativo');
 assert.match(ui, /function openPhotoShortcutFlow\(id\)[\s\S]*?openAttendancePhotos\(attendanceId\)/,
-  'com autorização, o atalho deve abrir a única galeria canônica da consulta');
+  'com sessão administrativa, o atalho deve abrir a única galeria canônica da consulta');
 assert.match(ui, /Fotos da consulta/,
   'cada atendimento deve expor o acesso direto às fotos da consulta');
 assert.match(ui, /data-fotos-abrir/);
 assert.match(ui, /abrirFotos:\s*openAttendancePhotos/);
 assert.match(ui, /Finalizar registro da consulta/);
 assert.match(ui, /protectedRequest\('preparar_prontuario_atendimento'/,
-  'preparação deve pedir prova recente pelo fluxo protegido');
+  'preparação deve manter a confirmação administrativa pelo fluxo protegido');
 assert.match(ui, /protectedProntuarioRequest\('finalizar'/,
-  'finalização documental deve usar o backend do prontuário e prova recente');
+  'finalização documental deve usar o backend do prontuário e confirmação administrativa');
 assert.match(ui, /jsonRequest\('listar_fotos_atendimento'/,
   'originais e URLs assinadas devem ser carregados somente ao abrir a galeria');
 assert.match(ui, /<option value="durante">Durante<\/option>/,
@@ -82,10 +84,10 @@ assert.match(ui, /Atualize a galeria para recuperar o que foi salvo/,
   'mudança após falha parcial deve orientar recuperação sem duplicar o vínculo');
 assert.match(ui, /referrerpolicy="no-referrer"/,
   'abertura do original não deve enviar referer');
-assert.match(ui, /clinical_photography_consented === true/,
-  'formulário de upload deve depender da autorização fotográfica atual');
-assert.match(ui, /Abrir prontuário e registrar autorização/,
-  'sem autorização, a galeria deve orientar a regularização sem enviar arquivo');
+assert.doesNotMatch(ui, /clinical_photography_consented|!photographyConsent/,
+  'arquivo clínico privado não pode exigir consentimento do paciente nem inferi-lo');
+assert.match(ui, /Arquivo clínico privado — publicação exige autorização específica/,
+  'interface deve distinguir acesso privado de autorização para publicar');
 assert.match(ui, /prontuarioJsonRequest\('listar',[\s\S]{0,220}protocolo_id: id/,
   'produto/lote deve vir do protocolo específico, não do catálogo inteiro');
 assert.match(ui, /protocolProductsById\.set\(id, products\)/);
@@ -99,10 +101,14 @@ assert.doesNotMatch(ui, /Informar outro lote/,
 const galleryStart = ui.indexOf('function renderAttendanceGallery');
 const galleryEnd = ui.indexOf('\n  function renderAttendances', galleryStart);
 const gallerySource = ui.slice(galleryStart, galleryEnd);
-const consentGate = gallerySource.indexOf(': !photographyConsent');
+const protocolGate = gallerySource.indexOf('if (!hasProtocol)');
+const archiveGate = gallerySource.indexOf('const upload = galleryReadOnly');
 const uploadForm = gallerySource.indexOf('data-form-foto-upload');
-assert(consentGate >= 0 && uploadForm > consentGate,
-  'gate de consentimento deve preceder o formulário de upload operacional');
+assert(protocolGate >= 0 && archiveGate > protocolGate && uploadForm > archiveGate,
+  'protocolo confirmado e bloqueio de arquivados devem preceder o formulário de upload');
+assert.match(gallerySource, /const hasProtocol = Boolean\(visit\.protocol_id && protocol\)/);
+assert.match(gallerySource, /const galleryReadOnly = visitArchived \|\| Boolean\(protocol && protocol\.archived_at\)/);
+assert.doesNotMatch(gallerySource, /photographyConsent|clinical_photography/);
 assert.match(css, /operacao-antes-depois[\s\S]*repeat\(3,/,
   'Antes, Durante e Depois devem ter colunas próprias');
 assert.match(css, /\.operacao-foto-contagens[^{]*\{[^}]*repeat\(5,/,
@@ -116,7 +122,13 @@ assert.match(css,
   'inputs operacionais devem neutralizar o estilo tipográfico do login');
 
 assert.match(edge, /"operacao\.preparar_prontuario_atendimento"[\s\S]*attendanceId/,
-  'prova recente deve estar vinculada à action e ao atendimento');
+  'autorização administrativa deve estar vinculada à action e ao atendimento');
+assert.match(edge, /await requireAdminSessionAction\(req, AUTH_CONFIG, context,/,
+  'mutações operacionais devem revalidar a sessão administrativa');
+assert.match(medicalRecordEdge, /await requireAdminSessionAction\(req, AUTH_CONFIG, context,/,
+  'mutações documentais devem revalidar a sessão administrativa');
+assert.doesNotMatch(edge + medicalRecordEdge, /requireRecentPasswordProof|requireRoutineEditAuthorization/,
+  'operações atuais não podem exigir senha secundária nem janela de edição');
 assert.match(edge, /rpc\("operacao_preparar_prontuario_atendimento"/);
 assert.match(edge, /case "listar_fotos_atendimento":/);
 assert.match(edge, /case "preparar_prontuario_atendimento":/);
@@ -185,15 +197,17 @@ const addPhoto = medicalRecordEdge.slice(addPhotoStart, addPhotoEnd);
 const preflight = addPhoto.indexOf('await assertPhotoUploadPreflight(');
 const storageUpload = addPhoto.indexOf('await uploadPrivateImage(storagePath, file)');
 assert(preflight >= 0 && storageUpload > preflight,
-  'Edge deve confirmar tenant, protocolo ativo e consentimento antes do Storage');
+  'Edge deve confirmar tenant, protocolo ativo e autorização privada antes do Storage');
 assert.match(medicalRecordEdge,
-  /protocols\?select=id,status,archived_at[\s\S]*clinic_id=eq\.[\s\S]*protocol_consent_current\?select=accepted,revoked_at/,
-  'preflight deve validar protocolo no tenant antes do consentimento atual');
+  /protocols\?select=id,status,archived_at[\s\S]*clinic_id=eq\.[\s\S]*protocol\.archived_at[\s\S]*if \(privateOwnerAccess\) return;[\s\S]*protocol_consent_current\?select=accepted,revoked_at/,
+  'preflight deve validar contexto ativo antes de permitir acesso privado owner, mantendo gate para outros papéis');
+assert.match(addPhoto, /await assertPhotoUploadPreflight\([\s\S]*?context\.role === "owner"/,
+  'acesso privado deve derivar do papel autenticado, nunca do payload');
 const finalizeArchivedCheck = finalizeMigration.indexOf('if v_protocol.archived_at is not null then');
 const finalizeSignedCheck = finalizeMigration.indexOf("if v_protocol.status = 'signed' then");
 assert(finalizeArchivedCheck >= 0 && finalizeArchivedCheck < finalizeSignedCheck,
   'protocolo arquivado deve ser rejeitado antes do retorno signed idempotente');
-assert.match(shell, /operacao\.js\?v=20260905-1/,
+assert.match(shell, /operacao\.js\?v=20260906-4/,
   'cache-bust deve entregar o JavaScript atualizado da Operação');
 assert.match(html, /operacao\.css\?v=20260905-1/,
   'cache-bust deve entregar o CSS atualizado da Operação');

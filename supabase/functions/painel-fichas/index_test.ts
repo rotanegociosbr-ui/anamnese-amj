@@ -136,7 +136,7 @@ Deno.test("listagem e arquivamento validam tenant antes dos sinks globais", asyn
     "requireLegacyClinicalScope(authContext.clinicId)",
     archiveStart,
   );
-  const recentProof = source.indexOf("requireRecentPasswordProof", archiveGate);
+  const recentProof = source.indexOf("requireAdminSessionAction", archiveGate);
   const archiveRpc = source.indexOf('"/rest/v1/rpc/painel_arquivar_ficha"', archiveGate);
   assert(
     archiveStart >= 0 && archiveGate > archiveStart && recentProof > archiveGate &&

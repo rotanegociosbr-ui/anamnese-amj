@@ -186,7 +186,7 @@ Deno.test("contagem PostgREST do KPI exige Content-Range total válido", () => {
   assertThrows(() => totalFromContentRange("0-0/*"));
 });
 
-Deno.test("somente conversão final exige prova recente", () => {
+Deno.test("conversão final confirma sessão administradora", () => {
   assertEquals(conversionRequiresRecentPassword("revisar"), false);
   assertEquals(conversionRequiresRecentPassword("vincular_existente"), true);
   assertEquals(conversionRequiresRecentPassword("criar_paciente"), true);
@@ -273,8 +273,8 @@ Deno.test("fonte liga ações UI a RPC única e protege apenas operações crít
     "Salvar deve chamar uma RPC atômica.",
   );
   assert(
-    source.includes("requireRecentPasswordProof"),
-    "Operações críticas devem consumir prova recente.",
+    source.includes("requireAdminSessionAction"),
+    "Operações críticas devem validar sessão administradora.",
   );
   assert(
     source.includes("p_confirm_possible_distinct"),
@@ -600,7 +600,7 @@ Deno.test("Fase 5B conecta listar, aceitar e arquivar somente às RPCs da caixa 
   );
 });
 
-Deno.test("Fase 5B mantém aceite owner+AAL2 e exige senha recente somente ao arquivar", async () => {
+Deno.test("Fase 5B mantém aceite owner+AAL2 e confirma sessão administradora ao arquivar", async () => {
   const source = await Deno.readTextFile(new URL("./index.ts", import.meta.url));
   const acceptStart = source.indexOf("async function handleSiteRequestAccept");
   const acceptEnd = source.indexOf("async function handleSiteRequestArchive", acceptStart);
@@ -626,7 +626,7 @@ Deno.test("Fase 5B mantém aceite owner+AAL2 e exige senha recente somente ao ar
     'await requireProtected(req, context, payload, "archive_site_request", siteRequestId)',
   );
   const archiveRpc = archive.indexOf('rpc("crm_site_booking_archive"');
-  assert(passwordProof >= 0, "Arquivamento deve exigir prova recente de senha e operation_id.");
+  assert(passwordProof >= 0, "Arquivamento deve exigir sessão administradora e operation_id.");
   assert(
     archiveRpc > passwordProof,
     "Prova recente precisa ser validada antes de chamar a RPC de arquivamento.",

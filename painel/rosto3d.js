@@ -182,7 +182,7 @@
     if(!frameAllowed(source)||!state.protocolId||!state.binding||state.saving)throw Error('Abra ou recarregue uma consulta antes de salvar.');
     const id=state.protocolId,seq=state.contextSeq,binding=state.binding;state.saving=true;contextControls();let proof;
     try {
-      proof=await window.AMJProtecao.solicitarSenhaRecente({titulo:'Salvar pontos no prontuário',explicacao:'Confirme o registro em '+state.protocolLabel+'. A versão anterior será preservada.',motivo:'Registro de pontos e observações em modelo facial genérico'});
+      proof=await window.AMJProtecao.solicitarEdicaoRotineira({titulo:'Salvar pontos no prontuário',explicacao:'Confirme o registro em '+state.protocolLabel+'. A versão anterior será preservada.',motivo:'Registro de pontos e observações em modelo facial genérico'});
       if(!frameAllowed(source)||seq!==state.contextSeq||id!==state.protocolId)throw Error('Consulta ou sessão alterada. Não foi enviado.');
       const body=await request('salvar',{protocolo_id:id,document,expected_version:expectedVersion,expected_patient_id:binding.patient_id,expected_protocol_version:binding.protocol_version,operation_id:proof.operation_id,motivo:proof.motivo||'Registro de estudo facial genérico'},proof);
       state.binding=checkedBinding(body,id);

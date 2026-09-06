@@ -166,7 +166,7 @@
   }
   async function protectedRequest(action, fields, options) {
     if (!window.AMJProtecao || typeof window.AMJProtecao.solicitarSenhaRecente !== 'function') {
-      throw new Error('A confirmação segura por senha não está disponível. Atualize a página.');
+      throw new Error('A confirmação administrativa não está disponível. Atualize a página.');
     }
     let proof = null;
     try {

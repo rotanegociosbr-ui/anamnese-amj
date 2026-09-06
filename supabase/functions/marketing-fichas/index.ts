@@ -6,7 +6,7 @@ import {
   DualAuthConfig,
   DualAuthContext,
   DualAuthError,
-  requireRecentPasswordProof,
+  requireAdminSessionAction,
 } from "../_shared/dual-auth.ts";
 
 type J = Record<string, unknown>;
@@ -113,7 +113,7 @@ function tenant(c: DualAuthContext) {
   return { clinicId: c.clinicId, userId: c.userId };
 }
 async function proof(req: Request, c: DualAuthContext, p: J, action: string, target: string) {
-  await requireRecentPasswordProof(req, CFG, c, {
+  await requireAdminSessionAction(req, CFG, c, {
     operationId: uuid(p.operation_id, "operation_id"),
     action: `marketing.${action}`,
     targetId: target,

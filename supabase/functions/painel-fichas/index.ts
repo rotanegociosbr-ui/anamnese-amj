@@ -5,7 +5,7 @@ import {
   DualAuthConfig,
   DualAuthContext,
   DualAuthError,
-  requireRecentPasswordProof,
+  requireAdminSessionAction,
   writeClinicAudit,
 } from "../_shared/dual-auth.ts";
 
@@ -445,7 +445,7 @@ export async function handleRequest(req: Request): Promise<Response> {
         requestId: operationId,
       };
       try {
-        await requireRecentPasswordProof(req, AUTH_CONFIG, authContext, {
+        await requireAdminSessionAction(req, AUTH_CONFIG, authContext, {
           operationId,
           action: `painel.${source}.${action}`,
           targetId: documentId,
@@ -564,7 +564,7 @@ export async function handleRequest(req: Request): Promise<Response> {
         requestId: operationId,
       };
       try {
-        await requireRecentPasswordProof(req, AUTH_CONFIG, authContext, {
+        await requireAdminSessionAction(req, AUTH_CONFIG, authContext, {
           operationId,
           action: `painel.${source}.excluir_definitivamente`,
           targetId: documentId,

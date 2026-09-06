@@ -30,41 +30,41 @@
   const MODULES = Object.freeze({
     rosto3d: Object.freeze({
       global: 'AMJRosto3D',
-      src: './rosto3d.js?v=20260906-3',
+      src: './rosto3d.js?v=20260906-4',
       css: './rosto3d.css?v=20260906-3',
       root: 'rosto3d-root'
     }),
     crm: Object.freeze({
       global: 'AMJCRMLeads',
-      src: './crm.js?v=20260901-1',
+      src: './crm.js?v=20260906-4',
       css: './crm.css?v=20260901-1',
       root: 'crm-root'
     }),
     marketing: Object.freeze({
       global: 'AMJMarketing',
-      src: './marketing.js?v=20260829-1',
+      src: './marketing.js?v=20260906-4',
       css: './marketing.css?v=20260829-1',
       root: 'marketing-root'
     }),
     operacao: Object.freeze({
       global: 'AMJOperacaoClinica',
-      src: './operacao.js?v=20260905-1',
+      src: './operacao.js?v=20260906-4',
       root: 'operacao-clinica-root'
     }),
     acompanhamentos: Object.freeze({
       global: 'AMJAcompanhamentos',
-      src: './acompanhamentos.js?v=20260826-1',
+      src: './acompanhamentos.js?v=20260906-4',
       css: './acompanhamentos.css?v=20260826-1',
       root: 'acompanhamentos-root'
     }),
     gestao: Object.freeze({
       global: 'AMJGestaoAdministrativa',
-      src: './gestao.js?v=20260824-1',
+      src: './gestao.js?v=20260906-4',
       root: 'gestao-administrativa-root'
     }),
     cotacoes: Object.freeze({
       global: 'AMJCotacoes',
-      src: './cotacoes.js?v=20260824-1',
+      src: './cotacoes.js?v=20260906-4',
       root: 'cotacoes-root'
     }),
     integracoes: Object.freeze({

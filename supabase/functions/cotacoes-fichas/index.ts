@@ -5,7 +5,7 @@ import {
   DualAuthConfig,
   DualAuthContext,
   DualAuthError,
-  requireRecentPasswordProof,
+  requireAdminSessionAction,
 } from "../_shared/dual-auth.ts";
 
 type JsonRecord = Record<string, unknown>;
@@ -474,9 +474,9 @@ async function reviewExactSku(
   const operationId = optionalUuid(payload.operation_id, "operation_id");
   if (!operationId) throw new ApiError(422, "invalid_operation_id", "Operação protegida inválida.");
 
-  let proof;
+  let authorization;
   try {
-    proof = await requireRecentPasswordProof(req, AUTH_CONFIG, context, {
+    authorization = await requireAdminSessionAction(req, AUTH_CONFIG, context, {
       operationId,
       action: reviewProofAction(decision),
       targetId: itemId,
@@ -487,12 +487,12 @@ async function reviewExactSku(
     }
     throw new ApiError(
       503,
-      "reauthentication_unavailable",
-      "Não foi possível confirmar sua senha agora.",
+      "session_validation_unavailable",
+      "Não foi possível validar sua sessão agora.",
     );
   }
 
-  const rpcResult = await admin("/rest/v1/rpc/cotacoes_revisar_sku_exato", "POST", {
+  const rpcResult = await admin("/rest/v1/rpc/cotacoes_revisar_sku_exato_admin_session", "POST", {
     p_clinic_id: clinicId,
     p_item_id: itemId,
     p_decision: decision,
@@ -500,7 +500,7 @@ async function reviewExactSku(
     p_expected_version: expectedVersion,
     p_operation_id: operationId,
     p_actor_id: actorId,
-    p_proof_id: proof.proofId,
+    p_main_session_id: authorization.sessionId,
     p_request_id: context.requestId,
   });
   const result = ensureRpcSuccess(rpcResult);

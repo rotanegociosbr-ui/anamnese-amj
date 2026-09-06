@@ -5,7 +5,7 @@ import {
   DualAuthConfig,
   DualAuthContext,
   DualAuthError,
-  requireRecentPasswordProof,
+  requireAdminSessionAction,
   writeClinicAudit,
 } from "../_shared/dual-auth.ts";
 
@@ -1144,7 +1144,7 @@ async function requireProtected(
 ): Promise<void> {
   const operationId = requiredUuid(payload.operation_id, "operation_id");
   try {
-    await requireRecentPasswordProof(req, AUTH_CONFIG, context, {
+    await requireAdminSessionAction(req, AUTH_CONFIG, context, {
       operationId,
       action: `crm.${action}`,
       targetId,
@@ -1154,7 +1154,7 @@ async function requireProtected(
       if (error.auditContext) {
         await writeClinicAudit(AUTH_CONFIG, error.auditContext, {
           entity: "crm_protected_operation",
-          action: "reauthenticate",
+          action: "authorize_admin_session",
           outcome: "denied",
           details: { endpoint: "crm-fichas", reason_code: error.code },
         });
@@ -1164,7 +1164,7 @@ async function requireProtected(
     throw new ApiError(
       503,
       "reauthentication_unavailable",
-      "Não foi possível confirmar sua senha agora.",
+      "Não foi possível validar sua sessão agora.",
     );
   }
 }

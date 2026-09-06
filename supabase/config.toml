@@ -150,3 +150,10 @@ enabled = true
 # Saving also consumes a recent password proof scoped to this consultation.
 verify_jwt = false
 entrypoint = "./functions/rosto3d-fichas/index.ts"
+
+[functions.edicao-autorizacao]
+enabled = true
+# Internal verification: Auth user, active session, owner and AAL2. Grants also
+# consume the unchanged one-time recent-password proof. No anonymous access.
+verify_jwt = false
+entrypoint = "./functions/edicao-autorizacao/index.ts"

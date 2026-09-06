@@ -185,7 +185,7 @@
 
   async function protectedRequest(action, payload, reason) {
     if (!window.AMJProtecao || typeof window.AMJProtecao.solicitarSenhaRecente !== 'function') {
-      throw new Error('A confirmação por senha não está disponível. Atualize a página.');
+      throw new Error('A confirmação administrativa não está disponível. Atualize a página.');
     }
     let proof = null;
     try {
@@ -226,7 +226,7 @@
 
   async function protectedProntuarioRequest(action, payload, options) {
     if (!window.AMJProtecao || typeof window.AMJProtecao.solicitarSenhaRecente !== 'function') {
-      throw new Error('A confirmação por senha não está disponível. Atualize a página.');
+      throw new Error('A confirmação administrativa não está disponível. Atualize a página.');
     }
     let proof = null;
     try {
@@ -356,7 +356,7 @@
             '<button class="operacao-botao" type="submit">Declarar taxa</button></form>' +
         '</div>' +
         '<section class="operacao-card operacao-largo"><h3>Perfil de procedimentos por paciente e data</h3>' +
-          '<p class="operacao-nota">Cada data é uma visita e pode reunir vários procedimentos. “Apagar” apenas arquiva com senha e auditoria.</p>' +
+          '<p class="operacao-nota">Cada data é uma visita e pode reunir vários procedimentos. “Apagar” apenas arquiva com confirmação e auditoria.</p>' +
           '<div data-operacao-atendimentos></div></section>' +
         '<section class="operacao-card operacao-largo"><h3>Preferências de contato vigentes</h3>' +
           '<p class="operacao-nota">Cada linha mostra a versão vigente já registrada para paciente, finalidade e canal.</p>' +
@@ -474,12 +474,10 @@
       return;
     }
     const protocol = protocolForVisit(visit);
-    const summary = protocolSummaryForVisit(visit);
-    const photographyConsent = Boolean(summary && summary.clinical_photography_consented === true);
     if (!visit.protocol_id || !protocol) {
       step.textContent = 'Prontuário pendente';
       step.classList.add('alerta');
-      guidance.textContent = 'Primeiro prepare o prontuário desta consulta. O consentimento e as fotos nunca serão presumidos.';
+      guidance.textContent = 'Primeiro prepare o prontuário desta consulta. Nenhum consentimento ou foto será criado automaticamente.';
       button.textContent = 'Preparar prontuário para fotos';
       return;
     }
@@ -490,16 +488,9 @@
       button.textContent = 'Abrir consulta arquivada';
       return;
     }
-    if (!photographyConsent) {
-      step.textContent = 'Autorização pendente';
-      step.classList.add('alerta');
-      guidance.textContent = 'Abra o prontuário e registre a autorização atual de fotografia clínica antes do envio.';
-      button.textContent = 'Registrar autorização de fotografia';
-      return;
-    }
     step.textContent = 'Galeria liberada';
     step.classList.remove('alerta');
-    guidance.textContent = 'Pronto: escolha várias imagens ou use a câmera do celular. Cada arquivo ficará nesta consulta.';
+    guidance.textContent = 'Arquivo clínico privado — publicação exige autorização específica. Escolha imagens ou use a câmera; cada arquivo ficará nesta consulta.';
     button.textContent = 'Adicionar ou tirar fotos';
   }
 
@@ -847,7 +838,8 @@
         return String(item.id || '') === id;
       });
       if (!protocol) throw new Error('Não foi possível conferir os produtos deste prontuário.');
-      const products = Array.isArray(protocol.produtos) ? protocol.produtos : [];
+      const products = Array.isArray(protocol.produtos_rascunho) ? protocol.produtos_rascunho :
+        Array.isArray(protocol.produtos) ? protocol.produtos : [];
       protocolProductsById.set(id, products);
       return products;
     })().finally(function () {
@@ -918,13 +910,12 @@
       return photo.attendance_id === visit.id;
     });
     const summary = protocolSummaryForVisit(visit);
-    const photographyConsent = Boolean(summary && summary.clinical_photography_consented === true);
     const overview = photoOverviewForVisit(visit, summary);
-    const hasProtocol = Boolean(visit.protocol_id);
+    const hasProtocol = Boolean(visit.protocol_id && protocol);
     const documentationStatus = !hasProtocol ? 'Prontuário não preparado' : galleryReadOnly
-      ? 'Somente leitura' : !photographyConsent ? 'Autorização pendente' : overview.clinical < 1
+      ? 'Somente leitura' : overview.clinical < 1
       ? 'Foto clínica pendente' : 'Fotos clínicas registradas';
-    const statusClass = !hasProtocol || !photographyConsent || overview.clinical < 1 ? ' alerta' : '';
+    const statusClass = !hasProtocol || overview.clinical < 1 ? ' alerta' : '';
     const countChip = function (label, count, className) {
       return '<span class="operacao-foto-contagem ' + className + '"><b>' + escapeHtml(count) + '</b>' +
         escapeHtml(label) + '</span>';
@@ -944,17 +935,17 @@
       : '<button type="button" class="operacao-botao pequeno" data-fotos-abrir="' + escapeHtml(visit.id) +
         '">Ver ou adicionar fotos</button><button type="button" class="operacao-botao pequeno secundario" ' +
         'data-prontuario-abrir="' + escapeHtml(visit.protocol_id) + '">' +
-        (!photographyConsent ? 'Abrir prontuário e registrar autorização' : 'Abrir prontuário completo') + '</button>') +
+        'Abrir prontuário completo</button>') +
       '<span>' + escapeHtml(overview.active) + ' ativa(s)' + (overview.archived
         ? ' · ' + escapeHtml(overview.archived) + ' arquivada(s)' : '') + '</span></div>';
     const galleryStart = '<details class="operacao-galeria" data-galeria-atendimento="' +
       escapeHtml(visit.id) + '"><summary><span>Galeria da consulta</span><small>' +
       escapeHtml(overview.active) + ' foto(s) ativa(s)</small></summary>' +
-      '<p class="operacao-nota">Uso clínico privado. Não autoriza marketing nem publicação.</p>';
+      '<p class="operacao-nota">Arquivo clínico privado — publicação exige autorização específica.</p>';
     if (!hasProtocol) {
       return overviewHeader + directActions +
-        '<div class="operacao-fotos-fluxo"><b>1. Prepare o prontuário.</b><span>2. Registre a autorização de fotografia.</span>' +
-        '<span>3. Envie uma ou várias fotos por categoria.</span></div></section>';
+        '<div class="operacao-fotos-fluxo"><b>1. Prepare o prontuário.</b>' +
+        '<span>2. Envie uma ou várias fotos privadas por categoria. Publicação exige autorização específica.</span></div></section>';
     }
     if (!attendancePhotosAreFresh(visit.id)) {
       return overviewHeader + directActions + galleryStart +
@@ -973,10 +964,6 @@
     const products = renderCategory('produtos_utilizados', 'Produtos, ativos e ampolas');
     const upload = galleryReadOnly
       ? '<p class="operacao-nota">Galeria somente leitura enquanto a visita ou o prontuário estiver arquivado.</p>'
-      : !photographyConsent
-      ? '<div class="operacao-aviso-listagem"><p>Registre a autorização atual de fotografia clínica antes de enviar arquivos.</p>' +
-          '<button type="button" class="operacao-botao pequeno secundario" data-prontuario-abrir="' +
-          escapeHtml(visit.protocol_id) + '">Abrir prontuário e registrar autorização</button></div>'
       : '<form class="operacao-foto-upload" data-form-foto-upload data-atendimento-id="' + escapeHtml(visit.id) + '" ' +
           'data-protocolo-id="' + escapeHtml(visit.protocol_id) + '"><h6>Adicionar uma ou várias fotos</h6>' +
           '<p class="operacao-nota">Originais privados preservados. JPEG, PNG ou WebP, até 25 MB por arquivo. HEIC ainda não é aceito.</p>' +
@@ -1037,8 +1024,6 @@
           const protocolSummary = protocolSummaryForVisit(visit);
           const photoOverview = photoOverviewForVisit(visit, protocolSummary);
           const photoPending = clinicalPhotoPending(protocolSummary);
-          const consentPending = Boolean(visit.protocol_id) &&
-            !(protocolSummary && protocolSummary.clinical_photography_consented === true);
           const items = state.data.procedimentos_atendimento.filter(function (item) {
             return item.attendance_id === visit.id;
           }).sort(function (a, b) {
@@ -1146,9 +1131,8 @@
                   escapeHtml(photoOverview.products) + ' de produtos</span>'
                 : '<span class="operacao-selo">' + escapeHtml(photoOverview.clinical) +
                   ' foto(s) clínica(s) · ' + escapeHtml(photoOverview.products) + ' de produtos</span>') +
-              (consentPending ? '<span class="operacao-selo alerta">Consentimento de foto pendente</span>' : '') +
               '</div>' + (protocol && protocol.status === 'draft' && !protocol.archived_at
-                ? '<p class="operacao-nota operacao-nota-documental">A finalização documental exige consentimento de fotografia confirmado explicitamente e ao menos uma foto clínica ativa em Antes, Durante ou Depois. Fotos de produtos não contam.</p>'
+                ? '<p class="operacao-nota operacao-nota-documental">A finalização documental exige revisão do registro e ao menos uma foto clínica ativa em Antes, Durante ou Depois. Fotos de produtos não contam. O arquivo permanece privado; publicação exige autorização específica.</p>'
                 : '') + renderAttendanceGallery(visit, items, archived) + '</article>';
         }).join('') + '</section>';
     }).join('');
@@ -1658,7 +1642,7 @@
         const reason = formValue(form, 'motivo_duplicidade');
         if (reason.length < 3) throw new Error('Explique por que esta foto é clinicamente distinta.');
         if (!window.AMJProtecao || typeof window.AMJProtecao.solicitarSenhaRecente !== 'function') {
-          throw new Error('A confirmação por senha não está disponível. Atualize a página.');
+          throw new Error('A confirmação administrativa não está disponível. Atualize a página.');
         }
         proof = await window.AMJProtecao.solicitarSenhaRecente({
           titulo: 'Confirmar foto clínica distinta',
@@ -2029,14 +2013,14 @@
           if (prepareProtocol) {
             const attendanceId = prepareProtocol.dataset.prontuarioPreparar;
             await prepareAttendanceProtocol(attendanceId, prepareProtocol.dataset.versao);
-            status('Prontuário em rascunho vinculado. Consentimento e fotos continuam pendentes até registro explícito.');
+            status('Prontuário em rascunho vinculado. Adicione fotos ao arquivo privado; nenhum consentimento será criado automaticamente.');
           } else {
             await protectedProntuarioRequest('finalizar', {
               protocolo_id: finalizeProtocol.dataset.prontuarioFinalizar,
               versao_esperada: Number(finalizeProtocol.dataset.versao)
             }, {
               titulo: 'Finalizar registro da consulta',
-              explicacao: 'Confirme somente após revisar o registro, o consentimento atual de fotografia e ao menos uma foto clínica ativa em Antes, Durante ou Depois. Fotos de produtos não contam.',
+              explicacao: 'Confirme somente após revisar o registro e ao menos uma foto clínica ativa em Antes, Durante ou Depois. Fotos de produtos não contam. O arquivo é privado; publicação exige autorização específica.',
               motivo: 'Finalização do registro clínico confirmada pela gestão'
             });
             status('Registro documental da consulta finalizado. O status clínico do atendimento não foi alterado.');
@@ -2045,7 +2029,7 @@
           if (photosAttendanceId) await openAttendancePhotos(photosAttendanceId);
         } catch (error) {
           const finalizationMessage = ({
-            clinical_photography_consent_required: 'Registre explicitamente o consentimento atual de fotografia clínica no prontuário antes de finalizar.',
+            clinical_photography_consent_required: 'A versão atual do servidor não liberou esta finalização privada. Atualize a página e tente novamente; nenhum consentimento será presumido.',
             clinical_photo_required: 'Adicione ao menos uma foto clínica ativa em Antes, Durante ou Depois. Fotos de produtos não contam.',
             version_conflict: 'O registro mudou em outro acesso. Atualize e tente novamente.',
             protocol_archived: 'Restaure o prontuário antes de finalizar.',
@@ -2328,26 +2312,16 @@
         await loadAfterMutation();
         visit = state.data.atendimentos.find(function (item) { return item.id === attendanceId; });
         if (!visit || !visit.protocol_id) throw new Error('O prontuário foi preparado, mas o vínculo ainda não apareceu. Atualize e tente novamente.');
-        status('Prontuário preparado. Agora registre a autorização de fotografia; nenhuma foto será presumida.');
+        status('Prontuário preparado. Adicione fotos ao arquivo clínico privado; publicação exige autorização específica.');
       } finally {
         setBusy(false);
       }
     }
     const protocol = protocolForVisit(visit);
+    if (!protocol) throw new Error('Não foi possível conferir este prontuário. Atualize a tela antes de adicionar fotos.');
     if (protocol && protocol.archived_at) {
       await openAttendancePhotos(attendanceId);
       throw new Error('O prontuário desta consulta está arquivado. Restaure-o antes de adicionar fotos.');
-    }
-    const summary = protocolSummaryForVisit(visit);
-    const photographyConsent = Boolean(summary && summary.clinical_photography_consented === true);
-    if (!photographyConsent) {
-      if (!window.AMJProntuario || typeof window.AMJProntuario.abrirProtocolo !== 'function') {
-        await openAttendancePhotos(attendanceId);
-        throw new Error('Abra o prontuário e registre a autorização de fotografia antes do envio.');
-      }
-      await window.AMJProntuario.abrirProtocolo(visit.protocol_id);
-      status('Registre a autorização de fotografia clínica. Ela não autoriza marketing nem publicação.');
-      return true;
     }
     if (!await openAttendancePhotos(attendanceId)) return false;
     const upload = bySelector('[data-form-foto-upload][data-atendimento-id="' + CSS.escape(attendanceId) + '"]');

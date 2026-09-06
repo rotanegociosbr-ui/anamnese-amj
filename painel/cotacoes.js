@@ -273,7 +273,7 @@
       throw new Error('Atualize a tela antes de revisar esta identidade.');
     }
     if (!window.AMJProtecao || typeof window.AMJProtecao.solicitarSenhaRecente !== 'function') {
-      throw new Error('A confirmação segura por senha não está disponível. Atualize a página.');
+      throw new Error('A confirmação administrativa não está disponível. Atualize a página.');
     }
     const approving = decision === 'aprovar';
     const verb = approving ? 'aprovar' : 'rejeitar';
@@ -281,7 +281,7 @@
     try {
       proof = await window.AMJProtecao.solicitarSenhaRecente({
         titulo: approving ? 'Aprovar identidade exata da cotação' : 'Rejeitar identidade da cotação',
-        explicacao: 'Confirme sua senha e registre o motivo. A decisão será auditada e não altera custo, venda, estoque ou produto.',
+        explicacao: 'Confirme a decisão e registre o motivo. A decisão será auditada e não altera custo, venda, estoque ou produto.',
         motivo: (approving ? 'Aprovação' : 'Rejeição') + ' manual da identidade exata do SKU'
       });
       return await call('revisar_sku_exato', {

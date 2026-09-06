@@ -221,7 +221,7 @@ assert.match(js, /forma_pagamento: method/);
 assert.match(js, /actualCents === Math\.round\(Number\(expected\) \* 100\)/);
 assert.match(js, /idempotency_key: intentKey\('compra'\)/);
 assert.match(js, /Possível compra repetida/);
-assert.match(js, /Confirmar compra distinta com senha/);
+assert.match(js, /Confirmar compra distinta/);
 assert.match(js, /protectedCall\('criar_compra'/);
 assert.match(js, /data-financeiro-abrir-compra-existente/);
 assert.match(js, /resetIntentOnEdit/);

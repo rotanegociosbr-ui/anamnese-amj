@@ -137,7 +137,9 @@ assert.match(shell,
   'navegação pelo shell deve transferir foco ao título da área');
 
 assert.match(record, /function renderPhotoComparison\(/);
-assert.match(record, /consent\(protocol, 'clinical_photography'\)/);
+const comparisonSource = record.slice(record.indexOf('function renderPhotoComparison('), record.indexOf('function renderPhotoSection('));
+assert.doesNotMatch(comparisonSource, /consent\(/, 'comparação do arquivo clínico privado não pode exigir ou inferir consentimento do paciente');
+assert.match(comparisonSource, /comparablePhoto\(photo, phase\)/, 'comparação deve usar somente fotos válidas da fase e consulta atuais');
 assert.match(record, /safeSignedPhotoUrl\(photo\.miniatura_url\)[\s\S]+safeSignedPhotoUrl\(photo\.url_assinada\)/);
 assert.match(record, /A autorização para marketing é independente/);
 assert.match(css, /\.prontuario-comparacao-grade\s*\{[\s\S]*grid-template-columns:\s*repeat\(2,/);

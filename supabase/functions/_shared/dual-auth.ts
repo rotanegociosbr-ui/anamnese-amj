@@ -526,8 +526,56 @@ export async function authenticateDual(
   return await authenticateBearer(match[1], config, requestId);
 }
 
+export interface AdminSessionAction {
+  mode: "admin_session";
+  userId: string;
+  clinicId: string;
+  sessionId: string;
+  operationId: string;
+  action: string;
+  targetId: string;
+}
+
+/** Admin mutations use the current login + MFA, never a secondary password.
+ * The endpoint still resolves the target, confirms intent and owns its audit /
+ * version / idempotency checks. The request bearer is revalidated here so a
+ * revoked session, changed membership, or forged/stale context fails closed.
+ */
+export async function requireAdminSessionAction(
+  req: Request,
+  config: DualAuthConfig,
+  context: DualAuthContext,
+  scope: RecentPasswordProofScope,
+): Promise<AdminSessionAction> {
+  if (context.authMethod !== "supabase_auth" || context.role !== "owner" ||
+      context.aal !== "aal2" || !validUuid(context.userId) ||
+      !validUuid(context.clinicId) || !validUuid(context.sessionId)) {
+    throw new DualAuthError(403, "owner_mfa_required",
+      "Entre com sua conta administradora e confirme o autenticador.", context);
+  }
+  if (!scope || !validUuid(scope.operationId) || !validUuid(scope.targetId) ||
+      typeof scope.action !== "string" || !SAFE_PROOF_ACTION.test(scope.action)) {
+    throw new DualAuthError(400, "invalid_action_scope",
+      "A operação confirmada é inválida.", context);
+  }
+  const current = await authenticateDual(req, {
+    ...config, allowedRoles: ["owner"], requireAal2: true,
+  });
+  if (current.userId !== context.userId || current.clinicId !== context.clinicId ||
+      current.sessionId !== context.sessionId) {
+    throw new DualAuthError(403, "action_context_changed",
+      "O acesso mudou. Atualize a tela antes de confirmar.", context);
+  }
+  return {
+    mode: "admin_session", userId: context.userId, clinicId: context.clinicId,
+    sessionId: context.sessionId, operationId: scope.operationId,
+    action: scope.action, targetId: scope.targetId,
+  };
+}
+
 /**
- * Exige uma nova autenticacao por senha sem substituir a sessao AAL2 principal.
+ * Legacy one-time password proof. No active application endpoint uses this
+ * path under the current admin-session policy; retained for historical RPCs.
  *
  * O navegador deve criar uma sessao Supabase isolada, nao persistente, e enviar
  * somente o access_token secundario em:
@@ -946,6 +994,96 @@ export async function requireRecentPasswordProof(
     targetId: scope.targetId,
     passwordAuthenticatedAt,
   };
+}
+
+/** Legacy 30-minute grant literals. The endpoint is retired; active application
+ * mutations use requireAdminSessionAction, including explicit critical actions. */
+export const ROUTINE_EDIT_ACTIONS = Object.freeze([
+  "financeiro.editar_cliente", "financeiro.editar_fornecedor",
+  "financeiro.editar_marca", "financeiro.editar_produto",
+  "prontuario.update", "rosto3d.study.save",
+] as const);
+
+export interface RoutineEditAuthorization {
+  active: boolean;
+  expires_at: string | null;
+  allowed_actions: readonly string[];
+}
+
+/** context must come from authenticateDual for THIS request, never the browser. */
+export async function routineEditAuthorization(
+  config: DualAuthConfig,
+  context: DualAuthContext,
+  mode: "status" | "grant" | "revoke",
+  proofId: string | null = null,
+  action: string | null = null,
+): Promise<RoutineEditAuthorization> {
+  if (context.authMethod !== "supabase_auth" || context.role !== "owner" ||
+    context.aal !== "aal2" || !validUuid(context.userId) ||
+    !validUuid(context.clinicId) || !validUuid(context.sessionId)) {
+    throw new DualAuthError(403, "owner_mfa_required",
+      "Entre com sua conta individual e confirme o autenticador.", context);
+  }
+  if (action !== null && !(ROUTINE_EDIT_ACTIONS as readonly string[]).includes(action)) {
+    throw new DualAuthError(403, "routine_edit_action_not_allowed",
+      "Esta ação exige confirmação individual por senha.", context);
+  }
+  const baseUrl = normalizeBaseUrl(config.supabaseUrl);
+  if (!baseUrl || !config.serviceRoleKey) throw new DualAuthError(503,
+    "routine_edit_unavailable", "Não foi possível conferir a liberação de edição.", context);
+  let response: Response;
+  let value: Record<string, unknown>;
+  try {
+    response = await fetchWithTimeout(config.fetchImpl || fetch,
+      baseUrl + "/rest/v1/rpc/clinic_routine_edit_authorization", {
+        method: "POST", cache: "no-store",
+        headers: { apikey: config.serviceRoleKey,
+          Authorization: "Bearer " + config.serviceRoleKey,
+          "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ p_clinic_id: context.clinicId,
+          p_actor_user_id: context.userId, p_main_session_id: context.sessionId,
+          p_mode: mode, p_proof_id: proofId, p_action: action }),
+      });
+    value = await response.json();
+  } catch {
+    throw new DualAuthError(503, "routine_edit_unavailable",
+      "Não foi possível conferir a liberação de edição.", context);
+  }
+  if (!response.ok || value?.ok !== true) {
+    const denied = value?.code === "42501";
+    throw new DualAuthError(denied ? 403 : 503,
+      denied ? "routine_edit_denied" : "routine_edit_unavailable",
+      denied ? "A liberação não está válida para esta sessão. Confirme o acesso novamente."
+        : "Não foi possível conferir a liberação de edição.", context);
+  }
+  if (typeof value.active !== "boolean" || (value.active &&
+    (typeof value.expires_at !== "string" || !Number.isFinite(Date.parse(value.expires_at))))) {
+    throw new DualAuthError(503, "routine_edit_unavailable",
+      "Não foi possível conferir a liberação de edição.", context);
+  }
+  return { active: value.active,
+    expires_at: value.active ? value.expires_at as string : null,
+    allowed_actions: ROUTINE_EDIT_ACTIONS };
+}
+
+export async function requireRoutineEditAuthorization(
+  req: Request,
+  config: DualAuthConfig,
+  context: DualAuthContext,
+  scope: RecentPasswordProofScope,
+): Promise<{ mode: "window" | "password"; expires_at: string | null }> {
+  if (!scope || !validUuid(scope.operationId) || !validUuid(scope.targetId) ||
+    !(ROUTINE_EDIT_ACTIONS as readonly string[]).includes(scope.action)) {
+    throw new DualAuthError(403, "routine_edit_action_not_allowed",
+      "Esta ação exige confirmação individual por senha.", context);
+  }
+  // The RPC rechecks active owner membership and the main auth.sessions row.
+  // Neither the browser's countdown nor a caller-provided grant ID is trusted.
+  const grant = await routineEditAuthorization(config, context, "status", null, scope.action);
+  if (grant.active) return { mode: "window", expires_at: grant.expires_at };
+  // Compatibility for unchanged clients; this never creates/extends a window.
+  await requireRecentPasswordProof(req, config, context, scope);
+  return { mode: "password", expires_at: null };
 }
 
 export function authResponseFields(

@@ -5,7 +5,7 @@ import {
   DualAuthConfig,
   DualAuthContext,
   DualAuthError,
-  requireRecentPasswordProof,
+  requireAdminSessionAction,
   writeClinicAudit,
 } from "../_shared/dual-auth.ts";
 
@@ -194,6 +194,8 @@ const DATABASE_ERROR_MESSAGES: Record<string, string> = {
   role_forbidden: "Seu perfil não permite esta operação.",
   required_parameter_missing: "Preencha os campos obrigatórios.",
   procedure_kind_invalid: "Selecione um procedimento válido.",
+  protocol_essentials_required: "Para finalizar, informe o procedimento e sua data clínica. O rascunho continua salvo.",
+  catalog_product_incomplete: "Complete o cadastro do produto antes de utilizá-lo.",
   anamnesis_invalid: "Revise os dados clínicos informados.",
   complaint_too_long: "A queixa informada está muito longa.",
   technique_notes_too_long: "As notas técnicas estão muito longas.",
@@ -316,6 +318,7 @@ async function assertPhotoUploadPreflight(
   protocolId: string,
   productId: string | null,
   lotSnapshot: string | null,
+  privateOwnerAccess = false,
 ): Promise<void> {
   if ((productId === null) !== (lotSnapshot === null)) {
     throw new ApiError(
@@ -346,6 +349,10 @@ async function assertPhotoUploadPreflight(
     throw new ApiError(403, "protocol_locked", DATABASE_ERROR_MESSAGES.protocol_locked);
   }
 
+  // An owner already authenticated with MFA may keep a private clinical file.
+  // This operation is not a patient consent and grants no publication rights.
+  if (privateOwnerAccess) return;
+
   // O protocolo foi confirmado no tenant antes de consultar a view por ID.
   const currentConsent = await serviceJson(
     "/rest/v1/protocol_consent_current?select=accepted,revoked_at" +
@@ -368,6 +375,15 @@ async function assertPhotoProductContextPreflight(
   lotSnapshot: string | null,
 ): Promise<void> {
   if (productId === null || lotSnapshot === null) return;
+  const draftRows = await serviceJson(
+    "/rest/v1/protocols?select=status,draft_products&id=eq." + encodeURIComponent(protocolId) + "&limit=1",
+  );
+  const draft = draftRows[0];
+  if (draft?.status === "draft" && Array.isArray(draft.draft_products)) {
+    if (draft.draft_products.some((item) => item && typeof item === "object" &&
+        (item as JsonRecord).product_id === productId && (item as JsonRecord).lot === lotSnapshot)) return;
+    throw new ApiError(422, "photo_product_context_invalid", DATABASE_ERROR_MESSAGES.photo_product_context_invalid);
+  }
   const protocolProducts = await serviceJson(
     "/rest/v1/protocol_products?select=lot" +
       "&protocol_id=eq." + encodeURIComponent(protocolId) +
@@ -477,6 +493,7 @@ async function handleList(
     "procedure_date",
     "return_date",
     "care_notes",
+    "draft_products",
     "status",
     "version",
     "archived_at",
@@ -559,6 +576,8 @@ async function handleList(
     );
     return {
       ...protocol,
+      produtos_rascunho: protocol.status === "draft" && Array.isArray(protocol.draft_products)
+        ? protocol.draft_products : null,
       paciente: patient
         ? {
           id: patient.id,
@@ -608,7 +627,7 @@ async function handleListPhotos(
   if (!validUuid(protocolId)) {
     throw new ApiError(422, "invalid_protocol", "Prontuário inválido.");
   }
-  await assertPhotoUploadPreflight(clinicId, protocolId, null, null);
+  await assertPhotoUploadPreflight(clinicId, protocolId, null, null, context.role === "owner");
   const page = positiveInteger(payload.pagina, 1, 100_000);
   const pageSize = positiveInteger(payload.por_pagina, 12, 24);
   const includeArchived = payload.incluir_arquivadas === true;
@@ -657,6 +676,46 @@ async function handleListPhotos(
     ok: true,
     fotos: photos,
     paginacao: { pagina: page, por_pagina: pageSize, tem_mais: hasMore },
+  });
+}
+
+function draftText(value: unknown, max: number): string | null {
+  if (value === undefined || value === null || value === "") return null;
+  if (typeof value !== "string" || value.trim().length > max) {
+    throw new ApiError(422, "draft_text_invalid", "Revise o texto: nenhum conteúdo foi descartado.");
+  }
+  return value.trim() || null;
+}
+
+function normalizeDraftProducts(value: unknown): JsonRecord[] {
+  if (!Array.isArray(value) || value.length > 50) {
+    throw new ApiError(422, "products_invalid", "Revise as linhas de produtos do rascunho.");
+  }
+  const fields = new Set(["product_id", "lot", "expiry", "amount", "unit", "position"]);
+  return value.map((raw, index) => {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+      throw new ApiError(422, "product_item_invalid", "Linha de produto inválida.");
+    }
+    const item = raw as JsonRecord;
+    if (Object.keys(item).some((key) => !fields.has(key))) {
+      throw new ApiError(422, "product_item_invalid", "Campo de produto desconhecido.");
+    }
+    const productId = draftText(item.product_id, 40);
+    const lot = draftText(item.lot, 100);
+    const expiry = draftText(item.expiry, 10);
+    const unit = draftText(item.unit, 20);
+    if ((productId && !validUuid(productId)) || (expiry && !validDate(expiry)) ||
+        (lot && containsControlCharacter(lot))) {
+      throw new ApiError(422, "product_item_invalid", "Revise os dados preenchidos do produto.");
+    }
+    const amount = item.amount === undefined || item.amount === null || item.amount === ""
+      ? null : item.amount;
+    if (amount !== null && ((typeof amount !== "number" && typeof amount !== "string") ||
+        !Number.isFinite(Number(amount)) || Number(amount) <= 0 || Number(amount) > 1000000)) {
+      throw new ApiError(422, "product_item_invalid", "Revise a quantidade preenchida.");
+    }
+    return { product_id: productId, lot, expiry, amount, unit,
+      position: item.position === undefined ? index + 1 : positiveInteger(item.position, index + 1, 100) };
   });
 }
 
@@ -775,7 +834,7 @@ async function requireProtectedOperation(
       "Atualize a tela e tente novamente.",
     );
   }
-  await requireRecentPasswordProof(req, AUTH_CONFIG, context, {
+  await requireAdminSessionAction(req, AUTH_CONFIG, context, {
     operationId,
     action,
     targetId,
@@ -811,7 +870,7 @@ async function handleSaveDraft(
   const procedureKind = typeof payload.tipo_procedimento === "string"
     ? payload.tipo_procedimento.trim()
     : "";
-  if (!procedureKind || procedureKind.length > 120) {
+  if (procedureKind.length > 120) {
     throw new ApiError(
       422,
       "procedure_kind_invalid",
@@ -824,18 +883,34 @@ async function handleSaveDraft(
   }
   const products = payload.produtos === undefined && protocolId
     ? null
-    : normalizeProducts(payload.produtos ?? []);
+    : normalizeDraftProducts(payload.produtos ?? []);
   const consents = normalizeConsents(payload.consentimentos);
   const expectedVersion = protocolId ? requiredVersion(payload.versao_esperada) : null;
-  const operationId = protocolId
-    ? await requireProtectedOperation(
-      req,
-      context,
-      payload,
-      "prontuario.update",
-      protocolId,
-    )
-    : idempotencyKey;
+  let operationId = idempotencyKey;
+  if (protocolId) {
+    const current = await serviceJson(
+      "/rest/v1/protocols?select=id,patient_id,appointment_id,version&clinic_id=eq." + clinicId +
+      "&id=eq." + protocolId + "&limit=1",
+    );
+    if (!current.length) throw new ApiError(404, "protocol_not_found", "Prontuário não encontrado.");
+    if (Number(current[0].version) !== expectedVersion) {
+      throw new ApiError(409, "version_conflict", DATABASE_ERROR_MESSAGES.version_conflict);
+    }
+    const changesBinding = current[0].patient_id !== patientId ||
+      (current[0].appointment_id || null) !== appointmentId;
+    if (changesBinding || Object.keys(consents).length > 0) {
+      // A routine grant never authorizes patient reassignment or consent.
+      operationId = await requireProtectedOperation(req, context, payload, "prontuario.update", protocolId);
+    } else {
+      operationId = safeText(payload.operation_id, 40);
+      if (!validUuid(operationId)) throw new ApiError(422, "operation_id_required", "Atualize a tela e tente novamente.");
+      await requireAdminSessionAction(req, AUTH_CONFIG, context, {
+        operationId, action: "prontuario.update", targetId: protocolId,
+      });
+    }
+  } else if (Object.keys(consents).length > 0) {
+    operationId = await requireProtectedOperation(req, context, payload, "prontuario.consent", idempotencyKey);
+  }
 
   const result = await rpc("prontuario_salvar_rascunho_com_estoque", {
     p_clinic_id: clinicId,
@@ -847,13 +922,13 @@ async function handleSaveDraft(
     p_idempotency_key: idempotencyKey,
     p_patient_id: patientId,
     p_appointment_id: appointmentId,
-    p_procedure_kind: procedureKind,
-    p_complaint: optionalText(payload.queixa, 2000),
+    p_procedure_kind: procedureKind || null,
+    p_complaint: draftText(payload.queixa, 2000),
     p_anamnesis: anamnesis,
-    p_technique_notes: optionalText(payload.notas_tecnica, 5000),
+    p_technique_notes: draftText(payload.notas_tecnica, 5000),
     p_procedure_date: optionalDate(payload.data_procedimento, "a data do procedimento"),
     p_return_date: optionalDate(payload.data_retorno, "a data de retorno"),
-    p_care_notes: optionalText(payload.orientacoes, 5000),
+    p_care_notes: draftText(payload.orientacoes, 5000),
     p_products: products,
     p_consents: consents,
     p_request_id: operationId,
@@ -1328,13 +1403,14 @@ async function handleAddPhoto(
     throw new ApiError(422, "invalid_taken_at", "Informe a data da foto corretamente.");
   }
 
-  // Evita gravar até 25 MB no Storage quando o protocolo não está ativo ou a
-  // autorização atual foi revogada. O RPC repete a validação sob concorrência.
+  // Confirma o contexto privado antes de enviar os bytes. O RPC repete a
+  // autorização do ator e o vínculo; isso não registra consentimento do paciente.
   await assertPhotoUploadPreflight(
     clinicId,
     protocolId,
     productId,
     lotSnapshot,
+    context.role === "owner",
   );
 
   const bytes = new Uint8Array(await file.arrayBuffer());

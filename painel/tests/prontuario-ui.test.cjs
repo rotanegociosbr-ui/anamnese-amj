@@ -82,15 +82,15 @@ assert.match(galleryHtml, />Arquivar<\/button>/);
 const completedHtml = ui.renderConsultation(Object.assign({}, consultation, { status: 'signed' }), false);
 assert.match(completedHtml, /Consulta concluída/);
 assert.match(completedHtml, /Abrir dados e fotos/);
-assert.match(completedHtml, /Fotos clínicas autorizadas/);
+assert.match(completedHtml, /Consentimento fotográfico registrado/);
 assert.match(completedHtml, /Revogar autorização de fotos/);
 assert.doesNotMatch(completedHtml, /data-prontuario-finalizar=/);
 const revokedCompletedHtml = ui.renderConsultation(Object.assign({}, consultation, {
   status: 'signed', consentimentos_atuais: { clinical_photography: false }
 }), false);
-assert.match(revokedCompletedHtml, /Fotos clínicas não autorizadas/);
+assert.match(revokedCompletedHtml, /Consentimento fotográfico não registrado/);
 assert.match(revokedCompletedHtml, /Registrar autorização de fotos/);
-assert.doesNotMatch(revokedCompletedHtml, /data-prontuario-adicionar-fotos=/);
+assert.match(revokedCompletedHtml, /data-prontuario-adicionar-fotos=/,'arquivo privado não depende de consentimento para publicação');
 assert.equal(ui.isCompleted({ status: 'signed' }), true);
 assert.equal(ui.procedureLabel('toxina_botulinica'), 'Toxina botulínica');
 assert.equal(ui.procedureLabel('preenchimento'), 'Preenchimento');
@@ -127,8 +127,9 @@ assert.deepEqual(Array.from(groups[0].consultations, item => item.id), ['consult
 assert.match(source, /protectedRequest\('finalizar',[\s\S]*?protocolo_id: item\.id,[\s\S]*?versao_esperada: expectedVersion\(item\)/);
 assert.match(source, /protectedRequest\('alterar_consentimento_fotografia',[\s\S]*?protocolo_id: item\.id,[\s\S]*?aceito: accepted/,
   'consentimento em signed deve usar ação protegida separada');
-assert.match(source, /requiredPhoto: true/);
-assert.match(source, /photoMessage: 'Etapa obrigatória:/);
+const submitDraftBody = source.slice(source.indexOf('async function submitProtocol('),source.indexOf('async function submitPhoto('));
+assert.doesNotMatch(submitDraftBody, /requiredPhoto: true|focusPhotos: true/,'salvar rascunho não obriga foto nem muda o foco para upload');
+assert.match(submitDraftBody, /Rascunho salvo nesta consulta/);
 assert.match(source, /prontuario-produto-quantidade[^>]+max="1000000"/,
   'quantidade máxima exibida deve coincidir com Edge e banco');
 assert.match(source, /Number\.isFinite\(amount\)[\s\S]{0,100}amount > 1000000/,
@@ -151,8 +152,8 @@ assert.match(source, /prontuario-somente-leitura/);
 assert.match(html, /<h2>Pacientes e consultas<\/h2>/);
 assert.match(html, /<option value="during">Durante<\/option>/);
 assert.match(html, /Limite de 25 MB/);
-assert.match(html, /prontuario\.js\?v=20260906-3/);
-assert.match(html, /prontuario\.css\?v=20260826-1/);
+assert.match(html, /prontuario\.js\?v=20260906-4/);
+assert.match(html, /prontuario\.css\?v=20260906-4/);
 assert.match(css, /\.prontuario-paciente-grupo/);
 assert.match(css, /\.prontuario-galerias/);
 assert.match(css, /scroll-margin-top:88px/,
