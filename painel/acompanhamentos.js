@@ -26,6 +26,13 @@
         text(identidadeBackend.role).toLowerCase() === 'owner';
     } catch (_) { return false; }
   }
+  function currentSession(generation) { return generation === state.generation && ownerAccess(); }
+  function assertSessionContext(generation) {
+    if (!currentSession(generation)) {
+      const error = new Error('Sessão de acompanhamentos encerrada.');
+      error.code = 'stale_session'; throw error;
+    }
+  }
   function safeDate(value) {
     const parsed = new Date(text(value));
     return Number.isFinite(parsed.getTime()) ? DATE.format(parsed) : '—';
@@ -47,21 +54,27 @@
       }
     });
   }
-  function intent(name) {
-    if (!state.intents.has(name)) state.intents.set(name, { activation: uuid(), idempotency: uuid() });
+  function intent(name, fingerprint) {
+    const previous = state.intents.get(name);
+    if (!previous || (fingerprint !== undefined && previous.fingerprint !== fingerprint)) {
+      state.intents.set(name, { activation: uuid(), idempotency: uuid(), fingerprint: fingerprint,
+        attemptedAt: new Date().toISOString() });
+    }
     return state.intents.get(name);
   }
   function clearIntent(name) { state.intents.delete(name); }
   async function request(action, payload, proof) {
     const generation = state.generation;
     if (!ownerAccess()) throw new Error('Esta área exige conta proprietária individual com MFA.');
+    const headers = await cabecalhosAcesso(true, proof);
+    assertSessionContext(generation);
     const response = await fetch(API, {
-      method: 'POST', headers: await cabecalhosAcesso(true, proof), cache: 'no-store',
+      method: 'POST', headers: headers, cache: 'no-store',
       referrerPolicy: 'no-referrer', body: JSON.stringify(Object.assign({ acao: action }, payload || {}))
     });
     let data = {};
     try { data = await response.json(); } catch (_) { data = {}; }
-    if (generation !== state.generation) throw new Error('Sessão de acompanhamentos encerrada.');
+    assertSessionContext(generation);
     if (!response.ok || data.ok === false || data.erro) {
       const error = new Error(data.erro || 'Não foi possível concluir a operação.');
       error.code = data.codigo || String(response.status); throw error;
@@ -70,6 +83,8 @@
     return data;
   }
   async function protectedRequest(action, payload, title, fallbackReason) {
+    const generation = state.generation;
+    assertSessionContext(generation);
     if (!window.AMJProtecao || typeof window.AMJProtecao.solicitarSenhaRecente !== 'function') {
       throw new Error('A confirmação administrativa não está disponível. Atualize a página.');
     }
@@ -77,6 +92,7 @@
     try {
       proof = await window.AMJProtecao.solicitarSenhaRecente({ titulo: title,
         motivo: fallbackReason, motivoObrigatorio: true });
+      assertSessionContext(generation);
       return await request(action, Object.assign({}, payload, { operation_id: proof.operation_id,
         motivo: proof.motivo || fallbackReason }), proof);
     } finally { if (proof && typeof proof.encerrar === 'function') await proof.encerrar(); }
@@ -126,17 +142,19 @@
       '<div class="acomp-lista" data-acomp-lista></div></section>';
   }
   async function load(force) {
-    if (state.loading && !force) return;
+    if (!ownerAccess() || (state.loading && !force)) return;
+    const generation = state.generation;
     setBusy(true); status('Carregando acompanhamentos…');
     try {
       const data = await request('listar_acompanhamentos_fase2', { limite: 100 });
+      assertSessionContext(generation);
       state.rows = Array.isArray(data.acompanhamentos) ? data.acompanhamentos : [];
       state.responsaveis = Array.isArray(data.responsaveis) ? data.responsaveis : [];
       state.credentials = Array.isArray(data.credenciais_profissionais) ? data.credenciais_profissionais : [];
       state.consents = Array.isArray(data.consentimentos_marketing_atuais) ? data.consentimentos_marketing_atuais : [];
       state.loaded = true; render(); status('Acompanhamentos atualizados.');
-    } catch (error) { status(error.message, true); }
-    finally { setBusy(false); }
+    } catch (error) { if (currentSession(generation)) status(error.message, true); }
+    finally { if (currentSession(generation)) setBusy(false); }
   }
   function openForm(cardNode, kind) {
     const row = state.rows.find(function (item) { return text(item.id) === text(cardNode.dataset.acompRow); });
@@ -161,6 +179,8 @@
     return parsed;
   }
   async function submit(form) {
+    const generation = state.generation;
+    assertSessionContext(generation);
     const cardNode = form.closest('[data-acomp-row]');
     const row = state.rows.find(function (item) { return text(item.id) === text(cardNode.dataset.acompRow); });
     if (!row) return;
@@ -168,14 +188,15 @@
     const reason = text(form.elements.motivo.value);
     if (reason.length < 3) throw new Error('Informe o motivo da operação.');
     const intentName = kind + ':' + row.id;
-    const keys = intent(intentName);
     let action; let payload;
     if (kind === 'sequencia') {
+      const keys = intent(intentName);
       action = 'ativar_sequencia_pos_procedimento';
       payload = { atendimento_id: row.attendance_id, versao_atendimento: row.versao_atendimento || row.version,
         responsavel_id: text(form.elements.responsavel_id.value), intervalos_dias: intervals(form.elements.intervalos.value),
         activation_id: keys.activation, idempotency_key: keys.idempotency };
     } else if (kind === 'reativar') {
+      const keys = intent(intentName);
       action = 'ativar_reativacao';
       payload = { cliente_id: row.patient_id, ultimo_atendimento_id: row.attendance_id,
         versao_ultimo_atendimento: row.versao_atendimento || row.version, canal: row.canal,
@@ -190,16 +211,21 @@
       if (nextAction !== 'nenhuma' && !nextAt) throw new Error('Informe uma data futura para a próxima ação.');
       payload = { plano_id: row.plano_id, versao_plano: row.versao_plano, fila_id: row.fila_id,
         versao_fila: row.versao_fila, resultado: result,
-        proxima_acao: nextAction, proxima_acao_em: nextAction === 'nenhuma' ? null : (nextAt ? new Date(nextAt).toISOString() : null),
-        tentativa_em: new Date().toISOString(), idempotency_key: keys.idempotency };
+        proxima_acao: nextAction, proxima_acao_em: nextAction === 'nenhuma' ? null : (nextAt ? new Date(nextAt).toISOString() : null) };
+      // The server fingerprint includes the attempt timestamp: keep it on uncertain retries.
+      const keys = intent(intentName, JSON.stringify({ payload: payload, motivo: reason }));
+      payload.tentativa_em = keys.attemptedAt;
+      payload.idempotency_key = keys.idempotency;
     }
     if (kind !== 'tentativa' && !payload.responsavel_id) throw new Error('Selecione a pessoa responsável.');
     setBusy(true); status('Confirmando operação protegida…');
     try {
       await protectedRequest(action, payload, 'Confirmar acompanhamento', reason);
+      assertSessionContext(generation);
       clearIntent(intentName); setBusy(false); await load(true);
+      assertSessionContext(generation);
       status('Acompanhamento atualizado. Nenhuma mensagem foi enviada.');
-    } finally { setBusy(false); }
+    } finally { if (currentSession(generation)) setBusy(false); }
   }
   function bind() {
     if (!state.root || state.root.dataset.acompBound === '1') return;
@@ -215,7 +241,10 @@
     state.root.addEventListener('submit', function (event) {
       const form = event.target.closest('[data-acomp-form]');
       if (!form) return; event.preventDefault();
-      submit(form).catch(function (error) { status(error.message, true); setBusy(false); });
+      const generation = state.generation;
+      submit(form).catch(function (error) {
+        if (currentSession(generation)) { status(error.message, true); setBusy(false); }
+      });
     });
   }
   function mount(target) {
@@ -240,6 +269,7 @@
     if (state.root) {
       state.root.innerHTML = shell();
       state.root.hidden = true;
+      state.root.setAttribute('aria-busy', 'false');
     }
   }
 

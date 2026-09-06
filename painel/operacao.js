@@ -161,18 +161,29 @@
     return row ? row.full_name : 'Cliente';
   }
 
+  function assertSessionContext(generation) {
+    if (generation !== state.generation || !ownerAccess()) {
+      const error = new Error('Sessão operacional encerrada.');
+      error.code = 'stale_session';
+      throw error;
+    }
+  }
+
   async function jsonRequest(action, payload, proof) {
     const generation = state.generation;
+    assertSessionContext(generation);
+    const headers = await cabecalhosAcesso(true, proof);
+    assertSessionContext(generation);
     const response = await fetch(API, {
       method: 'POST',
-      headers: await cabecalhosAcesso(true, proof),
+      headers: headers,
       cache: 'no-store',
       referrerPolicy: 'no-referrer',
       body: JSON.stringify(Object.assign({ acao: action }, payload || {}))
     });
     let data = {};
     try { data = await response.json(); } catch (_) { data = {}; }
-    if (generation !== state.generation) throw new Error('Sessão operacional encerrada.');
+    assertSessionContext(generation);
     if (!response.ok || data.ok === false || data.erro) {
       const error = new Error(data.erro || 'Não foi possível concluir a operação.');
       error.code = data.codigo || String(response.status);
@@ -184,6 +195,8 @@
   }
 
   async function protectedRequest(action, payload, reason) {
+    const generation = state.generation;
+    assertSessionContext(generation);
     if (!window.AMJProtecao || typeof window.AMJProtecao.solicitarSenhaRecente !== 'function') {
       throw new Error('A confirmação administrativa não está disponível. Atualize a página.');
     }
@@ -194,6 +207,7 @@
         motivo: reason || 'Alteração operacional confirmada pela gestão',
         motivoObrigatorio: true
       });
+      assertSessionContext(generation);
       return await jsonRequest(action, Object.assign({}, payload || {}, {
         operation_id: proof.operation_id,
         motivo: proof.motivo || reason || 'Alteração operacional confirmada pela gestão'
@@ -205,16 +219,19 @@
 
   async function prontuarioJsonRequest(action, payload, proof) {
     const generation = state.generation;
+    assertSessionContext(generation);
+    const headers = await cabecalhosAcesso(true, proof);
+    assertSessionContext(generation);
     const response = await fetch(PRONTUARIO_API, {
       method: 'POST',
-      headers: await cabecalhosAcesso(true, proof),
+      headers: headers,
       cache: 'no-store',
       referrerPolicy: 'no-referrer',
       body: JSON.stringify(Object.assign({ acao: action }, payload || {}))
     });
     let data = {};
     try { data = await response.json(); } catch (_) { data = {}; }
-    if (generation !== state.generation) throw new Error('Sessão operacional encerrada.');
+    assertSessionContext(generation);
     if (!response.ok || data.ok === false || data.erro) {
       const error = new Error(data.erro || 'Não foi possível atualizar o prontuário clínico.');
       error.code = data.codigo || String(response.status);
@@ -225,12 +242,15 @@
   }
 
   async function protectedProntuarioRequest(action, payload, options) {
+    const generation = state.generation;
+    assertSessionContext(generation);
     if (!window.AMJProtecao || typeof window.AMJProtecao.solicitarSenhaRecente !== 'function') {
       throw new Error('A confirmação administrativa não está disponível. Atualize a página.');
     }
     let proof = null;
     try {
       proof = await window.AMJProtecao.solicitarSenhaRecente(options || {});
+      assertSessionContext(generation);
       return await prontuarioJsonRequest(action, Object.assign({}, payload || {}, {
         operation_id: proof.operation_id,
         motivo: proof.motivo || (options && options.motivo) ||
@@ -1752,13 +1772,17 @@
         const start = formValue(returnForm, 'janela_inicio');
         const end = formValue(returnForm, 'janela_fim');
         if ((exact && (start || end)) || (!exact && (!start || !end))) throw new Error('Use data exata ou uma janela completa.');
-        await protectedRequest('criar_retorno', {
+        const payload = {
           atendimento_id: formValue(returnForm, 'atendimento_id'), recomendacao: formValue(returnForm, 'recomendacao'),
           data_exata: optional(exact), janela_inicio: optional(start), janela_fim: optional(end),
           proxima_acao_em: localTimestampToIso(formValue(returnForm, 'proxima_acao_em')),
           responsavel_id: formValue(returnForm, 'responsavel_id'),
-          orientacao: optional(formValue(returnForm, 'orientacao')), idempotency_key: uuid()
-        }, 'Recomendação de retorno validada pela gestão');
+          orientacao: optional(formValue(returnForm, 'orientacao'))
+        };
+        const intentKey = intentKeyForForm(returnForm, payload);
+        payload.idempotency_key = intentKey;
+        await protectedRequest('criar_retorno', payload, 'Recomendação de retorno validada pela gestão');
+        confirmFormIntent(returnForm, intentKey);
       });
     });
     const preference = bySelector('[data-form-preferencia]');

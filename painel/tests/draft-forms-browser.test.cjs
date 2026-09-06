@@ -9,7 +9,7 @@ before(async()=>{const executablePath=process.env.PLAYWRIGHT_EXECUTABLE_PATH||(f
 after(async()=>{await browser?.close();});
 for(const mobile of [false,true])test('actual forms draft save/reopen without duplication — '+(mobile?'mobile':'desktop'),{timeout:60000},async()=>{
  const context=await browser.newContext({viewport:mobile?{width:390,height:844}:{width:1365,height:1000},isMobile:mobile,hasTouch:mobile,serviceWorkers:'block',locale:'pt-BR'}),page=await context.newPage(),calls=[],errors=[];
- const patientId='11111111-1111-4111-8111-111111111111',clients=[{id:patientId,nome:'Paciente sintética QA',ativo:true}],suppliers=[],products=[],protocols=[],inventory=[];let serial=1,photoFailure=true;
+ const patientId='11111111-1111-4111-8111-111111111111',clients=[{id:patientId,nome:'Paciente sintética QA',ativo:true}],suppliers=[],products=[],protocols=[],inventory=[];let serial=1,photoFailure=true,protocolReadFailure=false;
  const nextId=()=> '22222222-2222-4222-8222-'+String(++serial).padStart(12,'0');
  page.setDefaultTimeout(10000);
  page.on('pageerror',error=>errors.push(error.message));page.on('dialog',dialog=>dialog.dismiss());
@@ -24,7 +24,7 @@ for(const mobile of [false,true])test('actual forms draft save/reopen without du
    calls.push(body);let result={};const action=body.acao;
    if(action==='listar_catalogos')result={formas_pagamento:[],fornecedores:suppliers,marcas:[],produtos:products.filter(p=>p.status_cadastro==='completo'),produtos_rascunho:products.filter(p=>p.status_cadastro==='rascunho')};
    else if(action==='listar_clientes')result={clientes:clients};
-   else if(action==='listar'&&url.pathname.endsWith('/prontuario-fichas'))result={protocolos:protocols,paginacao:{pagina:body.pagina||1,tem_mais:false}};
+   else if(action==='listar'&&url.pathname.endsWith('/prontuario-fichas')){if(protocolReadFailure){await route.fulfill({status:503,json:{erro:'Leitura sintética indisponível'}});return;}result={protocolos:protocols,paginacao:{pagina:body.pagina||1,tem_mais:false}};}
    else if(action==='listar_fotos'){if(photoFailure){await route.fulfill({status:403,json:{erro:'Consentimento necessário',codigo:'clinical_photography_consent_required'}});return;}result={fotos:[],paginacao:{tem_mais:false}};}
    else if(action==='adicionar_foto')result={foto_id:nextId()};
    else if(['criar_cliente','criar_fornecedor','criar_produto','editar_produto'].includes(action)){
@@ -88,6 +88,34 @@ for(const mobile of [false,true])test('actual forms draft save/reopen without du
   assert.equal(uploads[0].protocolo_id,protocolId);assert.equal(uploads[0].produto_id,productId);assert.equal(uploads[0].lote,'PARCIAL QA');assert.equal(uploads[0].arquivo.type,'image/png');assert(uploads[0].idempotency_key);
   assert.equal(await page.locator('#prontuario-consentimento-fotos').isChecked(),false,'private upload never changes consent');assert(calls.filter(c=>c.acao==='criar_atualizar').every(c=>!Object.hasOwn(c,'consentimentos')));assert.equal(calls.filter(c=>c.acao==='alterar_consentimento_fotografia').length,0);
   assert.deepEqual(await page.evaluate(()=>window.__draftProofs),{routine:2,critical:0});assert.deepEqual(errors,[]);
+  await page.waitForFunction(()=>!document.querySelector('#prontuario-foto-form button[type=submit]').disabled);
+  await page.locator('#prontuario-notas').fill('Complemento sintético ainda não salvo.');
+  await page.evaluate(()=>AMJShell.navigate('produtos',{focus:false}));await page.evaluate(()=>AMJShell.navigate('prontuarios',{focus:false}));
+  assert.equal(await page.locator('#prontuario-id').inputValue(),protocolId);assert.equal(await page.locator('#prontuario-notas').inputValue(),'Complemento sintético ainda não salvo.','ordinary route changes preserve the open draft');
+  await page.locator('#prontuario-cancelar-edicao').click();await page.locator('#prontuario-busca').fill('Filtro sintético sem resultados');
+  assert.equal(await page.locator('[data-prontuario-editar]').count(),0);
+  assert.equal(await page.evaluate(id=>AMJShell.openExisting({type:'protocolo',id}),protocolId),true);
+  await page.waitForFunction(id=>document.querySelector('#prontuario-id').value===id,protocolId);
+  assert.equal(await page.locator('.prontuario-produto-lote').inputValue(),'PARCIAL QA','filtered consultation opens through its authoritative ID');
+  assert.equal(await page.locator('#prontuario-busca').inputValue(),'Filtro sintético sem resultados','opening a linked record does not reset the search');
+  await page.locator('#prontuario-busca').fill('');protocolReadFailure=true;
+  await page.locator('#prontuario-notas').fill('Complemento confirmado antes da falha de leitura.');
+  const savesBeforeFailure=calls.filter(c=>c.acao==='criar_atualizar').length;
+  await page.locator('#prontuario-salvar').click();await page.waitForFunction(()=>document.querySelector('#prontuario-form-status').textContent.includes('salvo no servidor'));
+  assert.equal(calls.filter(c=>c.acao==='criar_atualizar').length,savesBeforeFailure+1);
+  assert.equal(await page.locator('#prontuario-id').inputValue(),protocolId);assert.equal(await page.locator('#prontuario-versao').inputValue(),'3');
+  assert.equal(await page.locator('[data-prontuario-editar]').count(),0,'stale clinical snapshot cannot be reopened');
+  assert(await page.locator('[data-prontuario-atualizar-pendentes]').isVisible(),'confirmed write exposes an explicit recovery action');
+  await page.locator('#prontuario-notas').fill('Próximo complemento ainda não salvo.');
+  await page.evaluate(()=>AMJShell.navigate('produtos',{focus:false}));await page.evaluate(()=>AMJShell.navigate('prontuarios',{focus:false}));
+  assert.equal(await page.locator('#prontuario-notas').inputValue(),'Próximo complemento ainda não salvo.');
+  protocolReadFailure=false;await page.locator('[data-prontuario-atualizar-pendentes]').click();await page.waitForFunction(()=>!document.querySelector('[data-prontuario-atualizar-pendentes]'));
+  assert.equal(await page.locator('#prontuario-notas').inputValue(),'Próximo complemento ainda não salvo.','list recovery preserves subsequent unsaved input');
+  assert.equal(calls.filter(c=>c.acao==='criar_atualizar').length,savesBeforeFailure+1,'list recovery never repeats the write');
+  await page.locator('#prontuario-cancelar-edicao').click();await page.locator('[data-prontuario-editar]').click();
+  assert.equal(await page.locator('#prontuario-versao').inputValue(),'3');assert.equal(await page.locator('#prontuario-notas').inputValue(),'Complemento confirmado antes da falha de leitura.');
+  assert.equal(await page.locator('.prontuario-produto-lote').inputValue(),'PARCIAL QA');
+  assert.deepEqual(errors,[]);
   await page.locator('#prontuario-editor').screenshot({path:path.join(output,(mobile?'mobile':'desktop')+'-draft.png')});
   assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+2),'page must fit the viewport');
   }catch(error){console.error('Synthetic failure diagnostics',JSON.stringify({photoStatus:await page.locator('#prontuario-foto-status').textContent(),uploadCalls:calls.filter(c=>c.acao==='adicionar_foto'),errors}));throw error;}finally{await context.close();}

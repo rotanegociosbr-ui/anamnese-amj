@@ -12,6 +12,8 @@
     loaded: false,
     loading: false,
     catalogs: { formas_pagamento: [], fornecedores: [], marcas: [], produtos: [] },
+    catalogRevision: 0,
+    registryEditorRevisions: { cliente: 0, produto: 0, marca: 0, fornecedor: 0 },
     costs: [],
     inventory: [],
     pendingStock: [],
@@ -431,6 +433,20 @@
     const labels = { tipo: 'tipo', unidade: 'unidade', apresentacao: 'apresentação' };
     const fields = Array.isArray(item.pendencias) ? item.pendencias : ['tipo', 'unidade', 'apresentacao'].filter(function (key) { return !item[key]; });
     return fields.map(function (key) { return labels[key] || key; });
+  }
+
+  function rememberSavedProduct(item) {
+    // Only the acknowledged server record enters the catalog; no optimistic
+    // product/defaults, and incomplete drafts remain outside operation selectors.
+    ['produtos', 'produtos_rascunho'].forEach(function (key) {
+      state.catalogs[key] = (state.catalogs[key] || []).filter(function (row) {
+        return String(row.id) !== String(item.id);
+      });
+    });
+    state.catalogs[isProductDraft(item) ? 'produtos_rascunho' : 'produtos'].push(item);
+    state.catalogRevision += 1;
+    populateCatalogs();
+    renderRegistries();
   }
 
   function populateCatalogs() {
@@ -1177,7 +1193,9 @@
   }
 
   async function load(options) {
-    if (state.loading || !ownerAccess()) return;
+    if (state.loading || !ownerAccess()) return false;
+    const generation = state.generation;
+    const catalogRevision = state.catalogRevision;
     state.loading = true;
     status('financeiro-status', options && options.silent ? '' : 'Atualizando dados financeiros…', false);
     byId('financeiro-lista').setAttribute('aria-busy', 'true');
@@ -1193,8 +1211,12 @@
           por_pagina: 100
         })
       ]);
+      if (generation !== state.generation || !ownerAccess()) throw staleSessionError();
       renderSummary(results[0]);
-      state.catalogs = Object.assign(state.catalogs, results[1] || {});
+      // A refresh begun before a successful product save must not restore its
+      // old version or remove the newly acknowledged draft from the registry.
+      const catalogCurrent = catalogRevision === state.catalogRevision;
+      if (catalogCurrent) state.catalogs = Object.assign(state.catalogs, results[1] || {});
       state.clients = Array.isArray(results[2].clientes) ? results[2].clientes : [];
       state.entries = Array.isArray(results[3].lancamentos) ? results[3].lancamentos : state.entries;
       state.audit = Array.isArray(results[4].auditoria) ? results[4].auditoria : [];
@@ -1209,19 +1231,24 @@
       renderAudit();
       renderDuplicateReviews();
       state.loaded = true;
-      status('financeiro-status', 'Financeiro atualizado com dados do servidor.', false);
+      status('financeiro-status', catalogCurrent ? 'Financeiro atualizado com dados do servidor.' :
+        'Produto salvo. A atualização geral começou antes da alteração; use Atualizar para conferir os demais dados.', false);
+      return catalogCurrent;
     } catch (error) {
-      if (isStaleSession(error)) return;
+      if (isStaleSession(error)) return false;
       if (error.status === 401 || error.status === 403) {
         reset();
         if (typeof acessoNegado === 'function') await acessoNegado();
-        return;
+        return false;
       }
       status('financeiro-status', error.message, true);
       byId('financeiro-lista').innerHTML = '<p class="financeiro-vazio">Não foi possível carregar o Financeiro.</p>';
+      return false;
     } finally {
-      state.loading = false;
-      byId('financeiro-lista').setAttribute('aria-busy', 'false');
+      if (generation === state.generation) {
+        state.loading = false;
+        byId('financeiro-lista').setAttribute('aria-busy', 'false');
+      }
     }
   }
 
@@ -1238,6 +1265,7 @@
     state.loaded = false;
     state.loading = false;
     state.catalogs = { formas_pagamento: [], fornecedores: [], marcas: [], produtos: [] };
+    state.catalogRevision += 1;
     state.costs = [];
     state.inventory = [];
     state.pendingStock = [];
@@ -1700,6 +1728,8 @@
   function resetClientEdit() {
     const form = byId('financeiro-form-cliente');
     if (!form) return;
+    state.registryEditorRevisions.cliente += 1;
+    setBusy(form, false);
     form.reset();
     byId('financeiro-cliente-id').value = '';
     byId('financeiro-cliente-versao').value = '';
@@ -1717,6 +1747,8 @@
   function resetCatalogEdit(type) {
     const form = byId('financeiro-form-' + type);
     if (!form) return;
+    state.registryEditorRevisions[type] = (state.registryEditorRevisions[type] || 0) + 1;
+    setBusy(form, false);
     form.reset();
     byId('financeiro-' + type + '-id').value = '';
     byId('financeiro-' + type + '-versao').value = '';
@@ -1769,12 +1801,28 @@
       return;
     }
     if (type === 'cliente' || type === 'fornecedor') {
+      const generation = state.generation;
+      const editorRevision = (state.registryEditorRevisions[type] || 0) + 1;
+      state.registryEditorRevisions[type] = editorRevision;
+      const form = byId('financeiro-form-' + type);
+      setBusy(form, false);
+      const fieldValues = function () {
+        return JSON.stringify(Array.from(form.querySelectorAll('input,select,textarea')).map(function (control) {
+          return [control.id, control.value, control.checked];
+        }));
+      };
+      const originalFields = fieldValues();
+      const sameEditor = function () {
+        return generation === state.generation && editorRevision === state.registryEditorRevisions[type] &&
+          originalFields === fieldValues();
+      };
       status('financeiro-status', 'Carregando os dados protegidos para edição…', false);
       try {
         const result = await call('obter_' + type, { id: id });
+        if (!sameEditor()) return;
         item = result[type] || item;
       } catch (error) {
-        status('financeiro-status', error.message, true);
+        if (sameEditor() && !isStaleSession(error)) status('financeiro-status', error.message, true);
         return;
       }
     }
@@ -1872,6 +1920,11 @@
       if (confirmation) confirmation.focus();
       return;
     }
+    const generation = state.generation;
+    let editorRevision = state.registryEditorRevisions.cliente;
+    const sameEditor = function () {
+      return generation === state.generation && editorRevision === state.registryEditorRevisions.cliente;
+    };
     setBusy(form, true);
     try {
       const candidate = state.selectedCandidate;
@@ -1903,24 +1956,33 @@
         payload.idempotency_key = intentKey('cliente');
         await call('criar_cliente', payload);
       }
+      if (!sameEditor()) return;
       clearIntent('cliente');
       resetClientEdit();
+      editorRevision = state.registryEditorRevisions.cliente;
       const successMessage = clientId ? 'Dados do cliente atualizados.' :
         'Cliente salvo e exibido em Clientes cadastrados.';
       status('financeiro-cliente-status', successMessage, false);
       await load({ silent: true });
+      if (!sameEditor()) return;
       showClientsRegistry(payload.nome, successMessage);
     } catch (error) {
-      if (!isStaleSession(error)) {
+      if (sameEditor() && !isStaleSession(error)) {
         status('financeiro-cliente-status', error.message, true);
         showExactDuplicate('financeiro-cliente-status', error);
       }
     }
-    finally { setBusy(form, false); }
+    finally { if (sameEditor()) setBusy(form, false); }
   }
 
   async function saveRegistry(form, type, payload, statusId, success) {
     if (!requireValid(form)) return;
+    const generation = state.generation;
+    const editorRevision = state.registryEditorRevisions[type];
+    const sameEditor = function () {
+      return generation === state.generation &&
+        editorRevision === state.registryEditorRevisions[type];
+    };
     setBusy(form, true);
     try {
       const id = byId('financeiro-' + type + '-id').value;
@@ -1938,22 +2000,37 @@
       } else {
         result = await call('criar_' + type, Object.assign({ idempotency_key: intentKey('criar_' + type) }, payload));
       }
-      clearIntent('criar_' + type);
+      if (generation !== state.generation || !ownerAccess()) throw staleSessionError();
+      if (sameEditor()) clearIntent('criar_' + type);
       const saved = result && result[type];
+      if (type !== 'produto' && !sameEditor()) return;
       if (type === 'produto' && saved && saved.id) {
-        byId('financeiro-produto-id').value = saved.id;
-        byId('financeiro-produto-versao').value = versionOf(saved);
+        if (sameEditor()) {
+          byId('financeiro-produto-id').value = saved.id;
+          byId('financeiro-produto-versao').value = versionOf(saved);
+        }
+        rememberSavedProduct(saved);
+        if (!sameEditor()) return;
+        byId('financeiro-produto-titulo').textContent = 'Editar produto';
+        byId('financeiro-produto-salvar').textContent = isProductDraft(saved) ? 'Salvar e continuar depois' : 'Salvar alterações';
         byId('financeiro-produto-cancelar-edicao').classList.remove('oculto');
       } else resetCatalogEdit(type);
-      status(statusId, isProductDraft(saved) ? 'Rascunho salvo. Use Continuar cadastro para completar os dados, sem criar outro produto.' : id ? 'Cadastro atualizado.' : success, false);
-      await load({ silent: true });
+      const savedMessage = isProductDraft(saved) ? 'Rascunho salvo. Use Continuar cadastro para completar os dados, sem criar outro produto.' : id ? 'Cadastro atualizado.' : success;
+      status(statusId, savedMessage, false);
+      const refreshed = await load({ silent: true });
+      if (generation !== state.generation || !ownerAccess()) throw staleSessionError();
+      if (!sameEditor()) return;
+      if (type === 'produto' && saved && saved.id && !refreshed) {
+        status(statusId, savedMessage + ' Atualização da lista pendente; o produto e seu preenchimento foram preservados. Use Atualizar para conferir.', false);
+      }
     } catch (error) {
-      if (!isStaleSession(error)) {
-        status(statusId, error.message, true);
+      if (!isStaleSession(error) && sameEditor()) {
+        const uncertain = type === 'produto' && (error.status >= 500 || error.code === 'database_unavailable' || error.name === 'TypeError');
+        status(statusId, uncertain ? 'Não foi possível confirmar o salvamento. Seu preenchimento foi preservado. Use Atualizar para conferir o cadastro antes de tentar novamente.' : error.message, true);
         showExactDuplicate(statusId, error);
       }
     }
-    finally { setBusy(form, false); }
+    finally { if (sameEditor()) setBusy(form, false); }
   }
 
   function renderCosts() {

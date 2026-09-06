@@ -48,12 +48,12 @@
     }),
     operacao: Object.freeze({
       global: 'AMJOperacaoClinica',
-      src: './operacao.js?v=20260906-4',
+      src: './operacao.js?v=20260906-5',
       root: 'operacao-clinica-root'
     }),
     acompanhamentos: Object.freeze({
       global: 'AMJAcompanhamentos',
-      src: './acompanhamentos.js?v=20260906-4',
+      src: './acompanhamentos.js?v=20260906-5',
       css: './acompanhamentos.css?v=20260826-1',
       root: 'acompanhamentos-root'
     }),
@@ -359,9 +359,11 @@
         script.src = config.src;
         script.async = true;
         script.onload = function () {
-          const api = window[config.global];
-          if (!api) { reject(new Error('O módulo foi carregado, mas não iniciou.')); return; }
-          resolve(prepare(api));
+          try {
+            const api = window[config.global];
+            if (!api) { reject(new Error('O módulo foi carregado, mas não iniciou.')); return; }
+            resolve(prepare(api));
+          } catch (error) { reject(error); }
         };
         script.onerror = function () { reject(new Error('Não foi possível carregar esta área agora.')); };
         document.head.appendChild(script);
@@ -510,37 +512,59 @@
     const key = type + ':' + id;
     if (state.openingExisting.has(key)) return false;
     state.openingExisting.add(key);
+    let expectedRoute = null;
+    let epoch = null;
+    const isCurrent = function () {
+      return epoch === state.navigationEpoch && state.authenticated &&
+        state.currentRoute === expectedRoute && routeAllowed(ROUTES[expectedRoute]);
+    };
+    const navigateToRecord = async function (routeName) {
+      expectedRoute = routeName;
+      const navigation = navigate(routeName, { source: 'open-existing', focus: false });
+      epoch = state.navigationEpoch;
+      return await navigation && isCurrent();
+    };
     try {
       if (['cliente', 'fornecedor', 'marca', 'produto'].includes(type)) {
         const registryRoute = { cliente: 'clientes', fornecedor: 'fornecedores', marca: 'marcas', produto: 'produtos' }[type];
-        if (!await navigate(registryRoute, { source: 'open-existing', focus: false })) return false;
+        if (!await navigateToRecord(registryRoute)) return false;
         if (window.AMJFinanceiro && typeof window.AMJFinanceiro.abrirCadastro === 'function') {
-          await window.AMJFinanceiro.abrirCadastro(type, id);
-          return true;
+          const opened = await window.AMJFinanceiro.abrirCadastro(type, id);
+          return opened !== false && isCurrent();
         }
         const selector = '[data-financeiro-editar="' + CSS.escape(type) + '"][data-financeiro-id="' + CSS.escape(id) + '"]';
         const button = await waitForElement(selector, 5000);
+        if (!isCurrent()) return false;
         if (button) { button.click(); return true; }
       } else if (type === 'lead') {
-        if (!await navigate('crm', { source: 'open-existing', focus: false })) return false;
+        if (!await navigateToRecord('crm')) return false;
         if (window.AMJCRMLeads && typeof window.AMJCRMLeads.abrirLead === 'function') {
-          await window.AMJCRMLeads.abrirLead(id);
-          return true;
+          const opened = await window.AMJCRMLeads.abrirLead(id);
+          return opened !== false && isCurrent();
         }
       } else if (['atendimento', 'procedimento'].includes(type)) {
-        if (!await navigate('procedimentos', { source: 'open-existing', focus: false })) return false;
+        if (!await navigateToRecord('procedimentos')) return false;
         if (window.AMJOperacaoClinica && typeof window.AMJOperacaoClinica.abrirAtendimento === 'function') {
-          await window.AMJOperacaoClinica.abrirAtendimento(id);
-          return true;
+          const opened = await window.AMJOperacaoClinica.abrirAtendimento(id);
+          return opened !== false && isCurrent();
         }
         const button = await waitForElement('[data-atendimento-editar="' + CSS.escape(id) + '"]', 5000);
+        if (!isCurrent()) return false;
         if (button) { button.click(); return true; }
       } else if (['prontuario', 'protocolo'].includes(type)) {
-        if (!await navigate('prontuarios', { source: 'open-existing', focus: false })) return false;
+        if (!await navigateToRecord('prontuarios')) return false;
+        if (window.AMJProntuario && typeof window.AMJProntuario.abrirProtocolo === 'function') {
+          const opened = await window.AMJProntuario.abrirProtocolo(id);
+          return opened !== false && isCurrent();
+        }
         const button = await waitForElement('[data-prontuario-editar="' + CSS.escape(id) + '"]', 5000);
+        if (!isCurrent()) return false;
         if (button) { button.click(); return true; }
       }
-      setRouteStatus('O registro existente foi localizado, mas não pôde ser aberto nesta tela. Atualize e tente novamente.');
+      if (isCurrent()) setRouteStatus('O registro existente foi localizado, mas não pôde ser aberto nesta tela. Atualize e tente novamente.');
+      return false;
+    } catch (error) {
+      if (isCurrent()) setRouteStatus(error && error.message ? error.message : 'Não foi possível abrir o registro agora. Tente novamente.');
       return false;
     } finally {
       state.openingExisting.delete(key);

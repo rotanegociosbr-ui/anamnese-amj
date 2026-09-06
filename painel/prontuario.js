@@ -5,7 +5,7 @@
   const FINANCE_API = 'https://rjxtxoqprnumouqakxbc.supabase.co/functions/v1/financeiro-fichas';
   const state = { loaded: false, loading: false, patients: [], brands: [], products: [], inventory: [], protocols: [], generation: 0,
     pendingPatientId: null, pendingProtocolId: null, originalProductsSignature: null, editorGeneration: 0,
-    photosByProtocol: new Map(), openProtocolIds: new Set() };
+    photosByProtocol: new Map(), openProtocolIds: new Set(), protocolRevision: 0, pendingProtocolVersions: new Map() };
   const DATE = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeZone: 'America/Sao_Paulo' });
   const NUMBER = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 4 });
   const PHOTO_PHASE_LABELS = { before: 'Antes', during: 'Durante', after: 'Depois',
@@ -152,9 +152,11 @@
 
   async function jsonRequest(url, action, payload, proof) {
     const generation = state.generation;
+    const headers = await cabecalhosAcesso(true, proof);
+    if (generation !== state.generation) throw new Error('Sessão do prontuário encerrada.');
     const response = await fetch(url, {
       method: 'POST',
-      headers: await cabecalhosAcesso(true, proof),
+      headers: headers,
       cache: 'no-store',
       referrerPolicy: 'no-referrer',
       body: JSON.stringify(Object.assign({ acao: action }, payload || {}))
@@ -255,6 +257,23 @@
   function currentProtocol() {
     const protocolId = byId('prontuario-id') ? byId('prontuario-id').value : '';
     return state.protocols.find(function (item) { return String(item.id) === String(protocolId); }) || null;
+  }
+  function protocolNeedsRefresh(id) { return state.pendingProtocolVersions.has(String(id || '')); }
+  function refreshRequiredMessage() {
+    return 'Rascunho salvo no servidor. A lista ainda precisa ser atualizada; o formulário aberto será preservado. Use Atualizar consultas antes de reabrir, salvar novamente ou anexar fotos. Não é necessário criar outra consulta.';
+  }
+  function requireFreshProtocol(id, statusId) {
+    if (!protocolNeedsRefresh(id)) return true;
+    status(statusId || 'prontuario-status', refreshRequiredMessage(), true);
+    return false;
+  }
+  function rememberProtocolAcknowledgement(id, version) {
+    // The draft endpoint returns an ID/version, not normalized clinical data.
+    // Withhold the old snapshot until an authoritative read reaches this version.
+    const key = String(id || '');
+    state.pendingProtocolVersions.set(key, Math.max(Number(version) || 0, state.pendingProtocolVersions.get(key) || 0));
+    state.protocolRevision += 1;
+    render();
   }
   function populatePhotoProductOptions() {
     const select = byId('prontuario-foto-produto');
@@ -752,19 +771,21 @@
       }).join(' ');
       const text = normalize([(item.paciente && item.paciente.nome) || '', procedureLabel(item.procedure_kind),
         item.complaint, productText].join(' '));
-      return (showArchived || !isArchived(item)) && text.includes(query);
+      return !protocolNeedsRefresh(item.id) && (showArchived || !isArchived(item)) && text.includes(query);
     });
     const groups = groupProtocols(rows);
     byId('prontuario-contagem').textContent = groups.length + (groups.length === 1 ? ' paciente' : ' pacientes') +
       ' · ' + rows.length + (rows.length === 1 ? ' consulta' : ' consultas');
-    byId('prontuario-lista').innerHTML = groups.length ? groups.map(function (group) {
+    const pendingNotice = state.pendingProtocolVersions.size ? '<div class="prontuario-vazio" role="status">' +
+      escapeHtml(refreshRequiredMessage()) + ' <button type="button" data-prontuario-atualizar-pendentes>Atualizar consultas</button></div>' : '';
+    byId('prontuario-lista').innerHTML = pendingNotice + (groups.length ? groups.map(function (group) {
       return '<section class="prontuario-paciente-grupo" aria-label="Paciente ' + escapeHtml(group.name) + '">' +
         '<div class="prontuario-paciente-topo"><div><span>Paciente</span><h4>' + escapeHtml(group.name) + '</h4></div><strong>' +
         group.consultations.length + (group.consultations.length === 1 ? ' consulta' : ' consultas') + '</strong></div>' +
         '<div class="prontuario-consultas">' + group.consultations.map(function (item) {
           return renderConsultation(item, showArchived);
         }).join('') + '</div></section>';
-    }).join('') : '<p class="prontuario-vazio">Nenhuma consulta encontrada.</p>';
+    }).join('') : (pendingNotice ? '' : '<p class="prontuario-vazio">Nenhuma consulta encontrada.</p>'));
   }
 
   function focusConsultationSummary(protocolId) {
@@ -891,6 +912,8 @@
 
   async function load(options) {
     if (state.loading || !ownerAccess()) return;
+    const generation = state.generation;
+    const protocolRevision = state.protocolRevision;
     const silent = Boolean(options && options.silent);
     state.loading = true;
     byId('prontuario-lista').setAttribute('aria-busy', 'true');
@@ -902,14 +925,27 @@
         jsonRequest(FINANCE_API, 'listar_estoque', { limite: 500 }),
         loadAllProtocols()
       ]);
+      if (generation !== state.generation) return false;
+      if (protocolRevision !== state.protocolRevision) {
+        status('prontuario-status', refreshRequiredMessage(), false);
+        return false;
+      }
       state.patients = Array.isArray(result[0].clientes) ? result[0].clientes : [];
       state.brands = Array.isArray(result[1].marcas) ? result[1].marcas : [];
       state.products = Array.isArray(result[1].produtos) ? result[1].produtos : [];
       state.inventory = Array.isArray(result[2].estoque) ? result[2].estoque : [];
       state.protocols = Array.isArray(result[3]) ? result[3] : [];
+      state.pendingProtocolVersions.forEach(function (version, id) {
+        if (state.protocols.some(function (item) { return String(item.id) === id && expectedVersion(item) >= version; })) {
+          state.pendingProtocolVersions.delete(id);
+        }
+      });
       populateOptions();
       render();
       state.loaded = true;
+      if (!protocolNeedsRefresh(byId('prontuario-id').value) && byId('prontuario-form-status').textContent === refreshRequiredMessage()) {
+        status('prontuario-form-status', 'Lista atualizada. Os campos do formulário foram preservados; você pode continuar esta consulta.', false);
+      }
       if (!silent) status('prontuario-status', 'Prontuários atualizados com dados privados do servidor.', false);
       if (state.pendingProtocolId) {
         const protocolId = state.pendingProtocolId;
@@ -926,13 +962,19 @@
         byId('prontuario-editor').open = true;
         byId('prontuario-editor').scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
+      if (state.pendingProtocolVersions.size) {
+        status('prontuario-status', refreshRequiredMessage(), false);
+        return false;
+      }
       return true;
     } catch (error) {
-      status('prontuario-status', error.message, true);
+      if (generation === state.generation) status('prontuario-status', error.message, true);
       return false;
     } finally {
-      state.loading = false;
-      byId('prontuario-lista').setAttribute('aria-busy', 'false');
+      if (generation === state.generation) {
+        state.loading = false;
+        byId('prontuario-lista').setAttribute('aria-busy', 'false');
+      }
     }
   }
 
@@ -955,6 +997,8 @@
   }
   function resetForm() {
     state.editorGeneration += 1;
+    state.pendingProtocolId = null;
+    state.pendingPatientId = null;
     clearDuplicatePhotoChoice();
     const form = byId('prontuario-form');
     protocolIntentKeys.delete(form);
@@ -983,6 +1027,7 @@
     status('prontuario-form-status', '', false);
   }
   function beginEdit(id, options) {
+    if (!requireFreshProtocol(id)) return false;
     const item = state.protocols.find(function (row) { return String(row.id) === String(id); });
     if (!item) return;
     const completed = isCompleted(item);
@@ -1032,6 +1077,7 @@
   async function submitProtocol(event) {
     event.preventDefault();
     const form = event.currentTarget;
+    if (!requireFreshProtocol(byId('prontuario-id').value, 'prontuario-form-status')) return;
     if (isCompleted(currentProtocol())) {
       status('prontuario-form-status', 'A consulta concluída está disponível somente para leitura.', true);
       return;
@@ -1077,15 +1123,19 @@
         explicacao: consentChanged ? 'Confirme a autorização ou revogação de fotografia clínica. A decisão ficará registrada na auditoria.' : 'A complementação do rascunho ficará registrada na auditoria.',
         motivo: 'Correção ou complementação de prontuário pela gestão'
       }) : await jsonRequest(API, 'criar_atualizar', payload);
-      if (generation !== state.generation || editorGeneration !== state.editorGeneration) return;
+      if (generation !== state.generation) return;
       const savedId = result.protocolo_id || result.id || protocolId;
+      const savedVersion = result.versao || result.version || (protocolId ? Number(payload.versao_esperada) + 1 : 1);
+      rememberProtocolAcknowledgement(savedId, savedVersion);
+      if (editorGeneration !== state.editorGeneration) return;
       byId('prontuario-id').value = savedId;
-      byId('prontuario-versao').value = result.versao || result.version || (protocolId ? Number(payload.versao_esperada) + 1 : 1);
+      byId('prontuario-versao').value = savedVersion;
       if (!protocolId) confirmProtocolIntent(form, intentKey);
       const refreshed = await load({ silent: true });
       if (generation !== state.generation || editorGeneration !== state.editorGeneration) return;
       if (refreshed) beginEdit(savedId);
-      status('prontuario-form-status', 'Rascunho salvo nesta consulta. Você pode sair e usar Continuar rascunho para completar depois. Fotos e requisitos serão conferidos somente ao finalizar.', false);
+      status('prontuario-form-status', protocolNeedsRefresh(savedId) ? refreshRequiredMessage() :
+        'Rascunho salvo nesta consulta. Você pode sair e usar Continuar rascunho para completar depois. Fotos e requisitos serão conferidos somente ao finalizar.', false);
     } catch (error) {
       if (generation === state.generation && editorGeneration === state.editorGeneration) status('prontuario-form-status', error.message, true);
     } finally { if (generation === state.generation && editorGeneration === state.editorGeneration) setBusy(form, false); }
@@ -1096,6 +1146,7 @@
     const form = event.currentTarget;
     clearDuplicatePhotoChoice();
     const protocolId = byId('prontuario-id').value;
+    if (!requireFreshProtocol(protocolId, 'prontuario-foto-status')) return;
     const generation = state.generation;
     const editorGeneration = state.editorGeneration;
     function contextIsCurrent() {
@@ -1255,6 +1306,7 @@
     })[error && error.code] || (error && error.message) || 'Não foi possível finalizar a consulta.';
   }
   async function changePhotographyConsent(id, accepted) {
+    if (!requireFreshProtocol(id)) return;
     const item = state.protocols.find(function (row) { return String(row.id) === String(id); });
     if (!item || isArchived(item) || typeof accepted !== 'boolean') return;
     const editorWasOpen = byId('prontuario-id').value === String(id);
@@ -1283,6 +1335,7 @@
     }
   }
   async function finalizeProtocol(id) {
+    if (!requireFreshProtocol(id)) return;
     const item = state.protocols.find(function (row) { return String(row.id) === String(id); });
     if (!item || isArchived(item) || isCompleted(item)) return;
     const missing = protocolPending(item);
@@ -1357,6 +1410,7 @@
     if (ownerAccess() && !state.loaded) load();
   }
   function newForPatient(patientId) {
+    state.pendingProtocolId = null;
     state.pendingPatientId = patientId;
     if (typeof agendaAtivarAba === 'function') agendaAtivarAba('prontuarios', false);
     if (state.loaded) {
@@ -1369,6 +1423,7 @@
   }
   function openProtocol(protocolId) {
     if (!protocolId) return;
+    state.pendingPatientId = null;
     state.pendingProtocolId = protocolId;
     if (typeof agendaAtivarAba === 'function') agendaAtivarAba('prontuarios', false);
     // A Operação pode ter acabado de criar/finalizar este protocolo. Sempre
@@ -1384,6 +1439,8 @@
     state.products = [];
     state.inventory = [];
     state.protocols = [];
+    state.pendingProtocolVersions.clear();
+    state.protocolRevision += 1;
     state.photosByProtocol.clear();
     state.openProtocolIds.clear();
     state.pendingPatientId = null;
@@ -1424,6 +1481,7 @@
       }
     }, true);
     list.addEventListener('click', function (event) {
+      if (event.target.closest('[data-prontuario-atualizar-pendentes]')) { load(); return; }
       const facial=event.target.closest('[data-prontuario-rosto]');
       if(facial){
         const item=state.protocols.find(function(p){return p.id===facial.dataset.prontuarioRosto;});

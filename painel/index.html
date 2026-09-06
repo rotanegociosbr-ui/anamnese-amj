@@ -300,6 +300,7 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
         <button class="principal" id="entrar-individual" type="submit">Entrar com segurança</button>
       </form>
       <p class="erro" id="auth-login-erro" role="alert" aria-live="assertive"></p>
+      <button class="secundario" id="auth-retomar" type="button" hidden>Repetir verificação</button>
       <p class="auth-nota">Somente contas convidadas pela clínica podem entrar. Não existe cadastro público neste aplicativo.</p>
     </div>
 
@@ -1047,10 +1048,10 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
 <footer>Ana Maria Costa Jacob · CRF/MG 40880 · Documentos clínicos protegidos</footer>
 
 <script src="./vendor/supabase-js-2.112.3.min.js"></script>
-<script src="./auth-mfa.js?v=20260819-3"></script>
-<script src="./financeiro.js?v=20260906-4"></script>
-<script src="./prontuario.js?v=20260906-4"></script>
-<script src="./app-shell.js?v=20260906-4"></script>
+<script src="./auth-mfa.js?v=20260906-5"></script>
+<script src="./financeiro.js?v=20260906-5"></script>
+<script src="./prontuario.js?v=20260906-5"></script>
+<script src="./app-shell.js?v=20260906-5"></script>
 <script>
 const SUPABASE_URL = 'https://rjxtxoqprnumouqakxbc.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_Ip14p4tUfYFjwUYaWinMlw_Gf9v0YwT';
@@ -1072,6 +1073,9 @@ let authController = null;
 let authSession = null;
 let authEncerrando = false;
 let authInicioConcluido = false;
+let authRetomadaPendente = false;
+let authRetomadaEmCurso = false;
+let authRetomadaRevisao = 0;
 let aplicativoLiberado = false;
 let identidadeBackend = null;
 let filtroAtual = 'todos';
@@ -1705,6 +1709,67 @@ function mensagemAuth(erro, padrao) {
   return padrao;
 }
 
+function falhaTemporariaDeSessao(erro) {
+  if (!erro || !['session_error', 'aal_error'].includes(erro.code)) return false;
+  const causa = erro.cause;
+  return Boolean(causa && (causa.name === 'AuthRetryableFetchError' ||
+    Number(causa.status) === 429 || Number(causa.status) >= 500));
+}
+
+function prepararRetomadaAuth(erro) {
+  authRetomadaPendente = Boolean(authController && falhaTemporariaDeSessao(erro));
+  el('auth-retomar').hidden = !authRetomadaPendente;
+  if (authRetomadaPendente) {
+    el('auth-login-erro').textContent = 'A conexão interrompeu a verificação. Tente novamente sem informar a senha.';
+  }
+}
+
+function cancelarRetomadaAuth() {
+  authRetomadaRevisao += 1;
+  authRetomadaPendente = false;
+  el('auth-retomar').hidden = true;
+}
+
+async function repetirVerificacaoAuth() {
+  if (!authRetomadaPendente || authRetomadaEmCurso || !authController || authEncerrando) return;
+  const revisao = authRetomadaRevisao;
+  const aindaAtual = () => revisao === authRetomadaRevisao && !authEncerrando;
+  const botao = el('auth-retomar');
+  authRetomadaEmCurso = true;
+  botao.disabled = true;
+  botao.textContent = 'Verificando…';
+  el('entrar-individual').disabled = true;
+  el('auth-login-erro').textContent = '';
+  try {
+    const session = await authController.getSession();
+    if (!aindaAtual()) return;
+    if (!session || !session.access_token) {
+      cancelarRetomadaAuth();
+      el('auth-login-erro').textContent = 'Sua sessão expirou. Entre novamente.';
+      return;
+    }
+    const tinhaRelogio = Boolean(Number(sessionStorage.getItem('amj_login_em'))) &&
+      Boolean(Number(sessionStorage.getItem('amj_atividade_em')));
+    if (tinhaRelogio && !sessaoAindaValida()) {
+      await sair('Sua sessão expirou por segurança. Entre novamente.');
+      return;
+    }
+    // Reuse the existing session; the original MFA and backend authorization still run.
+    await processarEtapaAuth(session, true, aindaAtual);
+    if (aindaAtual()) cancelarRetomadaAuth();
+  } catch (erro) {
+    if (!aindaAtual()) return;
+    el('auth-login-erro').textContent = mensagemAuth(erro, 'Não foi possível verificar a sessão.');
+    prepararRetomadaAuth(erro);
+  } finally {
+    authRetomadaEmCurso = false;
+    botao.disabled = false;
+    botao.textContent = 'Repetir verificação';
+    el('entrar-individual').disabled = false;
+  }
+}
+el('auth-retomar').addEventListener('click', repetirVerificacaoAuth);
+
 function limparEstadoAplicativo() {
   aplicativoLiberado = false;
   if (cancelarConfirmacaoAdmin) cancelarConfirmacaoAdmin();
@@ -1728,6 +1793,7 @@ function limparEstadoAplicativo() {
 }
 
 function finalizarSaidaInterface(msg) {
+  cancelarRetomadaAuth();
   limparEstadoAplicativo();
   authSession = null;
   modoAcesso = null;
@@ -1748,6 +1814,7 @@ function finalizarSaidaInterface(msg) {
 }
 
 async function sair(msg) {
+  cancelarRetomadaAuth();
   modoAcesso = null;
   if (authController && !authEncerrando) {
     authEncerrando = true;
@@ -1755,6 +1822,7 @@ async function sair(msg) {
       await authController.signOut();
     } catch (erro) {
       console.warn('A sessão local já não estava disponível para encerramento.');
+      msg = 'Acesso fechado neste aparelho; não foi possível confirmar o encerramento no servidor.';
     } finally {
       authEncerrando = false;
     }
@@ -1866,13 +1934,15 @@ async function prepararCadastroMfa(session) {
   }
 }
 
-async function processarEtapaAuth(session, restaurando) {
+async function processarEtapaAuth(session, restaurando, aindaAtual) {
+  if (aindaAtual && !aindaAtual()) return;
   authSession = session;
   modoAcesso = 'auth';
   aplicativoLiberado = false;
   sessionStorage.setItem('amj_modo_acesso', 'auth');
   iniciarRelogioSessao(restaurando);
   const proxima = await authController.getNextStep();
+  if (aindaAtual && !aindaAtual()) return;
   if (proxima.step === 'password') {
     mostrarTelaAutenticacao('tela-convite');
     el('convite-identidade').textContent = session.user && session.user.email || 'Conta convidada';
@@ -1898,8 +1968,10 @@ async function processarEtapaAuth(session, restaurando) {
 
 el('form-login-individual').addEventListener('submit', async evento => {
   evento.preventDefault();
+  if (authRetomadaEmCurso) return;
   const form = evento.currentTarget;
   if (!form.reportValidity()) return;
+  cancelarRetomadaAuth();
   const botao = el('entrar-individual');
   botao.disabled = true; botao.textContent = 'Verificando…';
   el('auth-login-erro').textContent = '';
@@ -3150,6 +3222,7 @@ el('cv-qr').addEventListener('click', () => {
   } catch (erro) {
     authInicioConcluido = true;
     el('auth-login-erro').textContent = mensagemAuth(erro, 'O login individual não pôde ser iniciado.');
+    prepararRetomadaAuth(erro);
     if (erro && (erro.code === 'client_unavailable' || erro.code === 'session_storage_unavailable')) {
       el('auth-login-erro').textContent = 'O login seguro não está disponível neste aparelho. Atualize o navegador e tente novamente.';
     }

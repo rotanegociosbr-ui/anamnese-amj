@@ -339,7 +339,7 @@ function staticAndAccessibilityTests() {
   assert(referrerPolicyPosition < firstResourcePosition,
     'A Referrer-Policy deve aparecer antes de qualquer recurso carregado.');
   assert(html.includes('./vendor/supabase-js-2.112.3.min.js'));
-  assert(html.includes('./auth-mfa.js?v=20260819-3'));
+  assert(html.includes('./auth-mfa.js?v=20260906-5'));
   assert(html.indexOf('./vendor/supabase-js-2.112.3.min.js') < html.indexOf('./auth-mfa.js'));
   assert(!authSource.includes('localStorage'));
   assert(!html.includes('localStorage'));

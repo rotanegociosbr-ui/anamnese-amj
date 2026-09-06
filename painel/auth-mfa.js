@@ -3,6 +3,7 @@
 
   const CLIENT_VERSION = '2.112.3';
   const AUTH_STORAGE_KEY = 'amj-auth-v1';
+  const LOCAL_SIGNOUT_KEY = 'amj_auth_local_signed_out';
   const PASSWORD_REQUIRED_KEY = 'amj_auth_requires_password';
   const PENDING_FACTOR_KEY = 'amj_auth_pending_factor';
   const SUPPORTED_LINK_TYPES = new Set(['invite', 'recovery']);
@@ -111,8 +112,28 @@
       throw authError('invalid_configuration', 'A configuração pública de autenticação está incompleta.');
     }
 
-    const sessionStorageAdapter = createSessionStorageAdapter(storage);
+    let locallySignedOut = false;
+    let signOutInFlight = false;
+    let signInInFlight = false;
+    let sessionRevision = 0;
+    const storageAdapter = createSessionStorageAdapter(storage);
+    const sessionStorageAdapter = {
+      getItem: key => storageAdapter.getItem(key),
+      removeItem: key => storageAdapter.removeItem(key),
+      setItem(key, value) {
+        // A delayed refresh must not restore the session after an explicit exit.
+        if (locallySignedOut && (key === AUTH_STORAGE_KEY || String(key).startsWith(AUTH_STORAGE_KEY + '-'))) return;
+        storageAdapter.setItem(key, value);
+      }
+    };
     const initialLink = readAuthLink(windowLike.location || {});
+    const explicitAuthLink = initialLink.requiresPassword ||
+      Boolean(initialLink.tokenHash && SUPPORTED_LINK_TYPES.has(initialLink.type));
+    if (explicitAuthLink) storageAdapter.removeItem(LOCAL_SIGNOUT_KEY);
+    locallySignedOut = storageAdapter.getItem(LOCAL_SIGNOUT_KEY) === '1';
+    if (locallySignedOut) {
+      [AUTH_STORAGE_KEY, AUTH_STORAGE_KEY + '-user', AUTH_STORAGE_KEY + '-code-verifier'].forEach(key => storageAdapter.removeItem(key));
+    }
     if (initialLink.requiresPassword) {
       sessionStorageAdapter.setItem(PASSWORD_REQUIRED_KEY, '1');
     }
@@ -134,6 +155,7 @@
 
     let enrollment = null;
     const authListener = client.auth.onAuthStateChange(function (event, session) {
+      if (locallySignedOut && session) return;
       onAuthEvent(event, session || null);
     });
 
@@ -159,6 +181,9 @@
     }
 
     async function initialize() {
+      if (locallySignedOut) return { session: null, linkType: '', requiresPassword: false };
+      const revision = sessionRevision;
+      const cancelled = () => locallySignedOut || revision !== sessionRevision;
       if (initialLink.linkError) {
         clearPasswordRequirement();
         cleanAuthUrl(windowLike);
@@ -169,6 +194,7 @@
           token_hash: initialLink.tokenHash,
           type: initialLink.type
         });
+        if (cancelled()) return { session: null, linkType: '', requiresPassword: false };
         if (verified.error) {
           clearPasswordRequirement();
           cleanAuthUrl(windowLike);
@@ -177,6 +203,7 @@
       }
 
       const result = await client.auth.getSession();
+      if (cancelled()) return { session: null, linkType: '', requiresPassword: false };
       if (result.error) {
         throw authError('session_error', 'Não foi possível validar a sessão individual.', result.error);
       }
@@ -198,14 +225,30 @@
       if (!normalizedEmail || !String(password || '')) {
         throw authError('missing_credentials', 'Informe o e-mail e a senha.');
       }
-      const result = await client.auth.signInWithPassword({
-        email: normalizedEmail,
-        password: String(password)
-      });
-      if (result.error || !result.data || !result.data.session) {
-        throw authError('invalid_credentials', 'E-mail ou senha não conferem.', result.error);
+      if (signOutInFlight) throw authError('signout_pending', 'Aguarde o encerramento da sessão anterior.');
+      // The SDK persists a login response before returning it. Keep a canceled
+      // request single-flight so it cannot overwrite a newer explicit login.
+      if (signInInFlight) throw authError('signin_pending', 'Aguarde a verificação de acesso anterior terminar.');
+      signInInFlight = true;
+      try {
+        locallySignedOut = false;
+        storageAdapter.removeItem(LOCAL_SIGNOUT_KEY);
+        sessionRevision += 1;
+        const revision = sessionRevision;
+        const result = await client.auth.signInWithPassword({
+          email: normalizedEmail,
+          password: String(password)
+        });
+        if (locallySignedOut || revision !== sessionRevision) {
+          throw authError('session_cancelled', 'Este acesso foi cancelado. Entre novamente para continuar.');
+        }
+        if (result.error || !result.data || !result.data.session) {
+          throw authError('invalid_credentials', 'E-mail ou senha não conferem.', result.error);
+        }
+        return result.data.session;
+      } finally {
+        signInInFlight = false;
       }
-      return result.data.session;
     }
 
     async function updatePassword(password) {
@@ -222,7 +265,10 @@
     }
 
     async function getSession() {
+      if (locallySignedOut) return null;
+      const revision = sessionRevision;
       const result = await client.auth.getSession();
+      if (locallySignedOut || revision !== sessionRevision) return null;
       if (result.error) {
         throw authError('session_error', 'Não foi possível validar a sessão individual.', result.error);
       }
@@ -230,11 +276,13 @@
     }
 
     async function getNextStep() {
+      const revision = sessionRevision;
       const session = await getSession();
-      if (!session) return { step: 'login', session: null };
+      if (!session || locallySignedOut || revision !== sessionRevision) return { step: 'login', session: null };
       if (requiresPassword()) return { step: 'password', session };
 
       const result = await client.auth.mfa.getAuthenticatorAssuranceLevel();
+      if (locallySignedOut || revision !== sessionRevision) return { step: 'login', session: null };
       if (result.error) {
         throw authError('aal_error', 'Não foi possível conferir a proteção em duas etapas.', result.error);
       }
@@ -370,12 +418,25 @@
     }
 
     async function signOut() {
+      locallySignedOut = true;
+      signOutInFlight = true;
+      sessionRevision += 1;
+      // Survives a reload while the network-side sign-out is still pending.
+      storageAdapter.setItem(LOCAL_SIGNOUT_KEY, '1');
       enrollment = null;
       clearPendingFactor();
       clearPasswordRequirement();
-      const result = await client.auth.signOut({ scope: 'local' });
-      if (result && result.error) {
-        throw authError('signout_failed', 'Não foi possível encerrar a sessão completamente.', result.error);
+      try {
+        // Preserve SDK access to the current session while it tries server revocation.
+        const result = await client.auth.signOut({ scope: 'local' });
+        if (result && result.error) {
+          throw authError('signout_failed', 'Acesso fechado neste aparelho; não foi possível confirmar o encerramento no servidor.', result.error);
+        }
+      } finally {
+        // The SDK can return before clearing storage when token refresh is offline.
+        // Always close the local session; writes from late refreshes remain blocked.
+        [AUTH_STORAGE_KEY, AUTH_STORAGE_KEY + '-user', AUTH_STORAGE_KEY + '-code-verifier'].forEach(key => storageAdapter.removeItem(key));
+        signOutInFlight = false;
       }
     }
 
