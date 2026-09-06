@@ -30,8 +30,8 @@
   const MODULES = Object.freeze({
     rosto3d: Object.freeze({
       global: 'AMJRosto3D',
-      src: './rosto3d.js?v=20260906-1',
-      css: './rosto3d.css?v=20260906-1',
+      src: './rosto3d.js?v=20260906-2',
+      css: './rosto3d.css?v=20260906-2',
       root: 'rosto3d-root'
     }),
     crm: Object.freeze({

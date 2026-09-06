@@ -1,0 +1,2038 @@
+{
+  "modelVersion": "zanatomy-neurovascular-20260906-v1",
+  "sourceCommit": "4ef7d59f4a2cc002f65ebd2bbb395ae4df3a5faf",
+  "normalization": {
+    "sourceWorldCenter": [
+      0.00000476837158203125,
+      158.6170196533203,
+      2.477994203567505
+    ],
+    "uniformScale": 0.15877617415983108,
+    "matrix": [
+      0.15877617415983108,
+      0,
+      0,
+      0,
+      0,
+      0.15877617415983108,
+      0,
+      0,
+      0,
+      0,
+      0.15877617415983108,
+      0,
+      -7.57103796767383e-7,
+      -25.184603537188934,
+      -0.3934464392326861,
+      1
+    ],
+    "targetHeight": 2.8
+  },
+  "license": "CC-BY-SA-4.0",
+  "attribution": [
+    "Z-Anatomy — The open source atlas of anatomy — CC BY-SA 4.0",
+    "BodyParts3D — The Database Center for Life Science — CC BY-SA 2.1 Japan",
+    "Cranial Nerves and Foramina — University of Dundee, CAHID — CC BY 4.0"
+  ],
+  "sourceUrls": [
+    "https://raw.githubusercontent.com/LluisV/Z-Anatomy/4ef7d59f4a2cc002f65ebd2bbb395ae4df3a5faf/Resources/Models/FBX/CardioVascular41.fbx",
+    "https://raw.githubusercontent.com/LluisV/Z-Anatomy/4ef7d59f4a2cc002f65ebd2bbb395ae4df3a5faf/Resources/Models/FBX/NervousSystem100.fbx"
+  ],
+  "clinicalValidation": false,
+  "patientSpecific": false,
+  "transformations": [
+    "Exact-name selection from existing source objects",
+    "Original world matrices baked",
+    "Single shared normalization, same as skin/skull/muscles of atlas",
+    "Mirrored winding corrected",
+    "Exact Float32 deduplication only, no smoothing or retopology"
+  ],
+  "limitations": [
+    "Generic atlas, not a patient-specific vascular or nerve map",
+    "Named branch sets may be combined in one source object, notably facial nerve",
+    "Names translated for review, not clinical validation",
+    "Not all arteries or nerves of face represented",
+    "No vessel thickness, distance, depth or safe-injection-zone inference",
+    "Excluded inner-ear, kidney, brain nuclei and all unlisted objects; no invented branches"
+  ],
+  "objects": [
+    {
+      "id": "zanatomy-111818568",
+      "sourceName": "Superficial_temporal_arteryr",
+      "sourceObjectId": 111818568,
+      "layer": "arteries",
+      "side": "right",
+      "labelPt": "Artéria temporal superficial — lado direito",
+      "sourceFile": "CardioVascular41.fbx",
+      "sourceSha256": "ed7d049117cc944a8c47a416b16ade642cbd1392bbcce3c677450d3234dbf680",
+      "sourceWorldMatrix": [
+        -100.00000149011615,
+        0,
+        0,
+        0,
+        0,
+        0.000005886097140104801,
+        -99.99999940395253,
+        0,
+        0,
+        99.99999940395253,
+        0.000005886097140104801,
+        0,
+        -6.625635781141422,
+        163.3817083756047,
+        -1.045112597819417,
+        1
+      ],
+      "mirroredWindingReversed": true,
+      "vertices": 5519,
+      "triangles": 10744,
+      "bounds": {
+        "min": [
+          -1.1820639371871948,
+          -0.42482849955558777,
+          -1.2955918312072754
+        ],
+        "max": [
+          -0.6538364291191101,
+          1.5695403814315796,
+          0.4722002148628235
+        ]
+      }
+    },
+    {
+      "id": "zanatomy-193215357",
+      "sourceName": "Frontal_branch_of_superficial_temporal_arteryr",
+      "sourceObjectId": 193215357,
+      "layer": "arteries",
+      "side": "right",
+      "labelPt": "Ramo frontal da artéria temporal superficial — lado direito",
+      "sourceFile": "CardioVascular41.fbx",
+      "sourceSha256": "ed7d049117cc944a8c47a416b16ade642cbd1392bbcce3c677450d3234dbf680",
+      "sourceWorldMatrix": [
+        -100.00000149011615,
+        0,
+        0,
+        0,
+        0,
+        -0.0000028561804651346685,
+        -99.99999940395266,
+        0,
+        0,
+        99.99999940395266,
+        -0.0000028561804651346685,
+        0,
+        -4.056809663494338,
+        163.91474031487132,
+        7.022263552052108,
+        1
+      ],
+      "mirroredWindingReversed": true,
+      "vertices": 956,
+      "triangles": 1888,
+      "bounds": {
+        "min": [
+          -0.9198712706565857,
+          0.5761862993240356,
+          0.2877020537853241
+        ],
+        "max": [
+          -0.39170733094215393,
+          0.9718959331512451,
+          0.9603584408760071
+        ]
+      }
+    },
+    {
+      "id": "zanatomy-514623023",
+      "sourceName": "Transverse_facial_arteryr",
+      "sourceObjectId": 514623023,
+      "layer": "arteries",
+      "side": "right",
+      "labelPt": "Artéria transversa da face — lado direito",
+      "sourceFile": "CardioVascular41.fbx",
+      "sourceSha256": "ed7d049117cc944a8c47a416b16ade642cbd1392bbcce3c677450d3234dbf680",
+      "sourceWorldMatrix": [
+        -100.00000149011615,
+        0,
+        0,
+        0,
+        0,
+        0.000005886095719019338,
+        -99.99999940395251,
+        0,
+        0,
+        99.99999940395251,
+        0.000005886095719019338,
+        0,
+        -4.639178716595417,
+        156.80720845359383,
+        4.970958865164709,
+        1
+      ],
+      "mirroredWindingReversed": true,
+      "vertices": 838,
+      "triangles": 1652,
+      "bounds": {
+        "min": [
+          -1.0369346141815186,
+          -0.4029996991157532,
+          -0.3724600374698639
+        ],
+        "max": [
+          -0.33191707730293274,
+          -0.09036064147949219,
+          0.7886607050895691
+        ]
+      }
+    },
+    {
+      "id": "zanatomy-801788998",
+      "sourceName": "Facial_arteryr",
+      "sourceObjectId": 801788998,
+      "layer": "arteries",
+      "side": "right",
+      "labelPt": "Artéria facial — lado direito",
+      "sourceFile": "CardioVascular41.fbx",
+      "sourceSha256": "ed7d049117cc944a8c47a416b16ade642cbd1392bbcce3c677450d3234dbf680",
+      "sourceWorldMatrix": [
+        -100.00000149011615,
+        0,
+        0,
+        0,
+        0,
+        0.000005886097140104801,
+        -99.99999940395253,
+        0,
+        0,
+        99.99999940395253,
+        0.000005886097140104801,
+        0,
+        -3.5420337686918892,
+        152.43650720539875,
+        4.312249055962871,
+        1
+      ],
+      "mirroredWindingReversed": true,
+      "vertices": 543,
+      "triangles": 1062,
+      "bounds": {
+        "min": [
+          -0.6447188258171082,
+          -1.233548641204834,
+          -0.3275996148586273
+        ],
+        "max": [
+          -0.4601491093635559,
+          -0.5194507241249084,
+          0.7123004198074341
+        ]
+      }
+    },
+    {
+      "id": "zanatomy-231715400",
+      "sourceName": "Superior_labial_arteryr",
+      "sourceObjectId": 231715400,
+      "layer": "arteries",
+      "side": "right",
+      "labelPt": "Artéria labial superior — lado direito",
+      "sourceFile": "CardioVascular41.fbx",
+      "sourceSha256": "ed7d049117cc944a8c47a416b16ade642cbd1392bbcce3c677450d3234dbf680",
+      "sourceWorldMatrix": [
+        -100.00000149011615,
+        0,
+        0,
+        0,
+        0,
+        0.000005886097140104801,
+        -99.99999940395251,
+        0,
+        0,
+        99.99999940395251,
+        0.000005886097140104801,
+        0,
+        -1.836403247131719,
+        154.31294462075124,
+        8.347096535994144,
+        1
+      ],
+      "mirroredWindingReversed": true,
+      "vertices": 248,
+      "triangles": 472,
+      "bounds": {
+        "min": [
+          -0.5353139042854309,
+          -0.6965330839157104,
+          0.6383971571922302
+        ],
+        "max": [
+          -0.18692976236343384,
+          -0.6670023798942566,
+          1.0103799104690552
+        ]
+      }
+    },
+    {
+      "id": "zanatomy-334387677",
+      "sourceName": "Submental_arteryr",
+      "sourceObjectId": 334387677,
+      "layer": "arteries",
+      "side": "right",
+      "labelPt": "Artéria submentual — lado direito",
+      "sourceFile": "CardioVascular41.fbx",
+      "sourceSha256": "ed7d049117cc944a8c47a416b16ade642cbd1392bbcce3c677450d3234dbf680",
+      "sourceWorldMatrix": [
+        -100.00000149011615,
+        0,
+        0,
+        0,
+        0,
+        0.000005886097140104801,
+        -99.99999940395251,
+        0,
+        0,
+        99.99999940395251,
+        0.000005886097140104801,
+        0,
+        -1.859411571680445,
+        150.37417447186732,
+        6.2773280068979,
+        1
+      ],
+      "mirroredWindingReversed": true,
+      "vertices": 920,
+      "triangles": 1770,
+      "bounds": {
+        "min": [
+          -0.513488233089447,
+          -1.4085328578948975,
+          0.1768471747636795
+        ],
+        "max": [
+          -0.028038255870342255,
+          -1.1705090999603271,
+          0.7596760988235474
+        ]
+      }
+    },
+    {
+      "id": "zanatomy-476415730",
+      "sourceName": "Inferior_labial_arteryr",
+      "sourceObjectId": 476415730,
+      "layer": "arteries",
+      "side": "right",
+      "labelPt": "Artéria labial inferior — lado direito",
+      "sourceFile": "CardioVascular41.fbx",
+      "sourceSha256": "ed7d049117cc944a8c47a416b16ade642cbd1392bbcce3c677450d3234dbf680",
+      "sourceWorldMatrix": [
+        100.00000149011615,
+        0,
+        0,
+        0,
+        0,
+        0.000014628375088369127,
+        -99.99999940395163,
+        0,
+        0,
+        99.99999940395163,
+        0.000014628375088369127,
+        0,
+        -2.647309177694125,
+        152.48566892755193,
+        7.515807589046794,
+        1
+      ],
+      "mirroredWindingReversed": false,
+      "vertices": 484,
+      "triangles": 944,
+      "bounds": {
+        "min": [
+          -0.5373775959014893,
+          -1.1780123710632324,
+          0.5721825361251831
+        ],
+        "max": [
+          -0.0483415313065052,
+          -0.7994749546051025,
+          0.8950002193450928
+        ]
+      }
+    },
+    {
+      "id": "zanatomy-605504431",
+      "sourceName": "Angular_arteryr",
+      "sourceObjectId": 605504431,
+      "layer": "arteries",
+      "side": "right",
+      "labelPt": "Artéria angular — lado direito",
+      "sourceFile": "CardioVascular41.fbx",
+      "sourceSha256": "ed7d049117cc944a8c47a416b16ade642cbd1392bbcce3c677450d3234dbf680",
+      "sourceWorldMatrix": [
+        100.00000149011615,
+        0,
+        0,
+        0,
+        0,
+        0.000014628375088369127,
+        -99.99999940395163,
+        0,
+        0,
+        99.99999940395163,
+        0.000014628375088369127,
+        0,
+        -0.943655667724808,
+        162.4628068540467,
+        8.475471263680841,
+        1
+      ],
+      "mirroredWindingReversed": false,
+      "vertices": 2503,
+      "triangles": 4841,
+      "bounds": {
+        "min": [
+          -0.48609280586242676,
+          -0.5377496480941772,
+          0.6813752055168152
+        ],
+        "max": [
+          -0.0028779651038348675,
+          1.2564361095428467,
+          1.0014755725860596
+        ]
+      }
+    },
+    {
+      "id": "zanatomy-818106180",
+      "sourceName": "Maxillary_arteryr",
+      "sourceObjectId": 818106180,
+      "layer": "arteries",
+      "side": "right",
+      "labelPt": "Artéria maxilar — lado direito",
+      "sourceFile": "CardioVascular41.fbx",
+      "sourceSha256": "ed7d049117cc944a8c47a416b16ade642cbd1392bbcce3c677450d3234dbf680",
+      "sourceWorldMatrix": [
+        -100.00000149011615,
+        0,
+        0,
+        0,
+        0,
+        0.000005886097140104801,
+        -99.99999940395253,
+        0,
+        0,
+        99.99999940395253,
+        0.000005886097140104801,
+        0,
+        -2.756494457736792,
+        156.70517723313796,
+        4.803402753113547,
+        1
+      ],
+      "mirroredWindingReversed": true,
+      "vertices": 2047,
+      "triangles": 3895,
+      "bounds": {
+        "min": [
+          -0.711134672164917,
+          -0.6332876682281494,
+          -0.3716587722301483
+        ],
+        "max": [
+          -0.40757298469543457,
+          -0.1595490276813507,
+          0.580249547958374
+        ]
+      }
+    },
+    {
+      "id": "zanatomy-121385351",
+      "sourceName": "Infra-orbital_arteryr",
+      "sourceObjectId": 121385351,
+      "layer": "arteries",
+      "side": "right",
+      "labelPt": "Artéria infraorbital — lado direito",
+      "sourceFile": "CardioVascular41.fbx",
+      "sourceSha256": "ed7d049117cc944a8c47a416b16ade642cbd1392bbcce3c677450d3234dbf680",
+      "sourceWorldMatrix": [
+        -100.00000149011615,
+        0,
+        0,
+        0,
+        0,
+        0.000005886095719019338,
+        -99.99999940395251,
+        0,
+        0,
+        99.99999940395251,
+        0.000005886095719019338,
+        0,
+        -2.67978402382585,
+        156.84852631963182,
+        6.219223172900617,
+        1
+      ],
+      "mirroredWindingReversed": true,
+      "vertices": 248,
+      "triangles": 472,
+      "bounds": {
+        "min": [
+          -0.4722171127796173,
+          -0.4253832995891571,
+          0.3294878900051117
+        ],
+        "max": [
+          -0.3716030418872833,
+          -0.167103111743927,
+          0.759401261806488
+        ]
+      }
+    },
+    {
+      "id": "zanatomy-471461507",
+      "sourceName": "Buccal_arteryr",
+      "sourceObjectId": 471461507,
+      "layer": "arteries",
+      "side": "right",
+      "labelPt": "Artéria bucal — lado direito",
+      "sourceFile": "CardioVascular41.fbx",
+      "sourceSha256": "ed7d049117cc944a8c47a416b16ade642cbd1392bbcce3c677450d3234dbf680",
+      "sourceWorldMatrix": [
+        -100.00000149011615,
+        0,
+        0,
+        0,
+        0,
+        0.000005886097140104801,
+        -99.99999940395251,
+        0,
+        0,
+        99.99999940395251,
+        0.000005886097140104801,
+        0,
+        -3.2263228617733795,
+        155.59399169995478,
+        4.6185042378395185,
+        1
+      ],
+      "mirroredWindingReversed": true,
+      "vertices": 307,
+      "triangles": 590,
+      "bounds": {
+        "min": [
+          -0.547045886516571,
+          -0.6855120658874512,
+          0.08235740661621094
+        ],
+        "max": [
+          -0.4699185788631439,
+          -0.2114342600107193,
+          0.6471341848373413
+        ]
+      }
+    },
+    {
+      "id": "zanatomy-152307383",
+      "sourceName": "Mental_branch_of_inferior_alveolar_arteryr",
+      "sourceObjectId": 152307383,
+      "layer": "arteries",
+      "side": "right",
+      "labelPt": "Ramo mentual da artéria alveolar inferior — lado direito",
+      "sourceFile": "CardioVascular41.fbx",
+      "sourceSha256": "ed7d049117cc944a8c47a416b16ade642cbd1392bbcce3c677450d3234dbf680",
+      "sourceWorldMatrix": [
+        100.00000149011615,
+        0,
+        0,
+        0,
+        0,
+        0.00001462837508836913,
+        -99.99999940395166,
+        0,
+        0,
+        99.99999940395166,
+        0.00001462837508836913,
+        0,
+        -1.2976493347014044,
+        150.81857441160747,
+        7.612056169184845,
+        1
+      ],
+      "mirroredWindingReversed": false,
+      "vertices": 260,
+      "triangles": 472,
+      "bounds": {
+        "min": [
+          -0.24223385751247406,
+          -1.228523850440979,
+          0.7831632494926453
+        ],
+        "max": [
+          -0.12992849946022034,
+          -1.1551949977874756,
+          0.8468689918518066
+        ]
+      }
+    },
+    {
+      "id": "zanatomy-745610176",
+      "sourceName": "Supratrochlear_arteryr",
+      "sourceObjectId": 745610176,
+      "layer": "arteries",
+      "side": "right",
+      "labelPt": "Artéria supratroclear — lado direito",
+      "sourceFile": "CardioVascular41.fbx",
+      "sourceSha256": "ed7d049117cc944a8c47a416b16ade642cbd1392bbcce3c677450d3234dbf680",
+      "sourceWorldMatrix": [
+        -100.00000149011615,
+        0,
+        0,
+        0,
+        0,
+        0.000005886097140104801,
+        -99.99999940395251,
+        0,
+        0,
+        99.99999940395251,
+        0.000005886097140104801,
+        0,
+        -1.3717472224871066,
+        159.89084297757708,
+        3.3615433565525477,
+        1
+      ],
+      "mirroredWindingReversed": true,
+      "vertices": 1225,
+      "triangles": 2361,
+      "bounds": {
+        "min": [
+          -0.2414676994085312,
+          0.1962824910879135,
+          0.14732566475868225
+        ],
+        "max": [
+          -0.1581074744462967,
+          0.5394818782806396,
+          0.9790043830871582
+        ]
+      }
+    },
+    {
+      "id": "zanatomy-952591919",
+      "sourceName": "Supra-orbital_arteryr",
+      "sourceObjectId": 952591919,
+      "layer": "arteries",
+      "side": "right",
+      "labelPt": "Artéria supraorbital — lado direito",
+      "sourceFile": "CardioVascular41.fbx",
+      "sourceSha256": "ed7d049117cc944a8c47a416b16ade642cbd1392bbcce3c677450d3234dbf680",
+      "sourceWorldMatrix": [
+        -100.00000149011615,
+        0,
+        0,
+        0,
+        0,
+        0.000005886097140104801,
+        -99.99999940395251,
+        0,
+        0,
+        99.99999940395251,
+        0.000005886097140104801,
+        0,
+        -2.5258254103413695,
+        161.94276839778018,
+        7.213775254925938,
+        1
+      ],
+      "mirroredWindingReversed": true,
+      "vertices": 1736,
+      "triangles": 3424,
+      "bounds": {
+        "min": [
+          -0.5717252492904663,
+          0.21795383095741272,
+          0.32465696334838867
+        ],
+        "max": [
+          -0.27072256803512573,
+          0.9441556930541992,
+          0.9803692698478699
+        ]
+      }
+    },
+    {
+      "id": "zanatomy-107533466",
+      "sourceName": "Supratrochlear_arteryl",
+      "sourceObjectId": 107533466,
+      "layer": "arteries",
+      "side": "left",
+      "labelPt": "Artéria supratroclear — lado esquerdo",
+      "sourceFile": "CardioVascular41.fbx",
+      "sourceSha256": "ed7d049117cc944a8c47a416b16ade642cbd1392bbcce3c677450d3234dbf680",
+      "sourceWorldMatrix": [
+        100.00000149011613,
+        0,
+        0,
+        0,
+        0,
+        -0.0000028561808081595693,
+        -99.9999994039527,
+        0,
+        0,
+        99.9999994039527,
+        -0.0000028561808081595693,
+        0,
+        1.3717463364771827,
+        159.89084334433977,
+        3.361542839756469,
+        1
+      ],
+      "mirroredWindingReversed": false,
+      "vertices": 1225,
+      "triangles": 2361,
+      "bounds": {
+        "min": [
+          0.15810582041740417,
+          0.1962824910879135,
+          0.14732559025287628
+        ],
+        "max": [
+          0.24146603047847748,
+          0.5394818782806396,
+          0.9790042042732239
+        ]
+      }
+    },
+    {
+      "id": "zanatomy-622936493",
+      "sourceName": "Supra-orbital_arteryl",
+      "sourceObjectId": 622936493,
+      "layer": "arteries",
+      "side": "left",
+      "labelPt": "Artéria supraorbital — lado esquerdo",
+      "sourceFile": "CardioVascular41.fbx",
+      "sourceSha256": "ed7d049117cc944a8c47a416b16ade642cbd1392bbcce3c677450d3234dbf680",
+      "sourceWorldMatrix": [
+        100.00000149011613,
+        0,
+        0,
+        0,
+        0,
+        -0.0000028561808081595693,
+        -99.9999994039527,
+        0,
+        0,
+        99.9999994039527,
+        -0.0000028561808081595693,
+        0,
+        2.5258245243314454,
+        161.9427691013157,
+        7.213774558744822,
+        1
+      ],
+      "mirroredWindingReversed": false,
+      "vertices": 1736,
+      "triangles": 3424,
+      "bounds": {
+        "min": [
+          0.2707209289073944,
+          0.21795383095741272,
+          0.3246569037437439
+        ],
+        "max": [
+          0.5717236399650574,
+          0.9441556930541992,
+          0.9803691506385803
+        ]
+      }
+    },
+    {
+      "id": "zanatomy-35870854",
+      "sourceName": "Superficial_temporal_arteryl",
+      "sourceObjectId": 35870854,
+      "layer": "arteries",
+      "side": "left",
+      "labelPt": "Artéria temporal superficial — lado esquerdo",
+      "sourceFile": "CardioVascular41.fbx",
+      "sourceSha256": "ed7d049117cc944a8c47a416b16ade642cbd1392bbcce3c677450d3234dbf680",
+      "sourceWorldMatrix": [
+        100.00000149011615,
+        0,
+        0,
+        0,
+        0,
+        -0.00000285618080815957,
+        -99.9999994039527,
+        0,
+        0,
+        99.9999994039527,
+        -0.00000285618080815957,
+        0,
+        6.6256348951315,
+        163.38170842823078,
+        -1.0451137448111432,
+        1
+      ],
+      "mirroredWindingReversed": false,
+      "vertices": 5519,
+      "triangles": 10744,
+      "bounds": {
+        "min": [
+          0.6538347601890564,
+          -0.42482849955558777,
+          -1.2955918312072754
+        ],
+        "max": [
+          1.1820622682571411,
+          1.5695403814315796,
+          0.4722000062465668
+        ]
+      }
+    },
+    {
+      "id": "zanatomy-280700131",
+      "sourceName": "Transverse_facial_arteryl",
+      "sourceObjectId": 280700131,
+      "layer": "arteries",
+      "side": "left",
+      "labelPt": "Artéria transversa da face — lado esquerdo",
+      "sourceFile": "CardioVascular41.fbx",
+      "sourceSha256": "ed7d049117cc944a8c47a416b16ade642cbd1392bbcce3c677450d3234dbf680",
+      "sourceWorldMatrix": [
+        100.00000149011613,
+        0,
+        0,
+        0,
+        0,
+        -0.0000028561808081595693,
+        -99.9999994039527,
+        0,
+        0,
+        99.9999994039527,
+        -0.0000028561808081595693,
+        0,
+        4.639177085527422,
+        156.80719711123274,
+        4.9709582929343625,
+        1
+      ],
+      "mirroredWindingReversed": false,
+      "vertices": 838,
+      "triangles": 1652,
+      "bounds": {
+        "min": [
+          0.3319152891635895,
+          -0.4030021131038666,
+          -0.37246012687683105
+        ],
+        "max": [
+          1.0369328260421753,
+          -0.09036064147949219,
+          0.7886605858802795
+        ]
+      }
+    },
+    {
+      "id": "zanatomy-921281299",
+      "sourceName": "Frontal_branch_of_superficial_temporal_arteryl",
+      "sourceObjectId": 921281299,
+      "layer": "arteries",
+      "side": "left",
+      "labelPt": "Ramo frontal da artéria temporal superficial — lado esquerdo",
+      "sourceFile": "CardioVascular41.fbx",
+      "sourceSha256": "ed7d049117cc944a8c47a416b16ade642cbd1392bbcce3c677450d3234dbf680",
+      "sourceWorldMatrix": [
+        100.00000149011613,
+        0,
+        0,
+        0,
+        0,
+        -0.0000028561808081595693,
+        -99.9999994039527,
+        0,
+        0,
+        99.9999994039527,
+        -0.0000028561808081595693,
+        0,
+        4.056808777484414,
+        163.91474107276986,
+        7.022262358461218,
+        1
+      ],
+      "mirroredWindingReversed": false,
+      "vertices": 956,
+      "triangles": 1888,
+      "bounds": {
+        "min": [
+          0.3917056620121002,
+          0.5761862993240356,
+          0.28770190477371216
+        ],
+        "max": [
+          0.919869601726532,
+          0.9718959331512451,
+          0.9603582620620728
+        ]
+      }
+    },
+    {
+      "id": "zanatomy-638593400",
+      "sourceName": "Facial_arteryl",
+      "sourceObjectId": 638593400,
+      "layer": "arteries",
+      "side": "left",
+      "labelPt": "Artéria facial — lado esquerdo",
+      "sourceFile": "CardioVascular41.fbx",
+      "sourceSha256": "ed7d049117cc944a8c47a416b16ade642cbd1392bbcce3c677450d3234dbf680",
+      "sourceWorldMatrix": [
+        100.00000149011615,
+        0,
+        0,
+        0,
+        0,
+        -0.00000285618080815957,
+        -99.9999994039527,
+        0,
+        0,
+        99.9999994039527,
+        -0.00000285618080815957,
+        0,
+        3.5420328826819665,
+        152.4365077263803,
+        4.312248493302014,
+        1
+      ],
+      "mirroredWindingReversed": false,
+      "vertices": 543,
+      "triangles": 1062,
+      "bounds": {
+        "min": [
+          0.4601474404335022,
+          -1.233548641204834,
+          -0.3275997042655945
+        ],
+        "max": [
+          0.6447172164916992,
+          -0.5194507241249084,
+          0.7123002409934998
+        ]
+      }
+    },
+    {
+      "id": "zanatomy-61657112",
+      "sourceName": "Inferior_labial_arteryl",
+      "sourceObjectId": 61657112,
+      "layer": "arteries",
+      "side": "left",
+      "labelPt": "Artéria labial inferior — lado esquerdo",
+      "sourceFile": "CardioVascular41.fbx",
+      "sourceSha256": "ed7d049117cc944a8c47a416b16ade642cbd1392bbcce3c677450d3234dbf680",
+      "sourceWorldMatrix": [
+        -100.00000149011613,
+        0,
+        0,
+        0,
+        0,
+        0.000005886097140104802,
+        -99.99999940395257,
+        0,
+        0,
+        99.99999940395257,
+        0.000005886097140104802,
+        0,
+        2.647308291684201,
+        152.48566972859746,
+        7.515807022088071,
+        1
+      ],
+      "mirroredWindingReversed": true,
+      "vertices": 484,
+      "triangles": 944,
+      "bounds": {
+        "min": [
+          0.048339877277612686,
+          -1.1780123710632324,
+          0.5721824169158936
+        ],
+        "max": [
+          0.5373759865760803,
+          -0.7994749546051025,
+          0.8950002193450928
+        ]
+      }
+    },
+    {
+      "id": "zanatomy-473151401",
+      "sourceName": "Submental_arteryl",
+      "sourceObjectId": 473151401,
+      "layer": "arteries",
+      "side": "left",
+      "labelPt": "Artéria submentual — lado esquerdo",
+      "sourceFile": "CardioVascular41.fbx",
+      "sourceSha256": "ed7d049117cc944a8c47a416b16ade642cbd1392bbcce3c677450d3234dbf680",
+      "sourceWorldMatrix": [
+        100.00000149011613,
+        0,
+        0,
+        0,
+        0,
+        -0.0000028561808081595693,
+        -99.9999994039527,
+        0,
+        0,
+        99.9999994039527,
+        -0.0000028561808081595693,
+        0,
+        1.8594106856705215,
+        150.37417516464154,
+        6.277327624531895,
+        1
+      ],
+      "mirroredWindingReversed": false,
+      "vertices": 920,
+      "triangles": 1770,
+      "bounds": {
+        "min": [
+          0.02803659997880459,
+          -1.4085328578948975,
+          0.17684710025787354
+        ],
+        "max": [
+          0.5134866237640381,
+          -1.1705090999603271,
+          0.7596760392189026
+        ]
+      }
+    },
+    {
+      "id": "zanatomy-605712517",
+      "sourceName": "Angular_arteryl",
+      "sourceObjectId": 605712517,
+      "layer": "arteries",
+      "side": "left",
+      "labelPt": "Artéria angular — lado esquerdo",
+      "sourceFile": "CardioVascular41.fbx",
+      "sourceSha256": "ed7d049117cc944a8c47a416b16ade642cbd1392bbcce3c677450d3234dbf680",
+      "sourceWorldMatrix": [
+        -100.00000149011613,
+        0,
+        0,
+        0,
+        0,
+        0.000005886097140104802,
+        -99.99999940395257,
+        0,
+        0,
+        99.99999940395257,
+        0.000005886097140104802,
+        0,
+        0.9436547817148848,
+        162.46280773898866,
+        8.475469824492981,
+        1
+      ],
+      "mirroredWindingReversed": true,
+      "vertices": 2503,
+      "triangles": 4841,
+      "bounds": {
+        "min": [
+          0.0028763101436197758,
+          -0.5377496480941772,
+          0.6813751459121704
+        ],
+        "max": [
+          0.4860911965370178,
+          1.2564361095428467,
+          1.0014753341674805
+        ]
+      }
+    },
+    {
+      "id": "zanatomy-681622574",
+      "sourceName": "Superior_labial_arteryl",
+      "sourceObjectId": 681622574,
+      "layer": "arteries",
+      "side": "left",
+      "labelPt": "Artéria labial superior — lado esquerdo",
+      "sourceFile": "CardioVascular41.fbx",
+      "sourceSha256": "ed7d049117cc944a8c47a416b16ade642cbd1392bbcce3c677450d3234dbf680",
+      "sourceWorldMatrix": [
+        100.00000149011613,
+        0,
+        0,
+        0,
+        0,
+        -0.0000028561808081595693,
+        -99.9999994039527,
+        0,
+        0,
+        99.9999994039527,
+        -0.0000028561808081595693,
+        0,
+        1.8364023611217957,
+        154.31294549447034,
+        8.347095809289895,
+        1
+      ],
+      "mirroredWindingReversed": false,
+      "vertices": 248,
+      "triangles": 472,
+      "bounds": {
+        "min": [
+          0.18692809343338013,
+          -0.6965330839157104,
+          0.6383969783782959
+        ],
+        "max": [
+          0.5353122353553772,
+          -0.6670023798942566,
+          1.0103797912597656
+        ]
+      }
+    },
+    {
+      "id": "zanatomy-945904385",
+      "sourceName": "Maxillary_arteryl",
+      "sourceObjectId": 945904385,
+      "layer": "arteries",
+      "side": "left",
+      "labelPt": "Artéria maxilar — lado esquerdo",
+      "sourceFile": "CardioVascular41.fbx",
+      "sourceSha256": "ed7d049117cc944a8c47a416b16ade642cbd1392bbcce3c677450d3234dbf680",
+      "sourceWorldMatrix": [
+        100.00000149011615,
+        0,
+        0,
+        0,
+        0,
+        -0.00000285618080815957,
+        -99.9999994039527,
+        0,
+        0,
+        99.9999994039527,
+        -0.00000285618080815957,
+        0,
+        2.7564935717268697,
+        156.70517779705756,
+        4.803401817273683,
+        1
+      ],
+      "mirroredWindingReversed": false,
+      "vertices": 2047,
+      "triangles": 3895,
+      "bounds": {
+        "min": [
+          0.40757131576538086,
+          -0.6332852244377136,
+          -0.37165889143943787
+        ],
+        "max": [
+          0.7111330032348633,
+          -0.1595490276813507,
+          0.5802493691444397
+        ]
+      }
+    },
+    {
+      "id": "zanatomy-207173666",
+      "sourceName": "Mental_branch_of_inferior_alveolar_arteryl",
+      "sourceObjectId": 207173666,
+      "layer": "arteries",
+      "side": "left",
+      "labelPt": "Ramo mentual da artéria alveolar inferior — lado esquerdo",
+      "sourceFile": "CardioVascular41.fbx",
+      "sourceSha256": "ed7d049117cc944a8c47a416b16ade642cbd1392bbcce3c677450d3234dbf680",
+      "sourceWorldMatrix": [
+        -100.0000014901161,
+        0,
+        0,
+        0,
+        0,
+        0.000005886097140104801,
+        -99.99999940395257,
+        0,
+        0,
+        99.99999940395257,
+        0.000005886097140104801,
+        0,
+        1.2976484486914803,
+        150.81857522106733,
+        7.612055747968154,
+        1
+      ],
+      "mirroredWindingReversed": true,
+      "vertices": 260,
+      "triangles": 472,
+      "bounds": {
+        "min": [
+          0.12992684543132782,
+          -1.228523850440979,
+          0.7831631898880005
+        ],
+        "max": [
+          0.24223221838474274,
+          -1.1551949977874756,
+          0.8468689322471619
+        ]
+      }
+    },
+    {
+      "id": "zanatomy-572635797",
+      "sourceName": "Infra-orbital_arteryl",
+      "sourceObjectId": 572635797,
+      "layer": "arteries",
+      "side": "left",
+      "labelPt": "Artéria infraorbital — lado esquerdo",
+      "sourceFile": "CardioVascular41.fbx",
+      "sourceSha256": "ed7d049117cc944a8c47a416b16ade642cbd1392bbcce3c677450d3234dbf680",
+      "sourceWorldMatrix": [
+        100.00000149011613,
+        0,
+        0,
+        0,
+        0,
+        -0.0000028561808081595693,
+        -99.9999994039527,
+        0,
+        0,
+        99.9999994039527,
+        -0.0000028561808081595693,
+        0,
+        2.6797831378159263,
+        156.8485150863974,
+        6.219222224529113,
+        1
+      ],
+      "mirroredWindingReversed": false,
+      "vertices": 248,
+      "triangles": 472,
+      "bounds": {
+        "min": [
+          0.3716013729572296,
+          -0.4253857433795929,
+          0.32948774099349976
+        ],
+        "max": [
+          0.4722154438495636,
+          -0.1671055257320404,
+          0.7594011425971985
+        ]
+      }
+    },
+    {
+      "id": "zanatomy-803706966",
+      "sourceName": "Buccal_arteryl",
+      "sourceObjectId": 803706966,
+      "layer": "arteries",
+      "side": "left",
+      "labelPt": "Artéria bucal — lado esquerdo",
+      "sourceFile": "CardioVascular41.fbx",
+      "sourceSha256": "ed7d049117cc944a8c47a416b16ade642cbd1392bbcce3c677450d3234dbf680",
+      "sourceWorldMatrix": [
+        100.00000149011613,
+        0,
+        0,
+        0,
+        0,
+        -0.0000028561808081595693,
+        -99.9999994039527,
+        0,
+        0,
+        99.9999994039527,
+        -0.0000028561808081595693,
+        0,
+        3.2263219757634567,
+        155.59399224771,
+        4.6185033991425835,
+        1
+      ],
+      "mirroredWindingReversed": false,
+      "vertices": 307,
+      "triangles": 590,
+      "bounds": {
+        "min": [
+          0.4699169099330902,
+          -0.6855120658874512,
+          0.082357257604599
+        ],
+        "max": [
+          0.5470442175865173,
+          -0.2114342600107193,
+          0.6471341252326965
+        ]
+      }
+    },
+    {
+      "id": "zanatomy-146160816",
+      "sourceName": "Trigeminal_nerve_(V)r",
+      "sourceObjectId": 146160816,
+      "layer": "nerves",
+      "side": "right",
+      "labelPt": "Nervo trigêmeo (V) — lado direito",
+      "sourceFile": "NervousSystem100.fbx",
+      "sourceSha256": "3ea1aad64956cad27348a27b8fb50494b7cc307c6bc77bee0810ec2a67dff2b1",
+      "sourceWorldMatrix": [
+        99.99999673366437,
+        0,
+        0,
+        0,
+        0,
+        -0.0000028561802223274667,
+        -99.9999865889549,
+        0,
+        0,
+        99.999981832505,
+        -0.0000028561816363228523,
+        0,
+        -3.098061494436017,
+        157.3858659170479,
+        4.129085085266375,
+        1
+      ],
+      "mirroredWindingReversed": false,
+      "vertices": 1224,
+      "triangles": 2344,
+      "bounds": {
+        "min": [
+          -0.3695545792579651,
+          -0.1513529270887375,
+          -0.6622946858406067
+        ],
+        "max": [
+          -0.07196053117513657,
+          0.22162669897079468,
+          -0.14906686544418335
+        ]
+      }
+    },
+    {
+      "id": "zanatomy-448379483",
+      "sourceName": "Anterior_division_of_mandibular_nervel",
+      "sourceObjectId": 448379483,
+      "layer": "nerves",
+      "side": "left",
+      "labelPt": "Divisão anterior do nervo mandibular — lado esquerdo",
+      "sourceFile": "NervousSystem100.fbx",
+      "sourceSha256": "3ea1aad64956cad27348a27b8fb50494b7cc307c6bc77bee0810ec2a67dff2b1",
+      "sourceWorldMatrix": [
+        -99.99999724456019,
+        0,
+        0,
+        0,
+        0,
+        -0.0000060348305737282316,
+        -99.99998709985056,
+        0,
+        0,
+        99.99998234340065,
+        -0.00000603483213891456,
+        0,
+        2.6945198517061466,
+        157.00631496597424,
+        1.9035927868354081,
+        1
+      ],
+      "mirroredWindingReversed": true,
+      "vertices": 324,
+      "triangles": 596,
+      "bounds": {
+        "min": [
+          0.3585657477378845,
+          -0.3551022708415985,
+          -0.16056528687477112
+        ],
+        "max": [
+          0.47909361124038696,
+          -0.14352749288082123,
+          -0.038905784487724304
+        ]
+      }
+    },
+    {
+      "id": "zanatomy-981436554",
+      "sourceName": "Buccal_nervel",
+      "sourceObjectId": 981436554,
+      "layer": "nerves",
+      "side": "left",
+      "labelPt": "Nervo bucal — lado esquerdo",
+      "sourceFile": "NervousSystem100.fbx",
+      "sourceSha256": "3ea1aad64956cad27348a27b8fb50494b7cc307c6bc77bee0810ec2a67dff2b1",
+      "sourceWorldMatrix": [
+        -99.99999724456019,
+        0,
+        0,
+        0,
+        0,
+        -0.000006034830924566951,
+        -99.99998113938685,
+        0,
+        0,
+        99.99997638293723,
+        -0.0000060348324897532205,
+        0,
+        3.1758372170243065,
+        153.93480489489625,
+        4.8593714653529165,
+        1
+      ],
+      "mirroredWindingReversed": true,
+      "vertices": 1368,
+      "triangles": 2632,
+      "bounds": {
+        "min": [
+          0.470018595457077,
+          -0.9137988686561584,
+          -0.04748642072081566
+        ],
+        "max": [
+          0.5377047657966614,
+          -0.35048454999923706,
+          0.6037270426750183
+        ]
+      }
+    },
+    {
+      "id": "zanatomy-557788006",
+      "sourceName": "Anterior_division_of_mandibular_nerver",
+      "sourceObjectId": 557788006,
+      "layer": "nerves",
+      "side": "right",
+      "labelPt": "Divisão anterior do nervo mandibular — lado direito",
+      "sourceFile": "NervousSystem100.fbx",
+      "sourceSha256": "3ea1aad64956cad27348a27b8fb50494b7cc307c6bc77bee0810ec2a67dff2b1",
+      "sourceWorldMatrix": [
+        99.99999724456019,
+        0,
+        0,
+        0,
+        0,
+        -0.000002856180214715119,
+        -99.99998709985069,
+        0,
+        0,
+        99.99998234340079,
+        -0.0000028561816287105096,
+        0,
+        -2.694517959449807,
+        157.00631496597424,
+        1.9035927868354081,
+        1
+      ],
+      "mirroredWindingReversed": false,
+      "vertices": 324,
+      "triangles": 596,
+      "bounds": {
+        "min": [
+          -0.47909486293792725,
+          -0.3551022708415985,
+          -0.16056528687477112
+        ],
+        "max": [
+          -0.3585669696331024,
+          -0.14352749288082123,
+          -0.038905784487724304
+        ]
+      }
+    },
+    {
+      "id": "zanatomy-108630292",
+      "sourceName": "Buccal_nerver",
+      "sourceObjectId": 108630292,
+      "layer": "nerves",
+      "side": "right",
+      "labelPt": "Nervo bucal — lado direito",
+      "sourceFile": "NervousSystem100.fbx",
+      "sourceSha256": "3ea1aad64956cad27348a27b8fb50494b7cc307c6bc77bee0810ec2a67dff2b1",
+      "sourceWorldMatrix": [
+        99.99999724456019,
+        0,
+        0,
+        0,
+        0,
+        -0.000002856180755016164,
+        -99.99998113938697,
+        0,
+        0,
+        99.99997638293735,
+        -0.0000028561821690115043,
+        0,
+        -3.1758353247679665,
+        153.93480480094237,
+        4.85937136772033,
+        1
+      ],
+      "mirroredWindingReversed": false,
+      "vertices": 1368,
+      "triangles": 2632,
+      "bounds": {
+        "min": [
+          -0.5377059578895569,
+          -0.9137988686561584,
+          -0.04748642072081566
+        ],
+        "max": [
+          -0.4700198173522949,
+          -0.35048454999923706,
+          0.6037270426750183
+        ]
+      }
+    },
+    {
+      "id": "zanatomy-801466883",
+      "sourceName": "Posterior_division_of_mandibular_nervel",
+      "sourceObjectId": 801466883,
+      "layer": "nerves",
+      "side": "left",
+      "labelPt": "Divisão posterior do nervo mandibular — lado esquerdo",
+      "sourceFile": "NervousSystem100.fbx",
+      "sourceSha256": "3ea1aad64956cad27348a27b8fb50494b7cc307c6bc77bee0810ec2a67dff2b1",
+      "sourceWorldMatrix": [
+        -99.99999724456019,
+        0,
+        0,
+        0,
+        0,
+        -0.0000060348305737282316,
+        -99.99998709985056,
+        0,
+        0,
+        99.99998234340065,
+        -0.00000603483213891456,
+        0,
+        2.955248149493389,
+        157.0322344927028,
+        1.7314524520864492,
+        1
+      ],
+      "mirroredWindingReversed": true,
+      "vertices": 468,
+      "triangles": 884,
+      "bounds": {
+        "min": [
+          0.3583860993385315,
+          -0.6463994979858398,
+          -0.16112127900123596
+        ],
+        "max": [
+          0.5808970332145691,
+          -0.1445862352848053,
+          -0.07456526160240173
+        ]
+      }
+    },
+    {
+      "id": "zanatomy-504549038",
+      "sourceName": "Inferior_alveolar_nervel",
+      "sourceObjectId": 504549038,
+      "layer": "nerves",
+      "side": "left",
+      "labelPt": "Nervo alveolar inferior — lado esquerdo",
+      "sourceFile": "NervousSystem100.fbx",
+      "sourceSha256": "3ea1aad64956cad27348a27b8fb50494b7cc307c6bc77bee0810ec2a67dff2b1",
+      "sourceWorldMatrix": [
+        -99.99999724456019,
+        0,
+        0,
+        0,
+        0,
+        -0.000006034830214024298,
+        -99.99998113938685,
+        0,
+        0,
+        99.99997638293723,
+        -0.000006034831779210534,
+        0,
+        3.3054922968588993,
+        153.49071796685612,
+        3.4967423407731077,
+        1
+      ],
+      "mirroredWindingReversed": true,
+      "vertices": 8784,
+      "triangles": 16944,
+      "bounds": {
+        "min": [
+          0.026065828278660774,
+          -1.3542976379394531,
+          -0.09362148493528366
+        ],
+        "max": [
+          0.5917033553123474,
+          -0.6379708051681519,
+          0.9516989588737488
+        ]
+      }
+    },
+    {
+      "id": "zanatomy-105331404",
+      "sourceName": "Mental_nervel",
+      "sourceObjectId": 105331404,
+      "layer": "nerves",
+      "side": "left",
+      "labelPt": "Nervo mentual — lado esquerdo",
+      "sourceFile": "NervousSystem100.fbx",
+      "sourceSha256": "3ea1aad64956cad27348a27b8fb50494b7cc307c6bc77bee0810ec2a67dff2b1",
+      "sourceWorldMatrix": [
+        -99.99999724456019,
+        0,
+        0,
+        0,
+        0,
+        -0.000006034830564862998,
+        -99.99997517892352,
+        0,
+        0,
+        99.99997042247419,
+        -0.000006034832130049175,
+        0,
+        2.0680660052766116,
+        150.9882773587173,
+        6.928619710905396,
+        1
+      ],
+      "mirroredWindingReversed": true,
+      "vertices": 1381,
+      "triangles": 2652,
+      "bounds": {
+        "min": [
+          0.2781398296356201,
+          -1.3111560344696045,
+          0.6744273900985718
+        ],
+        "max": [
+          0.34848552942276,
+          -1.1220932006835938,
+          0.7595100402832031
+        ]
+      }
+    },
+    {
+      "id": "zanatomy-933721469",
+      "sourceName": "Posterior_division_of_mandibular_nerver",
+      "sourceObjectId": 933721469,
+      "layer": "nerves",
+      "side": "right",
+      "labelPt": "Divisão posterior do nervo mandibular — lado direito",
+      "sourceFile": "NervousSystem100.fbx",
+      "sourceSha256": "3ea1aad64956cad27348a27b8fb50494b7cc307c6bc77bee0810ec2a67dff2b1",
+      "sourceWorldMatrix": [
+        99.99999724456019,
+        0,
+        0,
+        0,
+        0,
+        -0.000002856180214715119,
+        -99.99998709985069,
+        0,
+        0,
+        99.99998234340079,
+        -0.0000028561816287105096,
+        0,
+        -2.9552462572370493,
+        157.0322344927028,
+        1.7314524520864492,
+        1
+      ],
+      "mirroredWindingReversed": false,
+      "vertices": 468,
+      "triangles": 884,
+      "bounds": {
+        "min": [
+          -0.5808982849121094,
+          -0.6463994979858398,
+          -0.16112127900123596
+        ],
+        "max": [
+          -0.3583873212337494,
+          -0.1445862352848053,
+          -0.07456526160240173
+        ]
+      }
+    },
+    {
+      "id": "zanatomy-499608265",
+      "sourceName": "Inferior_alveolar_nerver",
+      "sourceObjectId": 499608265,
+      "layer": "nerves",
+      "side": "right",
+      "labelPt": "Nervo alveolar inferior — lado direito",
+      "sourceFile": "NervousSystem100.fbx",
+      "sourceSha256": "3ea1aad64956cad27348a27b8fb50494b7cc307c6bc77bee0810ec2a67dff2b1",
+      "sourceWorldMatrix": [
+        99.99999724456019,
+        0,
+        0,
+        0,
+        0,
+        -0.0000028561800444735116,
+        -99.99998113938697,
+        0,
+        0,
+        99.99997638293735,
+        -0.000002856181458468818,
+        0,
+        -3.3054904046025597,
+        153.4907179107437,
+        3.496742228200654,
+        1
+      ],
+      "mirroredWindingReversed": false,
+      "vertices": 8784,
+      "triangles": 16944,
+      "bounds": {
+        "min": [
+          -0.5917045474052429,
+          -1.3542976379394531,
+          -0.09362148493528366
+        ],
+        "max": [
+          -0.026067040860652924,
+          -0.6379708051681519,
+          0.9516989588737488
+        ]
+      }
+    },
+    {
+      "id": "zanatomy-205338607",
+      "sourceName": "Mental_nerver",
+      "sourceObjectId": 205338607,
+      "layer": "nerves",
+      "side": "right",
+      "labelPt": "Nervo mentual — lado direito",
+      "sourceFile": "NervousSystem100.fbx",
+      "sourceSha256": "3ea1aad64956cad27348a27b8fb50494b7cc307c6bc77bee0810ec2a67dff2b1",
+      "sourceWorldMatrix": [
+        99.99999724456019,
+        0,
+        0,
+        0,
+        0,
+        -0.000002856180584774526,
+        -99.99997517892365,
+        0,
+        0,
+        99.99997042247432,
+        -0.0000028561819987697823,
+        0,
+        -2.0680641130202706,
+        150.9882771935175,
+        6.928619518789085,
+        1
+      ],
+      "mirroredWindingReversed": false,
+      "vertices": 1380,
+      "triangles": 2652,
+      "bounds": {
+        "min": [
+          -0.3484867513179779,
+          -1.3111560344696045,
+          0.674427330493927
+        ],
+        "max": [
+          -0.278141051530838,
+          -1.1220932006835938,
+          0.7595099806785583
+        ]
+      }
+    },
+    {
+      "id": "zanatomy-269094747",
+      "sourceName": "Maxillary_nerver",
+      "sourceObjectId": 269094747,
+      "layer": "nerves",
+      "side": "right",
+      "labelPt": "Nervo maxilar (V2) — lado direito",
+      "sourceFile": "NervousSystem100.fbx",
+      "sourceSha256": "3ea1aad64956cad27348a27b8fb50494b7cc307c6bc77bee0810ec2a67dff2b1",
+      "sourceWorldMatrix": [
+        99.99999673366437,
+        0,
+        0,
+        0,
+        0,
+        -0.000002856180222327468,
+        -99.99998658895494,
+        0,
+        0,
+        99.99998183250504,
+        -0.0000028561816363228535,
+        0,
+        -2.2422192896865343,
+        156.91798151283288,
+        5.926588090521973,
+        1
+      ],
+      "mirroredWindingReversed": false,
+      "vertices": 4068,
+      "triangles": 7876,
+      "bounds": {
+        "min": [
+          -0.5274073481559753,
+          -0.6707333922386169,
+          -0.36195212602615356
+        ],
+        "max": [
+          -0.17175312340259552,
+          0.22083203494548798,
+          0.8643702864646912
+        ]
+      }
+    },
+    {
+      "id": "zanatomy-794305812",
+      "sourceName": "Ophthalmic_nerver",
+      "sourceObjectId": 794305812,
+      "layer": "nerves",
+      "side": "right",
+      "labelPt": "Nervo oftálmico (V1) — lado direito",
+      "sourceFile": "NervousSystem100.fbx",
+      "sourceSha256": "3ea1aad64956cad27348a27b8fb50494b7cc307c6bc77bee0810ec2a67dff2b1",
+      "sourceWorldMatrix": [
+        99.99999673366437,
+        0,
+        0,
+        0,
+        0,
+        -0.000002856180222327468,
+        -99.99998658895494,
+        0,
+        0,
+        99.99998183250504,
+        -0.0000028561816363228535,
+        0,
+        -2.4055583627776924,
+        161.33315902649713,
+        6.516233539301906,
+        1
+      ],
+      "mirroredWindingReversed": false,
+      "vertices": 3492,
+      "triangles": 6724,
+      "bounds": {
+        "min": [
+          -0.6202850341796875,
+          0.17263662815093994,
+          -0.36266687512397766
+        ],
+        "max": [
+          -0.15516076982021332,
+          0.744125247001648,
+          1.003844976425171
+        ]
+      }
+    },
+    {
+      "id": "zanatomy-347944056",
+      "sourceName": "Trigeminal_nerve_(V)l",
+      "sourceObjectId": 347944056,
+      "layer": "nerves",
+      "side": "left",
+      "labelPt": "Nervo trigêmeo (V) — lado esquerdo",
+      "sourceFile": "NervousSystem100.fbx",
+      "sourceSha256": "3ea1aad64956cad27348a27b8fb50494b7cc307c6bc77bee0810ec2a67dff2b1",
+      "sourceWorldMatrix": [
+        -99.99999673366437,
+        0,
+        0,
+        0,
+        0,
+        0.000029727949791828413,
+        -99.99998658895053,
+        0,
+        0,
+        99.99998183250062,
+        0.000029727949927681137,
+        0,
+        3.098062409823358,
+        157.3858659170479,
+        4.129085085266375,
+        1
+      ],
+      "mirroredWindingReversed": true,
+      "vertices": 1224,
+      "triangles": 2344,
+      "bounds": {
+        "min": [
+          0.07195916026830673,
+          -0.1513529270887375,
+          -0.6622945666313171
+        ],
+        "max": [
+          0.36955317854881287,
+          0.22162669897079468,
+          -0.14906685054302216
+        ]
+      }
+    },
+    {
+      "id": "zanatomy-238192397",
+      "sourceName": "Maxillary_nervel",
+      "sourceObjectId": 238192397,
+      "layer": "nerves",
+      "side": "left",
+      "labelPt": "Nervo maxilar (V2) — lado esquerdo",
+      "sourceFile": "NervousSystem100.fbx",
+      "sourceSha256": "3ea1aad64956cad27348a27b8fb50494b7cc307c6bc77bee0810ec2a67dff2b1",
+      "sourceWorldMatrix": [
+        -99.99999673366437,
+        0,
+        0,
+        0,
+        0,
+        0.00002972794694965798,
+        -99.99998658895052,
+        0,
+        0,
+        99.99998183250061,
+        0.000029727947085510574,
+        0,
+        2.2422202050738753,
+        156.91798283634304,
+        5.926587938066346,
+        1
+      ],
+      "mirroredWindingReversed": true,
+      "vertices": 4068,
+      "triangles": 7876,
+      "bounds": {
+        "min": [
+          0.17175175249576569,
+          -0.6707333922386169,
+          -0.361952006816864
+        ],
+        "max": [
+          0.5274059772491455,
+          0.22083446383476257,
+          0.8643702268600464
+        ]
+      }
+    },
+    {
+      "id": "zanatomy-535350315",
+      "sourceName": "Ophthalmic_nervel",
+      "sourceObjectId": 535350315,
+      "layer": "nerves",
+      "side": "left",
+      "labelPt": "Nervo oftálmico (V1) — lado esquerdo",
+      "sourceFile": "NervousSystem100.fbx",
+      "sourceSha256": "3ea1aad64956cad27348a27b8fb50494b7cc307c6bc77bee0810ec2a67dff2b1",
+      "sourceWorldMatrix": [
+        -99.99999673366437,
+        0,
+        0,
+        0,
+        0,
+        0.00002972794694965798,
+        -99.99998658895052,
+        0,
+        0,
+        99.99998183250061,
+        0.000029727947085510574,
+        0,
+        2.4055592781650335,
+        161.33316048383892,
+        6.5162351980228355,
+        1
+      ],
+      "mirroredWindingReversed": true,
+      "vertices": 3492,
+      "triangles": 6724,
+      "bounds": {
+        "min": [
+          0.15515939891338348,
+          0.17263662815093994,
+          -0.36266669631004333
+        ],
+        "max": [
+          0.6202836632728577,
+          0.744125247001648,
+          1.00384521484375
+        ]
+      }
+    },
+    {
+      "id": "zanatomy-601119600",
+      "sourceName": "Facial_nerve_(VII)r",
+      "sourceObjectId": 601119600,
+      "layer": "nerves",
+      "side": "right",
+      "labelPt": "Nervo facial (VII) — lado direito",
+      "sourceFile": "NervousSystem100.fbx",
+      "sourceSha256": "3ea1aad64956cad27348a27b8fb50494b7cc307c6bc77bee0810ec2a67dff2b1",
+      "sourceWorldMatrix": [
+        99.99999673366437,
+        0,
+        0,
+        0,
+        0,
+        -0.0000028561802223274667,
+        -99.9999865889549,
+        0,
+        0,
+        99.999981832505,
+        -0.0000028561816363228523,
+        0,
+        -4.479123420513488,
+        156.20377488972156,
+        2.787183945628308,
+        1
+      ],
+      "mirroredWindingReversed": false,
+      "vertices": 13968,
+      "triangles": 27312,
+      "bounds": {
+        "min": [
+          -1.0413949489593506,
+          -1.2374200820922852,
+          -0.670429527759552
+        ],
+        "max": [
+          -0.0026504884008318186,
+          0.6065866947174072,
+          0.9832338690757751
+        ]
+      }
+    },
+    {
+      "id": "zanatomy-786987420",
+      "sourceName": "Facial_nerve_(VII)l",
+      "sourceObjectId": 786987420,
+      "layer": "nerves",
+      "side": "left",
+      "labelPt": "Nervo facial (VII) — lado esquerdo",
+      "sourceFile": "NervousSystem100.fbx",
+      "sourceSha256": "3ea1aad64956cad27348a27b8fb50494b7cc307c6bc77bee0810ec2a67dff2b1",
+      "sourceWorldMatrix": [
+        -99.99999673366437,
+        0,
+        0,
+        0,
+        0,
+        0.000029727949791828413,
+        -99.99998658895053,
+        0,
+        0,
+        99.99998183250062,
+        0.000029727949927681137,
+        0,
+        4.47912433590083,
+        156.20377488972156,
+        2.787183945628308,
+        1
+      ],
+      "mirroredWindingReversed": true,
+      "vertices": 13968,
+      "triangles": 27312,
+      "bounds": {
+        "min": [
+          0.0026491195894777775,
+          -1.2374200820922852,
+          -0.6704294085502625
+        ],
+        "max": [
+          1.041393518447876,
+          0.6065866947174072,
+          0.9832336902618408
+        ]
+      }
+    }
+  ]
+}

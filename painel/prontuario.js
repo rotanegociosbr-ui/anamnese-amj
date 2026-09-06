@@ -686,7 +686,7 @@
       escapeHtml(procedureLabel(item.procedure_kind)) + '</strong><small>' + escapeHtml(safeDate(item.procedure_date)) +
       (item.return_date ? ' · retorno ' + escapeHtml(safeDate(item.return_date)) : '') + '</small></span><span class="prontuario-badges">' +
       photoBadge + consentBadge + statusBadge + archiveBadge + '</span></summary><div class="prontuario-consulta-corpo">' +
-      '<div class="prontuario-consulta-acoes">' + editActions + '<button class="' + (archived ? '' : 'perigo') +
+      '<div class="prontuario-consulta-acoes">' + editActions + (!archived ? '<button type="button" data-prontuario-rosto="' + escapeHtml(item.id) + '">Rosto 3D e pontos</button>' : '') + '<button class="' + (archived ? '' : 'perigo') +
       '" type="button" data-prontuario-estado="' + (archived ? 'restaurar' : 'arquivar') +
       '" data-prontuario-id="' + escapeHtml(item.id) + '">' + (archived ? 'Restaurar' : 'Arquivar') + '</button></div>' +
       '<section class="prontuario-consulta-produtos" aria-label="Produtos, lotes e quantidades"><h5>Produtos, lotes e quantidades</h5>' +
@@ -1364,6 +1364,17 @@
       }
     }, true);
     list.addEventListener('click', function (event) {
+      const facial=event.target.closest('[data-prontuario-rosto]');
+      if(facial){
+        const item=state.protocols.find(function(p){return p.id===facial.dataset.prontuarioRosto;});
+        if(!item||!ownerAccess())return;
+        const generation=state.generation;
+        void window.AMJShell.navigate('rosto3d').then(function(){
+          if(generation!==state.generation||!ownerAccess())return;
+          return window.AMJRosto3D.abrirProtocolo(item.id,[(item.paciente&&item.paciente.nome)||'Paciente',safeDate(item.procedure_date),procedureLabel(item.procedure_kind)].join(' · '));
+        }).catch(function(){status('prontuario-status','Não foi possível abrir o rosto 3D.',true);});
+        return;
+      }
       const edit = event.target.closest('[data-prontuario-editar]');
       const addPhotos = event.target.closest('[data-prontuario-adicionar-fotos]');
       const finalize = event.target.closest('[data-prontuario-finalizar]');

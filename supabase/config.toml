@@ -143,3 +143,10 @@ enabled = true
 verify_jwt = false
 import_map = "./functions/agendamento-submit/deno.json"
 entrypoint = "./functions/agendamento-submit/index.ts"
+
+[functions.rosto3d-fichas]
+enabled = true
+# Custom auth verifies the user, active session, owner membership and AAL2.
+# Saving also consumes a recent password proof scoped to this consultation.
+verify_jwt = false
+entrypoint = "./functions/rosto3d-fichas/index.ts"

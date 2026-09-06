@@ -1,0 +1,47 @@
+[
+  {
+    "name": "eyebrow001",
+    "license": "CC0",
+    "source": "Official MakeHuman system assets",
+    "sha256": "88b13146395133f3901715e11706cdfd293e5d6087ad7c5e01efe1485a26b513",
+    "transform": {
+      "center": [
+        5.551115123125783e-17,
+        7.200324999999999,
+        0.6440339355468749
+      ],
+      "scale": 1.096603954628011
+    },
+    "triangles": 192
+  },
+  {
+    "name": "eyelashes01",
+    "license": "CC0",
+    "source": "Official MakeHuman system assets",
+    "sha256": "f78f5b93fea1946fcae103d32c4f082dd9612a1ec2e7e2f90b03ebe59b0baf20",
+    "transform": {
+      "center": [
+        5.551115123125783e-17,
+        7.200324999999999,
+        0.6440339355468749
+      ],
+      "scale": 1.096603954628011
+    },
+    "triangles": 368
+  },
+  {
+    "name": "bob02",
+    "license": "CC0",
+    "source": "Official MakeHuman system assets",
+    "sha256": "30d44038836d786364eb4134a9259cf93ca0c707f883861b0135ebfb149caa08",
+    "transform": {
+      "center": [
+        5.551115123125783e-17,
+        7.200324999999999,
+        0.6440339355468749
+      ],
+      "scale": 1.096603954628011
+    },
+    "triangles": 2248
+  }
+]

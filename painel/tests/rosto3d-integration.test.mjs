@@ -10,7 +10,7 @@ const hostSource=read(path.join(panel,'rosto3d.js')),source=read(path.join(base,
 function harness(){
  const status={textContent:''},button={addEventListener(){}},frames=[],listeners={};
  const root={firstElementChild:null,innerHTML:'',querySelector(s){
-  return s==='[data-rosto3d-status]'?status:s==='[data-rosto3d-abrir]'?button:{appendChild(f){frames.push(f);}};
+  return s==='[data-rosto3d-status]'?status:s==='[data-rosto3d-abrir]'||s==='[data-rosto3d-consultas]'?button:s==='[data-rosto3d-contexto]'?status:{appendChild(f){frames.push(f);}};
  }};
  let activeCalls=[],disposed=0;
  const sandbox={
@@ -28,7 +28,7 @@ function harness(){
 test('lazy mount is inert, no viewer before verified activation',async()=>{
  const h=harness();assert.equal(h.frames.length,0);h.api.atualizarAcesso();assert.equal(h.frames.length,0);
  assert.equal(await h.api.ativar(),true);assert.equal(h.frames.length,1);
- assert.equal(h.frames[0].src,'./rosto3d/v1/studio.html');assert.equal(h.frames[0].src.includes('TEST_ONLY'),false);
+ assert.equal(h.frames[0].src,'./rosto3d/v2/index.html');assert.equal(h.frames[0].src.includes('TEST_ONLY'),false);
  assert.equal(h.api.frameAllowed({}),false);assert.equal(h.api.frameAllowed(h.frames[0].contentWindow),true);
 });
 test('non-owner and signed-out activation never creates iframe',async()=>{
@@ -81,7 +81,8 @@ test('app routing, lazy load, reset and no privileged key added',()=>{
  assert.match(html,/id="aba-bt-rosto3d"/);assert.match(html,/id="aba-rosto3d"/);assert.match(html,/AMJRosto3D\.reset\(\)/);
  assert.match(shell,/rosto3d: Object.freeze\(\{ title: 'Rosto 3D'.*owner: true/);
  assert.match(shell,/SECONDARY_ORDER = \['prontuarios', 'rosto3d'\]/);
- assert.doesNotMatch(html,/<iframe/);assert.doesNotMatch(hostSource,/localStorage|sessionStorage|postMessage|service_role|fetch\(/);
+ assert.doesNotMatch(html,/<iframe/);assert.doesNotMatch(hostSource,/localStorage|sessionStorage|postMessage|service_role/);
+ assert.match(hostSource,/functions\/v1\/rosto3d-fichas/);
  assert.match(read(path.join(base,'entry.js')),/app\.frameAllowed\(window\)/);
  assert.match(read(path.join(base,'entry.js')),/event\.isTrusted/);
 });
@@ -126,4 +127,37 @@ test('tap identify is rotation-only, not a duplicate marking gesture',()=>{
  assert.ok(source.indexOf("if(tool!=='mark'||!target)return;")>identify);
  assert.match(source,/setAnimationLoop\(null\)/);assert.match(source,/resizeObserver\?\.disconnect/);
  assert.match(source,/label\.textContent=label\.hidden/);
+});
+
+async function clinicalHarness(){
+ const h=harness();await h.api.ativar();h.renderer();h.requests=[];h.loads=[];
+ h.sandbox.cabecalhosAcesso=async()=>({'Content-Type':'application/json'});
+ h.sandbox.fetch=async(url,init)=>{const body=JSON.parse(init.body);h.requests.push({url,body});return {ok:true,json:async()=>({ok:true,study:body.acao==='salvar'?{version:1,document:body.document}:null})};};
+ h.sandbox.window.AMJProtecao={solicitarSenhaRecente:async()=>({operation_id:'22222222-2222-4222-8222-222222222222',motivo:'Teste',encerrar:async()=>{}})};
+ Object.assign(h.frames[0].contentWindow.AMJRostoViewer,{ready:()=>true,unbind(){},loadStudy(study,label){h.loads.push({study,label});},hasChanges:()=>false,isBusy:()=>false});return h;
+}
+const testProtocol='11111111-1111-4111-8111-111111111111';
+test('study is loaded and saved under the selected consultation, not a caller-provided patient',async()=>{
+ const h=await clinicalHarness();await h.api.abrirProtocolo(testProtocol,'Paciente de teste · consulta');
+ const d={modelVersion:'test'};const result=await h.api.saveStudy(h.frames[0].contentWindow,d,0);
+ assert.equal(h.loads.length,1);assert.equal(result.version,1);assert.equal(h.requests.at(-1).body.protocolo_id,testProtocol);assert.equal(h.requests.at(-1).body.expected_version,0);assert(!('patient_id'in h.requests.at(-1).body));
+});
+test('unrelated window cannot save and no consultation means no save',async()=>{
+ const h=await clinicalHarness();await assert.rejects(h.api.saveStudy(h.frames[0].contentWindow,{},0));await h.api.abrirProtocolo(testProtocol,'Teste');const count=h.requests.length;await assert.rejects(h.api.saveStudy({}, {},0));assert.equal(h.requests.length,count);
+});
+test('late context response after logout never restores clinical notes',async()=>{
+ const h=await clinicalHarness();let resolve;h.sandbox.fetch=()=>new Promise(r=>resolve=r);
+ const opening=h.api.abrirProtocolo(testProtocol,'Teste');await new Promise(r=>setTimeout(r,0));h.api.reset();resolve({ok:true,json:async()=>({ok:true,study:{version:1,document:{notes:'synthetic'}}})});await opening;assert.equal(h.loads.length,0);
+});
+test('logout while password prompt is pending prevents the save request',async()=>{
+ const h=await clinicalHarness();await h.api.abrirProtocolo(testProtocol,'Teste');let resolve;h.sandbox.window.AMJProtecao.solicitarSenhaRecente=()=>new Promise(r=>resolve=r);
+ const saving=h.api.saveStudy(h.frames[0].contentWindow,{},0);h.api.reset();resolve({operation_id:testProtocol,encerrar:async()=>{}});await assert.rejects(saving);assert.equal(h.requests.filter(r=>r.body.acao==='salvar').length,0);
+});
+test('switching consultation with unsaved points requires confirmation',async()=>{
+ const h=await clinicalHarness();h.frames[0].contentWindow.AMJRostoViewer.hasChanges=()=>true;h.sandbox.window.confirm=()=>false;
+ assert.equal(await h.api.abrirProtocolo(testProtocol,'Teste'),false);assert.equal(h.requests.length,0);
+});
+test('duplicate readiness does not overwrite edits or fetch the consultation twice',async()=>{
+ const h=await clinicalHarness();await h.api.abrirProtocolo(testProtocol,'Teste');const count=h.requests.length,source=h.frames[0].contentWindow;
+ await Promise.all([h.api.frameReady(source),h.api.frameReady(source)]);assert.equal(h.requests.length,count);
 });
