@@ -8,9 +8,9 @@ const panel=path.resolve(import.meta.dirname,'..'),base=path.join(panel,'rosto3d
 const read=p=>fs.readFileSync(p,'utf8');
 const hostSource=read(path.join(panel,'rosto3d.js')),source=read(path.join(base,'app-v3.js'));
 function harness(){
- const status={textContent:''},button={addEventListener(){}},frames=[],listeners={};
+ const status={textContent:''},buttons={},frames=[],listeners={};
  const root={firstElementChild:null,innerHTML:'',querySelector(s){
-  return s==='[data-rosto3d-status]'?status:s==='[data-rosto3d-abrir]'||s==='[data-rosto3d-consultas]'?button:s==='[data-rosto3d-contexto]'?status:{appendChild(f){frames.push(f);}};
+  return s==='[data-rosto3d-status]'?status:s==='[data-rosto3d-contexto]'?{textContent:''}:s==='[data-rosto3d-frame]'?{appendChild(f){frames.push(f);}}:(buttons[s]??={addEventListener(type,fn){this[type]=fn;}});
  }};
  let activeCalls=[],disposed=0;
  const sandbox={
@@ -23,12 +23,12 @@ function harness(){
  };
  vm.runInNewContext(hostSource,sandbox);const api=sandbox.window.AMJRosto3D;api.montar(root);
  function renderer(){frames.at(-1).contentWindow.AMJRostoViewer={setActive(v){activeCalls.push(v);},dispose(){disposed++;}};}
- return {sandbox,api,frames,status,renderer,activeCalls,disposed:()=>disposed,listeners};
+ return {sandbox,api,frames,status,renderer,activeCalls,disposed:()=>disposed,listeners,buttons};
 }
 test('lazy mount is inert, no viewer before verified activation',async()=>{
  const h=harness();assert.equal(h.frames.length,0);h.api.atualizarAcesso();assert.equal(h.frames.length,0);
  assert.equal(await h.api.ativar(),true);assert.equal(h.frames.length,1);
- assert.equal(h.frames[0].src,'./rosto3d/v2/index.html');assert.equal(h.frames[0].src.includes('TEST_ONLY'),false);
+ assert.equal(h.frames[0].src,'./rosto3d/v2/index.html?v=20260906-3');assert.equal(h.frames[0].src.includes('TEST_ONLY'),false);
  assert.equal(h.api.frameAllowed({}),false);assert.equal(h.api.frameAllowed(h.frames[0].contentWindow),true);
 });
 test('non-owner and signed-out activation never creates iframe',async()=>{
@@ -131,8 +131,10 @@ test('tap identify is rotation-only, not a duplicate marking gesture',()=>{
 
 async function clinicalHarness(){
  const h=harness();await h.api.ativar();h.renderer();h.requests=[];h.loads=[];
+ const open=h.api.abrirProtocolo;h.api={...h.api,abrirProtocolo:(id,label,patientId='33333333-3333-4333-8333-333333333333')=>open(id,label,patientId)};
  h.sandbox.cabecalhosAcesso=async()=>({'Content-Type':'application/json'});
- h.sandbox.fetch=async(url,init)=>{const body=JSON.parse(init.body);h.requests.push({url,body});return {ok:true,json:async()=>({ok:true,study:body.acao==='salvar'?{version:1,document:body.document}:null})};};
+ h.binding={protocol_id:testProtocol,patient_id:'33333333-3333-4333-8333-333333333333',protocol_version:1};
+ h.sandbox.fetch=async(url,init)=>{const body=JSON.parse(init.body);h.requests.push({url,body});return {ok:true,json:async()=>({ok:true,protocolo_id:body.protocolo_id,binding:{...h.binding,protocol_id:body.protocolo_id},study:body.acao==='salvar'?{version:1,document:body.document}:null})};};
  h.sandbox.window.AMJProtecao={solicitarSenhaRecente:async()=>({operation_id:'22222222-2222-4222-8222-222222222222',motivo:'Teste',encerrar:async()=>{}})};
  Object.assign(h.frames[0].contentWindow.AMJRostoViewer,{ready:()=>true,unbind(){},loadStudy(study,label){h.loads.push({study,label});},hasChanges:()=>false,isBusy:()=>false});return h;
 }
@@ -141,6 +143,7 @@ test('study is loaded and saved under the selected consultation, not a caller-pr
  const h=await clinicalHarness();await h.api.abrirProtocolo(testProtocol,'Paciente de teste · consulta');
  const d={modelVersion:'test'};const result=await h.api.saveStudy(h.frames[0].contentWindow,d,0);
  assert.equal(h.loads.length,1);assert.equal(result.version,1);assert.equal(h.requests.at(-1).body.protocolo_id,testProtocol);assert.equal(h.requests.at(-1).body.expected_version,0);assert(!('patient_id'in h.requests.at(-1).body));
+ assert.equal(h.requests.at(-1).body.expected_patient_id,h.binding.patient_id);assert.equal(h.requests.at(-1).body.expected_protocol_version,1);
 });
 test('unrelated window cannot save and no consultation means no save',async()=>{
  const h=await clinicalHarness();await assert.rejects(h.api.saveStudy(h.frames[0].contentWindow,{},0));await h.api.abrirProtocolo(testProtocol,'Teste');const count=h.requests.length;await assert.rejects(h.api.saveStudy({}, {},0));assert.equal(h.requests.length,count);
@@ -160,4 +163,81 @@ test('switching consultation with unsaved points requires confirmation',async()=
 test('duplicate readiness does not overwrite edits or fetch the consultation twice',async()=>{
  const h=await clinicalHarness();await h.api.abrirProtocolo(testProtocol,'Teste');const count=h.requests.length,source=h.frames[0].contentWindow;
  await Promise.all([h.api.frameReady(source),h.api.frameReady(source)]);assert.equal(h.requests.length,count);
+});
+
+test('no save is allowed without an authoritative matching consultation binding',async()=>{
+ for(const binding of [null,{protocol_id:testProtocol,patient_id:'invalid',protocol_version:1},{protocol_id:testProtocol,patient_id:'33333333-3333-4333-8333-333333333333',protocol_version:0}]){
+  const h=await clinicalHarness();h.sandbox.fetch=async()=>({ok:true,json:async()=>({ok:true,protocolo_id:testProtocol,binding,study:null})});
+  await h.api.abrirProtocolo(testProtocol,'Teste');assert.equal(h.loads.length,0);
+  await assert.rejects(h.api.saveStudy(h.frames[0].contentWindow,{},0),/recarregue/);
+ }
+});
+
+test('a consultation reassigned before opening cannot load under the old patient label',async()=>{
+ const h=await clinicalHarness();h.binding.patient_id='44444444-4444-4444-8444-444444444444';
+ await h.api.abrirProtocolo(testProtocol,'Paciente anterior');assert.equal(h.loads.length,0);assert.match(h.status.textContent,/paciente desta consulta mudou/);
+ await assert.rejects(h.api.saveStudy(h.frames[0].contentWindow,{},0),/recarregue/);
+});
+
+test('explicit retry loads again after a transient server failure without recreating viewer',async()=>{
+ const h=await clinicalHarness(),fetch=h.sandbox.fetch;
+ h.sandbox.fetch=async()=>{throw Error('Rede indisponível');};await h.api.abrirProtocolo(testProtocol,'Teste');assert.equal(h.loads.length,0);
+ h.sandbox.fetch=fetch;await h.api.ativar(true);assert.equal(h.loads.length,1);assert.equal(h.frames.length,1);
+});
+
+test('reload prompts before replacing unsaved edits and updates the consultation binding',async()=>{
+ const h=await clinicalHarness();await h.api.abrirProtocolo(testProtocol,'Teste');const count=h.requests.length;
+ h.frames[0].contentWindow.AMJRostoViewer.hasChanges=()=>true;h.sandbox.window.confirm=()=>false;
+ assert.equal(await h.api.recarregar(),false);assert.equal(h.requests.length,count);
+ h.sandbox.window.confirm=()=>true;h.binding.protocol_version=4;
+ assert.equal(await h.api.recarregar(),true);assert.equal(h.loads.length,2);
+ await h.api.saveStudy(h.frames[0].contentWindow,{},0);assert.equal(h.requests.at(-1).body.expected_protocol_version,4);
+});
+
+test('conflict preserves points in the viewer and blocks resaving against stale binding until explicit reload',async()=>{
+ const h=await clinicalHarness();await h.api.abrirProtocolo(testProtocol,'Teste');let unbound=0;
+ h.frames[0].contentWindow.AMJRostoViewer.unbind=()=>unbound++;
+ const fetch=h.sandbox.fetch;h.sandbox.fetch=async()=>({ok:false,status:409,json:async()=>({ok:false,codigo:'protocol_context_conflict',erro:'Consulta alterada.'})});
+ await assert.rejects(h.api.saveStudy(h.frames[0].contentWindow,{},0),/Consulta alterada/);
+ assert.equal(unbound,0);assert.equal(h.loads.length,1);assert.match(h.status.textContent,/continuam na tela/);
+ await assert.rejects(h.api.saveStudy(h.frames[0].contentWindow,{},0),/recarregue/);
+ h.sandbox.fetch=fetch;await h.api.recarregar();assert.equal(unbound,1);
+ await h.api.saveStudy(h.frames[0].contentWindow,{},0);
+});
+
+test('return opens the exact consultation and cannot continue after logout during navigation',async()=>{
+ for(const logout of [false,true]){
+  const h=await clinicalHarness();await h.api.abrirProtocolo(testProtocol,'Teste');let resolve;const opened=[];
+  h.sandbox.window.AMJShell={navigate:()=>new Promise(r=>resolve=r)};h.sandbox.window.AMJProntuario={abrirProtocolo:async id=>opened.push(id)};
+  const returning=h.api.voltarConsulta();if(logout)h.api.reset();resolve(true);await returning;
+  assert.deepEqual(opened,logout?[]:[testProtocol]);
+ }
+});
+
+test('return and reload are blocked while a password/save operation is pending',async()=>{
+ const h=await clinicalHarness();await h.api.abrirProtocolo(testProtocol,'Teste');let resolve;
+ h.sandbox.window.AMJProtecao.solicitarSenhaRecente=()=>new Promise(r=>resolve=r);
+ const saving=h.api.saveStudy(h.frames[0].contentWindow,{},0);
+ assert.equal(await h.api.recarregar(),false);assert.equal(await h.api.voltarConsulta(),false);
+ resolve({operation_id:testProtocol,encerrar:async()=>{}});await saving;
+});
+
+test('return does not reopen consultation when shell navigation is canceled',async()=>{
+ const h=await clinicalHarness();await h.api.abrirProtocolo(testProtocol,'Teste');let opened=false;
+ h.sandbox.window.AMJShell={navigate:async()=>false};h.sandbox.window.AMJProntuario={abrirProtocolo:async()=>opened=true};
+ assert.equal(await h.api.voltarConsulta(),false);assert.equal(opened,false);
+});
+
+test('edits made during loading or retry are never silently overwritten',async()=>{
+ for(const outcome of ['success','error','pause']){
+  const h=await clinicalHarness();const fetch=h.sandbox.fetch;let resolve;let dirty=false,unbinds=0,confirms=0;
+  h.frames[0].contentWindow.AMJRostoViewer.hasChanges=()=>dirty;
+  h.frames[0].contentWindow.AMJRostoViewer.unbind=()=>{unbinds++;dirty=false;};
+  h.sandbox.window.confirm=()=>{confirms++;return false;};
+  h.sandbox.fetch=()=>new Promise(r=>resolve=r);const opening=h.api.abrirProtocolo(testProtocol,'Teste');
+  await new Promise(r=>setTimeout(r,0));dirty=true;if(outcome==='pause')h.api.pausar();
+  resolve({ok:outcome!=='error',json:async()=>({ok:outcome!=='error',erro:'Falha',protocolo_id:testProtocol,binding:h.binding,study:null})});
+  await opening;assert.equal(h.loads.length,0);assert.equal(dirty,true);assert.equal(unbinds,1);assert.equal(confirms,outcome==='success'?1:0);
+  h.sandbox.fetch=fetch;await h.api.ativar(true);assert.equal(h.loads.length,0);assert.equal(dirty,true);
+ }
 });

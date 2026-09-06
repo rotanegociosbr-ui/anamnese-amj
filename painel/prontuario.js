@@ -1369,9 +1369,9 @@
         const item=state.protocols.find(function(p){return p.id===facial.dataset.prontuarioRosto;});
         if(!item||!ownerAccess())return;
         const generation=state.generation;
-        void window.AMJShell.navigate('rosto3d').then(function(){
-          if(generation!==state.generation||!ownerAccess())return;
-          return window.AMJRosto3D.abrirProtocolo(item.id,[(item.paciente&&item.paciente.nome)||'Paciente',safeDate(item.procedure_date),procedureLabel(item.procedure_kind)].join(' · '));
+        void window.AMJShell.navigate('rosto3d').then(function(navigated){
+          if(navigated!==true||generation!==state.generation||!ownerAccess())return;
+          return window.AMJRosto3D.abrirProtocolo(item.id,[(item.paciente&&item.paciente.nome)||'Paciente',safeDate(item.procedure_date),procedureLabel(item.procedure_kind)].join(' · '),item.patient_id);
         }).catch(function(){status('prontuario-status','Não foi possível abrir o rosto 3D.',true);});
         return;
       }

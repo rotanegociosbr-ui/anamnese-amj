@@ -1,12 +1,15 @@
 import * as THREE from 'three';
 import {OrbitControls} from './vendor/OrbitControls.js';
 import {initial,preset,visible,tissueLayers} from './layer-state.mjs';
-import {annotations} from './annotations.mjs';
+import {annotations} from './annotations.mjs?v=20260906-3';
+import {TapGesture} from './gesture.mjs';
+import {pointPosition} from './study.mjs';
 const embedded=window.parent!==window;
 const host=()=>{try{return embedded&&window.parent.location.origin===location.origin&&window.parent.AMJRosto3D?.frameAttached(window)?window.parent.AMJRosto3D:null;}catch{return null;}};
 if(embedded&&!host())throw Error('Abra este visor pelo app Fichas.');
 const $=id=>document.getElementById(id),viewer=$('viewer'),models=[],textures=new Map(),requests=new Map();
-let state={...initial},scene,camera,renderer,controls,editor,resizeObserver,disposed=false,ready=false,active=!document.hidden&&(!embedded||Boolean(host()?.frameAllowed(window))),lost=false,requestId=0,down=null;
+let state={...initial},scene,camera,renderer,controls,editor,resizeObserver,disposed=false,ready=false,active=!document.hidden&&(!embedded||Boolean(host()?.frameAllowed(window))),lost=false,requestId=0,cameraFrame=0;
+const gesture=new TapGesture();
 const ray=new THREE.Raycaster(),pointer=new THREE.Vector2();
 const mats=m=>[].concat(m.material);
 async function loadJSON(path){const r=await fetch(path);if(!r.ok)throw Error('Arquivo indisponível: '+path);return r.json();}
@@ -22,6 +25,7 @@ function add(meta){
  const mesh=new THREE.Mesh(g,material);mesh.name=meta.id;mesh.userData=meta;mesh.visible=false;scene.add(mesh);models.push(mesh);
 }
 function render(){if(!disposed&&active&&!lost&&renderer)renderer.render(scene,camera);}
+function stopFocus(){if(cameraFrame)cancelAnimationFrame(cameraFrame);cameraFrame=0;}
 function selectOptions(){
  const list=models.filter(m=>m.userData.mode==='anatomy'&&tissueLayers.has(m.userData.layer)&&state[m.userData.layer]).sort((a,b)=>a.userData.labelPt.localeCompare(b.userData.labelPt,'pt-BR'));
  if(!list.some(m=>m.name===state.selected)){state.selected='';state.isolated=false;}
@@ -47,6 +51,7 @@ function sync(){
  editor?.refresh();render();
 }
 function view(angle=0){
+ stopFocus();
  const a=angle*Math.PI/180,box=new THREE.Box3();
  const frame=models.filter(m=>m.userData.mode===state.mode&&(state.mode==='appearance'?(m.userData.layer==='skin'||m.userData.layer==='hair'&&m.visible):m.userData.layer==='surface'));
  for(const mesh of frame){
@@ -57,17 +62,44 @@ function view(angle=0){
  const distance=1.12*Math.max(size.y,width/camera.aspect)/(2*Math.tan(camera.fov*Math.PI/360))+size.z*.3;
  controls.target.copy(target);camera.position.copy(target).add(new THREE.Vector3(Math.sin(a)*distance,.10,Math.cos(a)*distance));controls.maxDistance=Math.max(14,distance*1.6);controls.update();render();
 }
-async function setMode(value){
+async function setMode(value,{reframe=true}={}){
+ gesture.clear();stopFocus();
  const token=++requestId;state.mode=value;state.selected='';state.isolated=false;$('loading').hidden=false;$('loading').textContent=value==='appearance'?'Preparando o rosto…':'Preparando as camadas anatômicas…';
  for(const mesh of models)mesh.visible=false;editor?.refresh();render();
  try{if(!requests.has(value))requests.set(value,(async()=>{const data=await loadJSON('./assets/'+value+'.json');await Promise.all([...new Set(data.meshes.map(m=>m.texture).filter(Boolean))].map(loadTexture));if(disposed||embedded&&!host())return;for(const meta of data.meshes)add({...meta,mode:value});})());
- await requests.get(value);if(disposed||token!==requestId)return;sync();view();$('loading').hidden=true;
+ await requests.get(value);if(disposed||token!==requestId)return;sync();if(reframe)view();$('loading').hidden=true;
  }catch(error){if(token!==requestId)return;requests.delete(value);lost=true;window.AMJRostoFailed=true;$('loading').textContent=error.message+' Use Abrir / tentar novamente no app.';throw error;}
+}
+function focusPoint(point,mesh,baseChanged){
+ stopFocus();const at=new THREE.Vector3().fromArray(pointPosition(point,mesh.userData)),box=new THREE.Box3();
+ for(const model of models)if(model.userData.mode===point.mode&&['skin','surface'].includes(model.userData.layer))box.expandByObject(model);
+ const center=box.isEmpty()?controls.target.clone():box.getCenter(new THREE.Vector3()),offset=camera.position.clone().sub(controls.target),distance=offset.length();
+ const outward=at.clone().sub(center);outward.y=0;if(outward.lengthSq()<.0001)outward.copy(offset).setY(0);if(outward.lengthSq()<.0001)outward.set(0,0,1);outward.normalize();
+ const projected=at.clone().project(camera),facing=camera.position.clone().sub(at).normalize().dot(outward);
+ // Do not disturb the professional's current framing when the point is in view.
+ if(!baseChanged&&Math.abs(projected.x)<.8&&Math.abs(projected.y)<.8&&projected.z>-1&&projected.z<1&&facing>.25)return;
+ outward.y=THREE.MathUtils.clamp(offset.y/Math.max(distance,.001),-.5,.5);outward.normalize();
+ const nextPosition=at.clone().addScaledVector(outward,Math.max(controls.minDistance,distance)),startPosition=camera.position.clone(),startTarget=controls.target.clone(),started=performance.now();
+ const duration=matchMedia('(prefers-reduced-motion: reduce)').matches?0:320;
+ const step=now=>{cameraFrame=0;if(disposed||!active||lost)return;const t=duration?Math.min(1,(now-started)/duration):1,ease=t*t*(3-2*t);camera.position.lerpVectors(startPosition,nextPosition,ease);controls.target.lerpVectors(startTarget,at,ease);controls.update();render();if(t<1)cameraFrame=requestAnimationFrame(step);};
+ cameraFrame=requestAnimationFrame(step);
+}
+async function revealPoint(point,isCurrent){
+ gesture.clear();stopFocus();const baseChanged=state.mode!==point.mode;
+ if(baseChanged||!models.some(m=>m.name===point.meshId))await setMode(point.mode,{reframe:false});
+ if(!isCurrent()||disposed||lost||state.mode!==point.mode)return false;
+ const mesh=models.find(m=>m.name===point.meshId&&m.userData.mode===point.mode);if(!mesh)throw Error('A estrutura deste ponto não foi carregada.');
+ state.selected='';state.isolated=false;
+ if(point.mode==='anatomy'){
+  if(tissueLayers.has(mesh.userData.layer)){state[mesh.userData.layer]=true;state.selected=mesh.name;state.isolated=true;state.opacity=Math.min(state.opacity,.23);state.bones=false;state.atlasEyes=false;state.atlasHair=false;}
+  else if(mesh.userData.layer==='surface'){state.surface=true;state.opacity=1;}
+ }
+ sync();focusPoint(point,mesh,baseChanged);return true;
 }
 try{
  scene=new THREE.Scene();scene.background=new THREE.Color('#FBF6F0');camera=new THREE.PerspectiveCamera(34,1,.05,100);
  renderer=new THREE.WebGLRenderer({antialias:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1;
- viewer.append(renderer.domElement);controls=new OrbitControls(camera,renderer.domElement);controls.enableDamping=false;controls.enablePan=false;controls.minDistance=2.4;controls.addEventListener('change',render);
+ viewer.append(renderer.domElement);controls=new OrbitControls(camera,renderer.domElement);controls.enableDamping=false;controls.enablePan=false;controls.minDistance=2.4;controls.addEventListener('change',render);controls.addEventListener('start',stopFocus);
  scene.add(new THREE.HemisphereLight('#FFF8EE','#76685E',1.3));for(const [power,pos]of [[2.4,[-3,4,5]],[1,[4,2,3]],[1.5,[0,3,-4]]]){const light=new THREE.DirectionalLight('#FFF9F3',power);light.position.set(...pos);scene.add(light);}
  resizeObserver=new ResizeObserver(()=>{camera.aspect=viewer.clientWidth/viewer.clientHeight;camera.updateProjectionMatrix();renderer.setSize(viewer.clientWidth,viewer.clientHeight,false);render();});resizeObserver.observe(viewer);
  $('appearance').onclick=()=>setMode('appearance');$('anatomy').onclick=()=>setMode('anatomy');$('home').onclick=()=>view();
@@ -77,19 +109,21 @@ try{
  $('atlas-eyes').onchange=()=>{state.atlasEyes=$('atlas-eyes').checked;sync();};$('atlas-hair').onchange=()=>{state.atlasHair=$('atlas-hair').checked;sync();};$('opacity').oninput=()=>{state.opacity=Number($('opacity').value)/100;sync();};
  for(const id of ['appearance-eyes','hair','texture','hair-style'])$(id).onchange=sync;
  $('muscle-select').onchange=()=>{state.selected=$('muscle-select').value;state.isolated=false;sync();};$('isolate').onclick=()=>{state.isolated=!state.isolated;sync();};$('context').onclick=()=>{state.isolated=false;sync();};
- const target=renderer.domElement,contacts=new Set();let multi=false;
- target.addEventListener('pointerdown',e=>{contacts.add(e.pointerId);if(contacts.size>1){multi=true;down=null;}else if(e.isPrimary){multi=false;down={x:e.clientX,y:e.clientY,time:performance.now(),id:e.pointerId};}});
- target.addEventListener('pointercancel',e=>{contacts.delete(e.pointerId);down=null;});
- target.addEventListener('pointerup',e=>{contacts.delete(e.pointerId);const start=down;down=null;if(!active||disposed||multi||!start||start.id!==e.pointerId||Math.hypot(start.x-e.clientX,start.y-e.clientY)>6||performance.now()-start.time>550)return;
+ const target=renderer.domElement;
+ target.addEventListener('pointerdown',e=>{if(active&&!disposed&&!lost)gesture.down(e);else gesture.clear();});
+ target.addEventListener('pointermove',e=>gesture.move(e));
+ for(const type of ['pointercancel','lostpointercapture'])target.addEventListener(type,e=>gesture.cancel(e));
+ target.addEventListener('pointerup',e=>{const tap=gesture.up(e);if(!active||disposed||lost||!tap)return;
  const rect=target.getBoundingClientRect();pointer.set((e.clientX-rect.left)/rect.width*2-1,-(e.clientY-rect.top)/rect.height*2+1);ray.setFromCamera(pointer,camera);
  if(editor?.tap(ray))return;if(state.mode!=='anatomy')return;
  const hit=ray.intersectObjects(models.filter(m=>m.visible&&(m.userData.layer!=='surface'||state.opacity>=.8)))[0];
  if(hit&&tissueLayers.has(hit.object.userData.layer)){state.selected=hit.object.name;sync();}});
- target.addEventListener('webglcontextlost',e=>{e.preventDefault();lost=true;$('loading').hidden=false;$('loading').textContent='O visor foi interrompido. Recarregue para continuar.';});
- document.addEventListener('visibilitychange',()=>{active=!document.hidden&&(!embedded||Boolean(host()?.frameAllowed(window)));render();});
+ target.addEventListener('webglcontextlost',e=>{e.preventDefault();gesture.clear();stopFocus();lost=true;$('loading').hidden=false;$('loading').textContent='O visor foi interrompido. Recarregue para continuar.';});
+ document.addEventListener('visibilitychange',()=>{active=!document.hidden&&(!embedded||Boolean(host()?.frameAllowed(window)));if(!active){gesture.clear();stopFocus();}render();});
+ window.addEventListener('blur',()=>{gesture.clear();stopFocus();});
  const registry=await loadJSON('./assets/point-registry.json');if(disposed||embedded&&!host())throw Error('Sessão encerrada.');
- editor=annotations({THREE,scene,models,registry,getMode:()=>state.mode,render,host});
- window.AMJRostoViewer={ready:()=>ready,hasChanges:()=>editor.hasChanges(),isBusy:()=>editor.isBusy(),getStudy:()=>editor.getStudy(),loadStudy:(study,label)=>editor.loadStudy(study,label),unbind:()=>editor.unbind(),failed:()=>lost,setActive(v){active=Boolean(v)&&!disposed;render();},dispose(){disposed=true;requestId++;editor.dispose();resizeObserver?.disconnect();controls?.dispose();for(const m of models){m.geometry.dispose();for(const mat of mats(m))mat.dispose();}for(const t of textures.values())t.dispose();models.length=0;renderer.dispose();renderer.domElement.remove();}};
+ editor=annotations({THREE,scene,models,registry,getMode:()=>state.mode,render,host,revealPoint});
+ window.AMJRostoViewer={ready:()=>ready,hasChanges:()=>editor.hasChanges(),isBusy:()=>editor.isBusy(),getStudy:()=>editor.getStudy(),loadStudy(study,label){gesture.clear();stopFocus();return editor.loadStudy(study,label);},unbind(){gesture.clear();stopFocus();return editor.unbind();},failed:()=>lost,setActive(v){active=Boolean(v)&&!disposed;if(!active){gesture.clear();stopFocus();}render();},dispose(){disposed=true;gesture.clear();stopFocus();requestId++;editor.dispose();resizeObserver?.disconnect();controls?.dispose();for(const m of models){m.geometry.dispose();for(const mat of mats(m))mat.dispose();}for(const t of textures.values())t.dispose();models.length=0;renderer.dispose();renderer.domElement.remove();}};
  window.addEventListener('beforeunload',e=>{if(editor.hasChanges()){e.preventDefault();e.returnValue='';}});
  await setMode('appearance');ready=true;if(embedded&&host())void host().frameReady(window);
  for(const type of ['pointerdown','keydown','input','wheel'])document.addEventListener(type,e=>{if(e.isTrusted)host()?.activity(window);},{passive:true,capture:true});
