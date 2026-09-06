@@ -46,13 +46,13 @@ Deno.test("decimal representation and missing fields survive partial draft",()=>
 Deno.test("draft edits revalidate the admin session and preserve binding, consent scope and version guards",()=>{
  assertMatch(source,/Number\(current\[0\]\.version\) !== expectedVersion/);
  assertMatch(source,/changesBinding \|\| Object\.keys\(consents\)\.length > 0/);
- assertMatch(source,/requireProtectedOperation\(req, context, payload, "prontuario\.update", protocolId\)/);
+ assertMatch(source,/requireProtectedOperation\(req, context, operationPayload, "prontuario\.update", protocolId\)/);
  assertMatch(source,/requireAdminSessionAction\(req, AUTH_CONFIG, context/);
  assert.doesNotMatch(source,/requireRoutineEditAuthorization|requireRecentPasswordProof/);
  const protectedOperation=between("async function requireProtectedOperation(","async function handleSaveDraft(");
  assertMatch(protectedOperation,/validUuid\(operationId\)/);
  assertMatch(protectedOperation,/await requireAdminSessionAction\(req, AUTH_CONFIG, context, \{[\s\S]*operationId,[\s\S]*action,[\s\S]*targetId/);
- assertMatch(source,/requireProtectedOperation\(req, context, payload, "prontuario\.consent", idempotencyKey\)/);
+ assertMatch(source,/requireProtectedOperation\(req, context, operationPayload, "prontuario\.consent", idempotencyKey\)/);
 });
 Deno.test("catalog API separates drafts and accepts missing essentials",()=>{
  assertMatch(finance,/produtos_rascunho: rows\(products\.data\)\.filter/);

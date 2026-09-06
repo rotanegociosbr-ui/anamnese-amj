@@ -1,0 +1,25 @@
+{
+  "acao": "criar_atualizar",
+  "protocolo_id": null,
+  "paciente_id": "22222222-2222-4222-8222-222222222222",
+  "agendamento_id": null,
+  "tipo_procedimento": "outro",
+  "queixa": null,
+  "anamnese": {},
+  "notas_tecnica": "Fixture sintética de compatibilidade, sem dados de paciente real.",
+  "data_procedimento": "2026-09-06",
+  "data_retorno": null,
+  "orientacoes": null,
+  "produtos": [
+    {
+      "product_id": "33333333-3333-4333-8333-333333333333",
+      "lot": "LOTE SINTÉTICO",
+      "expiry": "2028-01-31",
+      "amount": 1,
+      "unit": "un",
+      "position": 1
+    }
+  ],
+  "consentimentos": { "clinical_photography": false },
+  "idempotency_key": "44444444-4444-4444-8444-444444444444"
+}

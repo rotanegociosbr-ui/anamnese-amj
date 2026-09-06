@@ -886,6 +886,13 @@ async function handleSaveDraft(
     : normalizeDraftProducts(payload.produtos ?? []);
   const consents = normalizeConsents(payload.consentimentos);
   const expectedVersion = protocolId ? requiredVersion(payload.versao_esperada) : null;
+  // Older forms already provide a stable idempotency key, but omit the separate
+  // operation ID (including creation with clinical_photography:false). This is
+  // an audit/retry identifier, not authorization. Never replace an explicit bad
+  // value; the same owner/MFA session and scope checks still run below.
+  const operationPayload = Object.prototype.hasOwnProperty.call(payload, "operation_id")
+    ? payload
+    : { ...payload, operation_id: idempotencyKey };
   let operationId = idempotencyKey;
   if (protocolId) {
     const current = await serviceJson(
@@ -899,17 +906,16 @@ async function handleSaveDraft(
     const changesBinding = current[0].patient_id !== patientId ||
       (current[0].appointment_id || null) !== appointmentId;
     if (changesBinding || Object.keys(consents).length > 0) {
-      // A routine grant never authorizes patient reassignment or consent.
-      operationId = await requireProtectedOperation(req, context, payload, "prontuario.update", protocolId);
+      operationId = await requireProtectedOperation(req, context, operationPayload, "prontuario.update", protocolId);
     } else {
-      operationId = safeText(payload.operation_id, 40);
+      operationId = safeText(operationPayload.operation_id, 40);
       if (!validUuid(operationId)) throw new ApiError(422, "operation_id_required", "Atualize a tela e tente novamente.");
       await requireAdminSessionAction(req, AUTH_CONFIG, context, {
         operationId, action: "prontuario.update", targetId: protocolId,
       });
     }
   } else if (Object.keys(consents).length > 0) {
-    operationId = await requireProtectedOperation(req, context, payload, "prontuario.consent", idempotencyKey);
+    operationId = await requireProtectedOperation(req, context, operationPayload, "prontuario.consent", idempotencyKey);
   }
 
   const result = await rpc("prontuario_salvar_rascunho_com_estoque", {
