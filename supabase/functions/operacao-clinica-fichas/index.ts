@@ -751,16 +751,65 @@ async function handleSaveAttendance(
   const idempotencyKey = requiredUuid(payload.idempotency_key, "a chave da operação");
   const targetId = attendanceId || idempotencyKey;
   const operationRequestId = await requestId(req, context, payload, "salvar_atendimento", targetId);
+  const expectedVersion = attendanceId
+    ? requiredInteger(payload.versao, "a versão", 1, 2_000_000_000)
+    : null;
+  const links: JsonRecord = {
+    agendamento_id: optionalUuid(payload.agendamento_id, "o agendamento"),
+    protocolo_id: optionalUuid(payload.protocolo_id, "o prontuário"),
+    lancamento_financeiro_id: optionalUuid(payload.lancamento_financeiro_id, "o lançamento financeiro"),
+  };
+  if (attendanceId) {
+    const { clinicId } = tenant(context);
+    const currentRows = await rest(
+      "/rest/v1/atendimentos_realizados?select=id,version,appointment_id,protocol_id,financial_entry_id" +
+        "&clinic_id=eq." + encodeURIComponent(clinicId) + "&id=eq." + encodeURIComponent(attendanceId) +
+        "&limit=1",
+    );
+    const current = currentRows[0];
+    if (!current) {
+      throw new ApiError(404, "attendance_not_found", "Atendimento não encontrado.");
+    }
+    const currentVersion = Number(current.version);
+    if (expectedVersion === null || !Number.isInteger(currentVersion) || currentVersion < 1 ||
+      expectedVersion > currentVersion) {
+      throw new ApiError(409, "version_conflict", "O registro mudou em outro acesso. Atualize a tela.");
+    }
+    // An older version can be a lost-response replay: the RPC resolves its operation ID
+    // before its canonical row/version check. A future version can never be that replay.
+    if (expectedVersion === currentVersion) {
+      const linkFields = [
+        ["agendamento_id", "appointment_id"],
+        ["protocolo_id", "protocol_id"],
+        ["lancamento_financeiro_id", "financial_entry_id"],
+      ] as const;
+      const confirmed = payload.confirmar_remocao_vinculos === undefined
+        ? []
+        : payload.confirmar_remocao_vinculos;
+      if (!Array.isArray(confirmed) || confirmed.length > 3 || confirmed.some((field) =>
+        !linkFields.some(([payloadField]) => field === payloadField)
+      )) {
+        throw new ApiError(422, "invalid_link_removal_confirmation", "Confirme quais vínculos deseja remover.");
+      }
+      if (linkFields.some(([payloadField, column]) =>
+        validUuid(current[column]) && links[payloadField] === null && !confirmed.includes(payloadField)
+      )) {
+        throw new ApiError(
+          422,
+          "attendance_link_removal_confirmation_required",
+          "Há vínculos existentes que ficaram vazios. Atualize o atendimento ou confirme explicitamente a remoção antes de salvar.",
+        );
+      }
+    }
+  }
   const result = await rpc("operacao_salvar_atendimento", {
     ...baseRpc(context),
     p_attendance_id: attendanceId,
-    p_expected_version: attendanceId
-      ? requiredInteger(payload.versao, "a versão", 1, 2_000_000_000)
-      : null,
+    p_expected_version: expectedVersion,
     p_patient_id: requiredUuid(payload.cliente_id, "o cliente"),
-    p_appointment_id: optionalUuid(payload.agendamento_id, "o agendamento"),
-    p_protocol_id: optionalUuid(payload.protocolo_id, "o prontuário"),
-    p_financial_entry_id: optionalUuid(payload.lancamento_financeiro_id, "o lançamento financeiro"),
+    p_appointment_id: links.agendamento_id,
+    p_protocol_id: links.protocolo_id,
+    p_financial_entry_id: links.lancamento_financeiro_id,
     p_procedure_kind: safeText(payload.procedimento, 120),
     p_attended_at: requiredTimestamp(payload.realizado_em, "a data do atendimento"),
     p_duration_minutes: optionalInteger(payload.duracao_minutos, "a duração", 1, 720),

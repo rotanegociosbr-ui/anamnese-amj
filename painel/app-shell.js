@@ -13,6 +13,7 @@
     fornecedores: Object.freeze({ title: 'Fornecedores', legacy: 'financeiro', owner: true, financeView: 'fornecedores', group: 'principal' }),
     agenda: Object.freeze({ title: 'Agenda', legacy: 'agenda', group: 'principal' }),
     receitas: Object.freeze({ title: 'Receitas avulsas', legacy: 'financeiro', owner: true, financeView: 'receitas', entryView: 'receitas_avulsas', group: 'principal' }),
+    cobrancas: Object.freeze({ title: 'Cobranças de procedimentos', legacy: 'financeiro', owner: true, financeView: 'receitas', entryView: 'procedimentos', group: 'principal' }),
     despesas: Object.freeze({ title: 'Despesas', legacy: 'financeiro', owner: true, financeView: 'despesas', entryView: 'despesas', group: 'principal' }),
     estoque: Object.freeze({ title: 'Estoque', legacy: 'financeiro', owner: true, financeView: 'estoque', group: 'principal' }),
     cotacoes: Object.freeze({ title: 'Cotações e preços', legacy: 'cotacoes', owner: true, group: 'principal' }),
@@ -48,7 +49,7 @@
     }),
     operacao: Object.freeze({
       global: 'AMJOperacaoClinica',
-      src: './operacao.js?v=20260906-5',
+      src: './operacao.js?v=20260906-7',
       root: 'operacao-clinica-root'
     }),
     acompanhamentos: Object.freeze({
@@ -611,16 +612,19 @@
     const context = document.createElement('section');
     context.id = 'app-procedure-context';
     context.className = 'app-procedure-context';
-    context.innerHTML = '<div><h2>Procedimentos por paciente e data</h2>' +
-      '<p>Registre a visita, os itens realizados, produtos, fotos antes/depois, cobrança e retorno no mesmo histórico.</p></div>' +
+    context.innerHTML = '<div><h2>Atendimentos e procedimentos</h2>' +
+      '<p>Procure a paciente e abra a consulta pela data. Fotos, prontuário e cobranças ficam ligados ao mesmo atendimento.</p></div>' +
       '<div class="app-context-actions"><button type="button" class="app-procedure-photo-shortcut" data-app-action="fotos-atendimento">Adicionar ou tirar fotos</button>' +
       '<button type="button" class="secundario" data-app-action="refresh-procedures">Atualizar</button>' +
       '<button type="button" class="secundario" data-shell-route="prontuarios">Prontuários e fotos</button>' +
-      '<button type="button" data-app-action="new-procedure">Novo procedimento</button></div>';
+      '<button type="button" data-app-action="new-procedure">Novo atendimento</button></div>';
     root.insertBefore(context, root.firstChild);
   }
 
   function focusNewProcedure() {
+    if (window.AMJOperacaoClinica && typeof window.AMJOperacaoClinica.novoAtendimento === 'function') {
+      return window.AMJOperacaoClinica.novoAtendimento();
+    }
     const form = document.querySelector('#operacao-clinica-root [data-form-atendimento]');
     if (!form) return;
     form.scrollIntoView({ behavior: 'smooth', block: 'start' });

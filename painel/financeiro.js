@@ -11,6 +11,8 @@
   const state = {
     loaded: false,
     loading: false,
+    loadCompletion: null,
+    openingEntry: null,
     catalogs: { formas_pagamento: [], fornecedores: [], marcas: [], produtos: [] },
     catalogRevision: 0,
     registryEditorRevisions: { cliente: 0, produto: 0, marca: 0, fornecedor: 0 },
@@ -848,7 +850,7 @@
       state.entryView = button.dataset.financeiroVisao;
       const typeFilter = byId('financeiro-filtro-tipo');
       if (typeFilter) typeFilter.value = '';
-      renderEntries();
+      renderEntries({ preserveForms: true });
     });
     const typeFilter = byId('financeiro-filtro-tipo');
     if (typeFilter && typeFilter.closest('label')) typeFilter.closest('label').hidden = true;
@@ -860,10 +862,94 @@
     state.entryView = view;
     const typeFilter = byId('financeiro-filtro-tipo');
     if (typeFilter) typeFilter.value = '';
-    renderEntries();
+    renderEntries({ preserveForms: true });
     const list = byId('financeiro-lista');
     if (list) list.scrollIntoView({ behavior: 'smooth', block: 'start' });
     return true;
+  }
+
+  async function openExistingEntry(value) {
+    const id = String(value || '').trim();
+    if (!id || !ownerAccess()) {
+      status('financeiro-status', !id ? 'Nenhum lançamento foi informado.' :
+        'Entre com a conta proprietária para consultar este lançamento.', true);
+      return false;
+    }
+    const generation = state.generation;
+    const opening = {};
+    state.openingEntry = opening;
+    const shell = window.AMJShell;
+    const currentRoute = function () {
+      return shell && typeof shell.currentRoute === 'function' ? shell.currentRoute() : null;
+    };
+    let expectedRoute = currentRoute();
+    const isCurrent = function () {
+      return generation === state.generation && ownerAccess() && state.openingEntry === opening &&
+        currentRoute() === expectedRoute;
+    };
+    try {
+      // Finish an already running refresh before searching, so its first page
+      // cannot replace the exact record just revealed by this read-only link.
+      if (state.loadCompletion) await state.loadCompletion;
+      if (!isCurrent()) return false;
+      status('financeiro-status', 'Localizando o lançamento…', false);
+      let entry = state.loaded && state.entries.find(function (row) { return row.id === id; });
+      if (!entry) {
+        // The existing endpoint supports pagination, not an ID filter.
+        for (let page = 1; page <= 100; page += 1) {
+          const data = await call('listar_lancamentos', { pagina: page, por_pagina: 100 });
+          if (!isCurrent()) return false;
+          const rows = Array.isArray(data.lancamentos) ? data.lancamentos : [];
+          entry = rows.find(function (row) { return row.id === id; });
+          if (entry || !data.paginacao || !data.paginacao.tem_mais) break;
+          if (page === 100) throw new Error('A busca de lançamentos atingiu o limite. Tente novamente pela lista financeira.');
+        }
+      }
+      if (!entry) throw new Error('Lançamento não encontrado. Atualize a lista financeira e confira o vínculo do procedimento.');
+      if (state.loadCompletion) await state.loadCompletion;
+      if (!isCurrent()) return false;
+      const view = entryViewOf(entry);
+      const route = { procedimentos: 'cobrancas', receitas_avulsas: 'receitas', despesas: 'despesas' }[view];
+      if (shell && typeof shell.navigate === 'function' && currentRoute() !== route) {
+        const previousRoute = expectedRoute;
+        expectedRoute = route;
+        const navigated = await shell.navigate(route, { focus: false });
+        if (navigated === false) {
+          if (currentRoute() === previousRoute) expectedRoute = previousRoute;
+          throw new Error('Não foi possível abrir a área financeira. Tente novamente.');
+        }
+      } else if (!shell && typeof trocarAba === 'function') {
+        trocarAba('financeiro');
+      }
+      if (!isCurrent()) return false;
+      const index = state.entries.findIndex(function (row) { return row.id === id; });
+      if (index === -1) state.entries.push(entry);
+      else state.entries[index] = entry;
+      state.entryView = view;
+      const situation = byId('financeiro-filtro-status');
+      if (situation && situation.value && situation.value !== entryStatus(entry) &&
+          !(situation.value === 'cancelado' && entryState(entry) === 'cancelado')) situation.value = '';
+      const typeFilter = byId('financeiro-filtro-tipo');
+      if (typeFilter && typeFilter.value && typeFilter.value !== entryType(entry)) typeFilter.value = '';
+      renderEntries({ preserveForms: true });
+      const list = byId('financeiro-lista');
+      const card = list && Array.from(list.querySelectorAll('[data-financeiro-entry-card]')).find(function (node) {
+        return node.dataset.financeiroEntryCard === id;
+      });
+      if (!card) throw new Error('O lançamento foi localizado, mas não foi possível exibir o cartão. Atualize a lista financeira.');
+      const details = card.querySelector('.financeiro-lancamento-detalhes');
+      if (details) details.open = true;
+      card.setAttribute('tabindex', '-1');
+      card.focus({ preventScroll: true });
+      card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      status('financeiro-status', 'Lançamento localizado. Os detalhes estão abertos; nenhum pagamento ou alteração foi realizado.', false);
+      return true;
+    } catch (error) {
+      if (isCurrent() && !isStaleSession(error)) status('financeiro-status', error.message, true);
+      return false;
+    } finally {
+      if (state.openingEntry === opening) state.openingEntry = null;
+    }
   }
 
   function renderPaymentHistory(entry) {
@@ -988,7 +1074,7 @@
     });
   }
 
-  function renderEntries() {
+  function renderEntries(settings) {
     ensureEntryViews();
     document.querySelectorAll('[data-financeiro-visao]').forEach(function (button) {
       const active = button.dataset.financeiroVisao === state.entryView;
@@ -1002,7 +1088,7 @@
     list.setAttribute('aria-busy', 'false');
     if (!entries.length) {
       list.innerHTML = '<p class="financeiro-vazio">Nenhum lançamento encontrado neste filtro.</p>';
-      populateOpenEntries();
+      if (!settings || !settings.preserveForms) populateOpenEntries();
       return;
     }
     list.innerHTML = entries.map(function (entry) {
@@ -1068,7 +1154,7 @@
         (actions.length ? '<div class="financeiro-lancamento-acoes">' + actions.join('') + '</div>' : '') +
         '</article>';
     }).join('');
-    populateOpenEntries();
+    if (!settings || !settings.preserveForms) populateOpenEntries();
   }
 
   function renderAudit() {
@@ -1197,6 +1283,8 @@
     const generation = state.generation;
     const catalogRevision = state.catalogRevision;
     state.loading = true;
+    let completeLoad;
+    state.loadCompletion = new Promise(function (resolve) { completeLoad = resolve; });
     status('financeiro-status', options && options.silent ? '' : 'Atualizando dados financeiros…', false);
     byId('financeiro-lista').setAttribute('aria-busy', 'true');
     try {
@@ -1247,14 +1335,16 @@
     } finally {
       if (generation === state.generation) {
         state.loading = false;
+        state.loadCompletion = null;
         byId('financeiro-lista').setAttribute('aria-busy', 'false');
       }
+      completeLoad();
     }
   }
 
   function activate() {
     updateAccess();
-    if (ownerAccess() && !state.loaded) load();
+    if (ownerAccess() && !state.loaded && !state.openingEntry) load();
   }
 
   function reset() {
@@ -1264,6 +1354,8 @@
     clearTimeout(state.searchTimer);
     state.loaded = false;
     state.loading = false;
+    state.loadCompletion = null;
+    state.openingEntry = null;
     state.catalogs = { formas_pagamento: [], fornecedores: [], marcas: [], produtos: [] };
     state.catalogRevision += 1;
     state.costs = [];
@@ -2727,6 +2819,7 @@
     reset: reset,
     carregar: load,
     abrirCadastro: openExistingRegistration,
+    abrirLancamento: openExistingEntry,
     abrirVisao: openEntryView
   };
 

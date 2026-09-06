@@ -696,6 +696,64 @@ body.app-shell-authenticated #tela-lista {
   transform: translateY(-1px);
 }
 
+/* Legibilidade do contexto de Procedimentos, sem afetar as visões financeiras. */
+#app-procedure-context {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 18px;
+  padding: 22px;
+}
+
+#app-procedure-context h2 {
+  font-size: clamp(28px, 2.4vw, 32px);
+  line-height: 1.2;
+}
+
+#app-procedure-context p {
+  max-width: 76ch;
+  margin-top: 8px;
+  font-size: 15px;
+  font-weight: 400;
+  line-height: 1.6;
+}
+
+#app-procedure-context .app-context-actions {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+#app-procedure-context .app-context-actions button {
+  min-width: 0;
+  min-height: 48px;
+  padding: 12px 16px;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+#app-procedure-context .app-context-actions button:focus-visible {
+  outline: 3px solid var(--app-gold);
+  outline-offset: 3px;
+}
+
+.app-shell-procedure-view :is(.operacao-status, .operacao-resumo span,
+  .operacao-visita header span, .operacao-vinculos span) {
+  font-weight: 400;
+  line-height: 1.55;
+}
+
+@media (max-width: 1180px) {
+  #app-procedure-context .app-context-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 600px) {
+  #app-procedure-context { padding: 18px; }
+  #app-procedure-context .app-context-actions { grid-template-columns: minmax(0, 1fr); }
+}
+
 /* Visões simples: a mesma fonte de dados financeira, sem páginas duplicadas. */
 #aba-financeiro[data-app-finance-view] > .financeiro-cabecalho,
 .app-shell-procedure-view .operacao-cabecalho {

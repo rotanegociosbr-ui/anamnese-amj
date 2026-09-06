@@ -9,7 +9,8 @@
   });
   const state = {
     root: null, loaded: false, loading: false, loadPromise: null, generation: 0,
-    listLimit: 1000, pagination: null, data: emptyData()
+    listLimit: 1000, pagination: null, data: emptyData(), attendanceBaseline: '', selectedAttendanceId: '',
+    attendanceRevision: 0
   };
   const disabledBeforeBusy = new WeakMap();
   const photoUploadKeys = new WeakMap();
@@ -208,8 +209,14 @@
         motivoObrigatorio: true
       });
       assertSessionContext(generation);
+      // Attendance updates replay by p_request_id in SQL. Reuse this payload's
+      // intent ID after a lost response, but still obtain fresh confirmation and
+      // validate the active session on every attempt. Other actions are unchanged.
+      const operationId = action === 'salvar_atendimento' && payload &&
+        payload.atendimento_id && payload.idempotency_key
+        ? payload.idempotency_key : proof.operation_id;
       return await jsonRequest(action, Object.assign({}, payload || {}, {
-        operation_id: proof.operation_id,
+        operation_id: operationId,
         motivo: proof.motivo || reason || 'Alteração operacional confirmada pela gestão'
       }), proof);
     } finally {
@@ -278,27 +285,40 @@
     return '' +
       '<section class="operacao-clinica" aria-labelledby="operacao-titulo">' +
         '<header class="operacao-cabecalho"><div><p class="operacao-supra">Gestão clínica</p>' +
-          '<h2 id="operacao-titulo">Procedimentos, retornos e margem gerencial</h2>' +
-          '<p>Registros por IDs, sem disparo automático de mensagens e sem valores presumidos.</p></div>' +
-          '<button type="button" class="operacao-botao secundario" data-operacao-recarregar>Atualizar</button></header>' +
+          '<h2 id="operacao-titulo">Atendimentos e procedimentos</h2>' +
+          '<p>Encontre a consulta da paciente. Abra o atendimento para consultar procedimentos, fotos, produtos e pagamentos.</p></div>' +
+          '<div class="operacao-acoes"><button type="button" class="operacao-botao secundario" data-operacao-recarregar>Atualizar lista</button>' +
+          '<button type="button" class="operacao-botao" data-atendimento-novo>Novo atendimento</button></div></header>' +
          '<p class="operacao-status" data-operacao-status role="status" aria-live="polite"></p>' +
          '<div data-operacao-paginacao></div>' +
          '<div class="operacao-resumo" data-operacao-resumo></div>' +
+         '<details class="operacao-secundarios" data-operacao-guia><summary>Como trabalhar nesta tela — passo a passo</summary>' +
+           '<ol><li><strong>Procure a paciente e a data</strong> nos atendimentos abaixo. Se já existe a consulta, abra esse registro.</li>' +
+           '<li><strong>Novo dia de atendimento:</strong> use Novo atendimento, escolha a paciente, informe procedimento, data e responsável, e salve.</li>' +
+           '<li><strong>Mais procedimentos no mesmo atendimento:</strong> abra a consulta e use Adicionar outro procedimento. Outro dia pede um novo atendimento.</li>' +
+           '<li><strong>Prontuário, produtos e fotos:</strong> abra os botões da mesma consulta. Se não houver prontuário, use Preparar prontuário e fotos. O arquivo é privado; publicação depende de autorização específica.</li>' +
+           '<li><strong>Valores e recebimentos:</strong> vincule a cobrança já cadastrada da paciente. A seleção não cria cobrança nem confirma recebimento.</li>' +
+           '<li><strong>Retorno:</strong> abra Planejar retorno em Mais controles. Selecione a consulta e informe a data definida pela profissional.</li>' +
+           '<li><strong>Arquivados:</strong> podem ser consultados. Restaurar é uma ação separada e só deve ser usada quando o arquivamento foi indevido.</li></ol>' +
+           '<p class="operacao-nota">Agendamento, prontuário e cobrança são vínculos com registros existentes, não campos para digitar novamente. Ao salvar, espere a confirmação. Se houver erro, o preenchimento permanece na tela.</p></details>' +
+         '<section class="operacao-card operacao-largo" data-atendimentos-historico><h3>Atendimentos cadastrados</h3>' +
+           '<label>Buscar paciente ou procedimento<input type="search" data-operacao-busca placeholder="Digite o nome da paciente ou do procedimento"></label>' +
+           '<p class="operacao-nota">Abra a consulta pela data. Cada atendimento reúne seus procedimentos e registros vinculados.</p>' +
+           '<div data-operacao-atendimentos></div></section>' +
          '<section class="operacao-fotos-atalho" data-fotos-atalho aria-labelledby="operacao-fotos-atalho-titulo">' +
            '<div class="operacao-fotos-atalho-cabecalho"><div><p class="operacao-supra">Acesso direto</p>' +
-             '<h3 id="operacao-fotos-atalho-titulo">Adicionar fotos ao atendimento</h3>' +
-             '<p>Escolha a paciente e a consulta. O sistema abre a etapa certa: prontuário, autorização ou galeria.</p></div>' +
+             '<h3 id="operacao-fotos-atalho-titulo">Fotos da consulta selecionada</h3>' +
+             '<p>A paciente, a data e o procedimento abaixo identificam onde as fotos serão guardadas.</p></div>' +
              '<span class="operacao-selo alerta" data-fotos-atalho-etapa>Escolha uma consulta</span></div>' +
            '<div class="operacao-fotos-atalho-controles"><label>Paciente e atendimento' +
              '<select data-fotos-atalho-atendimento aria-label="Paciente e atendimento para adicionar fotos"></select></label>' +
              '<button type="button" class="operacao-botao" data-fotos-atalho-abrir>Adicionar ou tirar fotos</button></div>' +
            '<p class="operacao-fotos-atalho-orientacao" data-fotos-atalho-orientacao role="status" aria-live="polite">' +
              'Selecione uma consulta para continuar.</p>' +
-           '<div class="operacao-fotos-fluxo" aria-label="Etapas obrigatórias das fotos clínicas">' +
-             '<span>1. Prontuário da consulta</span><span>2. Autorização de fotografia</span>' +
-             '<span>3. Escolher fotos ou abrir a câmera</span></div></section>' +
-         '<div class="operacao-grade">' +
+           '<p class="operacao-nota">As fotos ficam no prontuário desta consulta. Autorização para redes sociais é registrada separadamente.</p></section>' +
+         '<details class="operacao-formulario-principal" data-atendimento-editor><summary>Novo atendimento ou edição selecionada</summary>' +
           '<form class="operacao-card" data-form-atendimento><h3 data-atendimento-form-titulo>Registrar visita e procedimento</h3>' +
+            '<p class="operacao-contexto-atendimento" data-atendimento-contexto>Novo atendimento — selecione a paciente.</p>' +
             '<input name="atendimento_id" type="hidden"><input name="versao" type="hidden">' +
             '<label>Cliente<select name="cliente_id" required></select></label>' +
             '<label>Procedimento<input name="procedimento" maxlength="120" required></label>' +
@@ -307,12 +327,18 @@
             '<label>Responsável<select name="responsavel_id" required></select></label>' +
             '<label>Situação<select name="status" required><option value="realizado">Realizado</option>' +
               '<option value="concluido">Concluído</option><option value="interrompido">Interrompido</option></select></label>' +
-            '<details><summary>Vínculos opcionais</summary>' +
-              '<label>Agendamento<select name="agendamento_id"></select></label>' +
-              '<label>Prontuário<select name="protocolo_id"></select></label>' +
-              '<label>Cobrança do procedimento<select name="lancamento_financeiro_id"></select></label></details>' +
+            '<details data-atendimento-vinculos><summary>Agenda, prontuário e cobrança desta paciente</summary>' +
+              '<p class="operacao-nota">Selecione registros já existentes da mesma paciente. É possível salvar o atendimento sem esses vínculos e completar depois.</p>' +
+              '<label>Agendamento<select name="agendamento_id"></select></label><p class="operacao-nota" data-vinculo-ajuda="agendamento_id"></p>' +
+              '<button type="button" class="operacao-botao secundario" data-vinculo-abrir="agenda">Abrir agenda</button>' +
+              '<label>Prontuário<select name="protocolo_id"></select></label><p class="operacao-nota" data-vinculo-ajuda="protocolo_id"></p>' +
+              '<button type="button" class="operacao-botao secundario" data-vinculo-abrir="prontuario">Abrir prontuário selecionado</button>' +
+              '<label>Cobrança do procedimento<select name="lancamento_financeiro_id"></select></label><p class="operacao-nota" data-vinculo-ajuda="lancamento_financeiro_id"></p>' +
+              '<button type="button" class="operacao-botao secundario" data-vinculo-abrir="cobranca">Abrir cobrança selecionada</button></details>' +
+            '<p class="operacao-status" data-atendimento-status role="status" aria-live="polite"></p>' +
             '<div class="operacao-acoes"><button class="operacao-botao" type="submit" data-atendimento-salvar>Salvar atendimento</button>' +
-              '<button class="operacao-botao secundario" type="button" data-atendimento-cancelar-edicao hidden>Cancelar edição</button></div></form>' +
+              '<button class="operacao-botao secundario" type="button" data-atendimento-cancelar-edicao hidden>Fechar edição</button></div></form></details>' +
+         '<details class="operacao-secundarios"><summary>Mais controles — retornos, preferências e custos</summary><div class="operacao-grade">' +
           '<form class="operacao-card" data-form-retorno><h3>Planejar retorno validado</h3>' +
             '<label>Atendimento<select name="atendimento_id" required></select></label>' +
             '<label>Recomendação<input name="recomendacao" maxlength="120" required></label>' +
@@ -374,10 +400,8 @@
                 '<option value="comprovante">Comprovante</option><option value="operadora">Operadora</option></select></label></div>' +
             '<label>Referência da fonte<input name="referencia_fonte" maxlength="180"></label>' +
             '<button class="operacao-botao" type="submit">Declarar taxa</button></form>' +
-        '</div>' +
-        '<section class="operacao-card operacao-largo"><h3>Perfil de procedimentos por paciente e data</h3>' +
-          '<p class="operacao-nota">Cada data é uma visita e pode reunir vários procedimentos. “Apagar” apenas arquiva com confirmação e auditoria.</p>' +
-          '<div data-operacao-atendimentos></div></section>' +
+        '</div></details>' +
+        '<details class="operacao-secundarios"><summary>Históricos e relatórios — retornos, custos e rentabilidade</summary>' +
         '<section class="operacao-card operacao-largo"><h3>Preferências de contato vigentes</h3>' +
           '<p class="operacao-nota">Cada linha mostra a versão vigente já registrada para paciente, finalidade e canal.</p>' +
           '<div data-operacao-preferencias-contato></div></section>' +
@@ -393,7 +417,7 @@
           '<p class="operacao-nota">A métrica é margem de contribuição gerencial. Linhas incompletas não recebem margem.</p>' +
           '<div class="operacao-tabela-wrap"><table><thead><tr><th>Data</th><th>Procedimento</th><th>Valor do procedimento</th>' +
           '<th>Recebido</th><th>Materiais</th><th>Taxas</th><th>Margem</th><th>Qualidade</th></tr></thead>' +
-          '<tbody data-operacao-rentabilidade></tbody></table></div></section>' +
+          '<tbody data-operacao-rentabilidade></tbody></table></div></section></details>' +
       '</section>';
   }
 
@@ -473,7 +497,7 @@
     const select = bySelector('[data-fotos-atalho-atendimento]');
     if (!select || !select.value) return null;
     return state.data.atendimentos.find(function (row) {
-      return row.id === select.value && !row.archived_at;
+      return row.id === select.value;
     }) || null;
   }
 
@@ -494,18 +518,18 @@
       return;
     }
     const protocol = protocolForVisit(visit);
-    if (!visit.protocol_id || !protocol) {
+    if ((!visit.protocol_id || !protocol) && !visit.archived_at) {
       step.textContent = 'Prontuário pendente';
       step.classList.add('alerta');
       guidance.textContent = 'Primeiro prepare o prontuário desta consulta. Nenhum consentimento ou foto será criado automaticamente.';
       button.textContent = 'Preparar prontuário para fotos';
       return;
     }
-    if (protocol.archived_at || visit.archived_at) {
+    if (visit.archived_at || protocol && protocol.archived_at) {
       step.textContent = 'Somente leitura';
       step.classList.add('alerta');
-      guidance.textContent = 'Restaure o atendimento e o prontuário antes de adicionar novas fotos.';
-      button.textContent = 'Abrir consulta arquivada';
+      guidance.textContent = 'O prontuário está arquivado. Você pode abrir o histórico para leitura. Para anexar novas fotos, revise e restaure o registro pelo prontuário, se o arquivamento foi indevido.';
+      button.textContent = 'Abrir prontuário arquivado';
       return;
     }
     step.textContent = 'Galeria liberada';
@@ -517,14 +541,78 @@
   function hydratePhotoShortcut() {
     const select = bySelector('[data-fotos-atalho-atendimento]');
     if (!select) return;
-    const current = select.value;
-    const rows = state.data.atendimentos.filter(function (row) { return !row.archived_at; })
+    const current = state.selectedAttendanceId || select.value;
+    const rows = state.data.atendimentos.slice()
       .sort(function (a, b) { return String(b.attended_at || '').localeCompare(String(a.attended_at || '')); });
     select.innerHTML = options(rows, 'id', function (row) {
-      return selectedPatientName(row.patient_id) + ' · ' + dateTime(row.attended_at) + ' · ' + row.procedure_kind;
+      const protocol = protocolForVisit(row);
+      return selectedPatientName(row.patient_id) + ' · ' + dateTime(row.attended_at) + ' · ' + row.procedure_kind +
+        (row.archived_at || protocol && protocol.archived_at ? ' · arquivado / leitura' : '');
     });
     if (rows.some(function (row) { return row.id === current; })) select.value = current;
     updatePhotoShortcut();
+  }
+
+  function preserveOptions(node, html) {
+    if (!node) return;
+    const current = node.value;
+    const old = Array.from(node.options || []).find(function (option) { return option.value === current; });
+    node.innerHTML = html;
+    if (current && !Array.from(node.options || []).some(function (option) { return option.value === current; })) {
+      node.insertAdjacentHTML('beforeend', '<option value="' + escapeHtml(current) + '">' +
+        escapeHtml(old && old.textContent || 'Vínculo atual preservado') + '</option>');
+    }
+    node.value = current || '';
+  }
+  function attendanceFingerprint() {
+    const form = bySelector('[data-form-atendimento]');
+    if (!form) return '';
+    return JSON.stringify(['atendimento_id','cliente_id','procedimento','realizado_em','duracao_minutos',
+      'responsavel_id','status','agendamento_id','protocolo_id','lancamento_financeiro_id'].map(function (name) { return formValue(form, name); }));
+  }
+  function attendanceDirty() { return Boolean(state.attendanceBaseline && state.attendanceBaseline !== attendanceFingerprint()); }
+  function attendanceStatus(message, error) {
+    const node = bySelector('[data-atendimento-status]');
+    if (node) { node.textContent = message || ''; node.classList.toggle('erro', Boolean(error)); }
+  }
+  function attendanceContext() {
+    const form = bySelector('[data-form-atendimento]');
+    const node = bySelector('[data-atendimento-contexto]');
+    if (!form || !node) return;
+    node.textContent = (formValue(form, 'atendimento_id') ? 'Editando: ' : 'Novo atendimento: ') +
+      (formValue(form, 'cliente_id') ? selectedPatientName(formValue(form, 'cliente_id')) : 'selecione a paciente') +
+      (formValue(form, 'realizado_em') ? ' · ' + dateTime(formValue(form, 'realizado_em')) : '') +
+      (formValue(form, 'procedimento') ? ' · ' + formValue(form, 'procedimento') : '');
+  }
+  function hydrateAttendanceLinks() {
+    const form = bySelector('[data-form-atendimento]');
+    if (!form) return;
+    const patientId = formValue(form, 'cliente_id');
+    const visitId = formValue(form, 'atendimento_id');
+    const configs = [
+      { name:'agendamento_id', rows:state.data.agendamentos.filter(function (row) {
+        return state.data.vinculos_agenda.some(function (link) { return link.source_id === row.id && link.patient_id === patientId; });
+      }), label:function (row) { return row.procedimento + ' · ' + dateTime(row.inicio_em); }, empty:'Nenhum agendamento vinculado a esta paciente. Cadastre ou vincule pela Agenda; este atendimento pode ser salvo sem agendamento.' },
+      { name:'protocolo_id', rows:state.data.protocolos.filter(function (row) {
+        return row.patient_id === patientId && (!row.archived_at || row.id === formValue(form, 'protocolo_id')) &&
+          !state.data.atendimentos.some(function (visit) { return visit.id !== visitId && visit.protocol_id === row.id && !visit.archived_at; });
+      }), label:function (row) { return row.procedure_kind + ' · ' + (row.procedure_date || 'sem data') + (row.archived_at ? ' · arquivado / vínculo preservado' : ''); }, empty:'Nenhum prontuário disponível desta paciente. Salve o atendimento e use Preparar prontuário e fotos na consulta.' },
+      { name:'lancamento_financeiro_id', rows:state.data.lancamentos_receita.filter(function (row) {
+        return row.patient_id === patientId && (row.state === 'ativo' || row.id === formValue(form, 'lancamento_financeiro_id')) &&
+          !state.data.atendimentos.some(function (visit) { return visit.id !== visitId && visit.financial_entry_id === row.id && !visit.archived_at; }) &&
+          !state.data.procedimentos_atendimento.some(function (item) { return item.attendance_id !== visitId && item.financial_entry_id === row.id && !item.archived_at; });
+      }), label:function (row) { return row.description + ' · ' + money(row.total_amount); }, empty:'Nenhuma cobrança disponível desta paciente. Cadastre a cobrança no Financeiro e depois vincule aqui; não crie uma segunda cobrança para a mesma venda.' }
+    ];
+    configs.forEach(function (config) {
+      const select = form.elements[config.name];
+      preserveOptions(select, '<option value="">Sem vínculo — completar depois</option>' + config.rows.map(function (row) {
+        return '<option value="' + escapeHtml(row.id) + '">' + escapeHtml(config.label(row)) + '</option>';
+      }).join(''));
+      const help = bySelector('[data-vinculo-ajuda="' + config.name + '"]');
+      if (help) help.textContent = !patientId ? 'Escolha a paciente primeiro.' : config.rows.length
+        ? 'Selecione o registro correspondente a esta consulta. O vínculo é salvo junto com o atendimento.' : config.empty;
+    });
+    attendanceContext();
   }
 
   function hydrateForms() {
@@ -532,28 +620,17 @@
       return row.full_name;
     });
     const memberOptions = options(state.data.responsaveis, 'user_id', function (row) { return row.display_name; });
-    all('select[name="cliente_id"]').forEach(function (node) { node.innerHTML = patientOptions; });
-    all('select[name="responsavel_id"]').forEach(function (node) { node.innerHTML = memberOptions; });
+    all('select[name="cliente_id"]').forEach(function (node) { preserveOptions(node, patientOptions); });
+    all('select[name="responsavel_id"]').forEach(function (node) { preserveOptions(node, memberOptions); });
     const attendanceOptions = options(state.data.atendimentos.filter(function (row) { return !row.archived_at; }), 'id', function (row) {
       return selectedPatientName(row.patient_id) + ' · ' + row.procedure_kind + ' · ' + dateTime(row.attended_at);
     });
-    all('select[name="atendimento_id"]').forEach(function (node) { node.innerHTML = attendanceOptions; });
-    const appointmentSelect = bySelector('[data-form-atendimento] select[name="agendamento_id"]');
-    if (appointmentSelect) appointmentSelect.innerHTML = options(state.data.agendamentos, 'id', function (row) {
-      return row.procedimento + ' · ' + dateTime(row.inicio_em);
-    });
-    const protocolSelect = bySelector('[data-form-atendimento] select[name="protocolo_id"]');
-    if (protocolSelect) protocolSelect.innerHTML = options(state.data.protocolos.filter(function (row) { return !row.archived_at; }), 'id', function (row) {
-      return selectedPatientName(row.patient_id) + ' · ' + row.procedure_kind + ' · ' + (row.procedure_date || 'sem data');
-    });
-    const entrySelect = bySelector('[data-form-atendimento] select[name="lancamento_financeiro_id"]');
-    if (entrySelect) entrySelect.innerHTML = options(state.data.lancamentos_receita.filter(function (row) { return row.state === 'ativo'; }), 'id', function (row) {
-      return selectedPatientName(row.patient_id) + ' · ' + row.description + ' · ' + money(row.total_amount);
-    });
+    all('select[name="atendimento_id"]').forEach(function (node) { preserveOptions(node, attendanceOptions); });
+    hydrateAttendanceLinks();
     const productSelect = bySelector('[data-form-ajuste] select[name="produto_id"]');
-    if (productSelect) productSelect.innerHTML = options(state.data.produtos.filter(function (row) {
+    if (productSelect) preserveOptions(productSelect, options(state.data.produtos.filter(function (row) {
       return row.active && row.stock_control && !row.archived_at;
-    }), 'id', function (row) { return row.name + ' · ' + row.unit; });
+    }), 'id', function (row) { return row.name + ' · ' + row.unit; }));
     hydratePhotoShortcut();
     hydrateCostItems();
     hydrateFeePayments();
@@ -561,14 +638,16 @@
     const attendanceForm = bySelector('[data-form-atendimento]');
     const returnForm = bySelector('[data-form-retorno]');
     const adjustmentForm = bySelector('[data-form-ajuste]');
-    if (attendanceForm) attendanceForm.elements.realizado_em.value = localNow();
+    if (attendanceForm && !attendanceForm.elements.realizado_em.value) attendanceForm.elements.realizado_em.value = localNow();
     if (returnForm) {
-      returnForm.elements.data_exata.value = today();
-      returnForm.elements.proxima_acao_em.value = localNow();
+      if (!returnForm.elements.data_exata.value && !returnForm.elements.janela_inicio.value && !returnForm.elements.janela_fim.value) returnForm.elements.data_exata.value = today();
+      if (!returnForm.elements.proxima_acao_em.value) returnForm.elements.proxima_acao_em.value = localNow();
     }
-    if (adjustmentForm) adjustmentForm.elements.ocorrido_em.value = localNow();
+    if (adjustmentForm && !adjustmentForm.elements.ocorrido_em.value) adjustmentForm.elements.ocorrido_em.value = localNow();
     const costForm = bySelector('[data-form-custo]');
     if (costForm && !costForm.elements.vigente_desde.value) costForm.elements.vigente_desde.value = today();
+    attendanceContext();
+    if (!state.attendanceBaseline) state.attendanceBaseline = attendanceFingerprint();
   }
 
   function hydrateAdjustmentLots() {
@@ -579,9 +658,9 @@
     const lots = state.data.estoque_lotes.filter(function (row) {
       return row.product_id === productId && (isReturn || num(row.quantity_balance) > 0);
     });
-    form.elements.lote_id.innerHTML = options(lots, 'lot_id', function (row) {
+    preserveOptions(form.elements.lote_id, options(lots, 'lot_id', function (row) {
       return row.lot + ' · ' + row.quantity_balance + ' ' + row.unit + ' · vence ' + row.expiry;
-    });
+    }));
   }
 
   function resetAttendanceEditor() {
@@ -599,12 +678,22 @@
     if (title) title.textContent = 'Registrar visita e procedimento';
     if (submitButton) submitButton.textContent = 'Salvar atendimento';
     if (cancelButton) cancelButton.hidden = true;
+    state.attendanceRevision += 1;
+    state.selectedAttendanceId = '';
+    const shortcut = bySelector('[data-fotos-atalho-atendimento]');
+    if (shortcut) shortcut.value = '';
+    hydrateAttendanceLinks();
+    updatePhotoShortcut();
+    attendanceStatus('');
+    state.attendanceBaseline = attendanceFingerprint();
   }
 
-  function editAttendance(id) {
+  function editAttendance(id, skipConfirmation) {
     const row = state.data.atendimentos.find(function (item) { return item.id === id; });
     const form = bySelector('[data-form-atendimento]');
-    if (!row || !form || row.archived_at) return;
+    if (!row || !form || row.archived_at) return false;
+    if (!skipConfirmation && attendanceDirty() && !window.confirm('Há alterações não salvas. Deseja descartá-las e abrir este atendimento?')) return false;
+    state.attendanceRevision += 1;
     form.elements.atendimento_id.value = row.id;
     form.elements.versao.value = row.version;
     form.elements.cliente_id.value = row.patient_id;
@@ -614,16 +703,71 @@
     form.elements.duracao_minutos.value = row.duration_minutes || '';
     form.elements.responsavel_id.value = row.responsible_user_id || '';
     form.elements.status.value = row.status || 'realizado';
-    form.elements.agendamento_id.value = row.appointment_id || '';
-    form.elements.protocolo_id.value = row.protocol_id || '';
-    form.elements.lancamento_financeiro_id.value = row.financial_entry_id || '';
+    [['agendamento_id',row.appointment_id],['protocolo_id',row.protocol_id],['lancamento_financeiro_id',row.financial_entry_id]].forEach(function (pair) {
+      const select = form.elements[pair[0]];
+      select.value = '';
+      if (pair[1] && !Array.from(select.options).some(function (option) { return option.value === pair[1]; })) {
+        select.insertAdjacentHTML('beforeend', '<option value="' + escapeHtml(pair[1]) + '">Vínculo atual preservado</option>');
+      }
+      select.value = pair[1] || '';
+    });
+    hydrateAttendanceLinks();
+    state.selectedAttendanceId = row.id;
+    const shortcut = bySelector('[data-fotos-atalho-atendimento]');
+    if (shortcut) shortcut.value = row.id;
+    updatePhotoShortcut();
+    state.attendanceBaseline = attendanceFingerprint();
+    attendanceStatus('Você está editando este atendimento. Fotos e vínculos se referem à mesma consulta.');
     const title = bySelector('[data-atendimento-form-titulo]');
     const submitButton = bySelector('[data-atendimento-salvar]');
     const cancelButton = bySelector('[data-atendimento-cancelar-edicao]');
     if (title) title.textContent = 'Editar atendimento';
     if (submitButton) submitButton.textContent = 'Salvar alterações';
     if (cancelButton) cancelButton.hidden = false;
+    const editor = bySelector('[data-atendimento-editor]');
+    if (editor) editor.open = true;
     form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    return true;
+  }
+
+  function startAttendance() {
+    if (attendanceDirty() && !window.confirm('Há alterações não salvas. Deseja descartá-las e iniciar outro atendimento?')) return false;
+    resetAttendanceEditor();
+    const editor = bySelector('[data-atendimento-editor]');
+    if (editor) { editor.open = true; editor.scrollIntoView({behavior:'smooth',block:'start'}); }
+    const form = bySelector('[data-form-atendimento]');
+    if (form) form.elements.cliente_id.focus({preventScroll:true});
+    return true;
+  }
+  function selectAttendanceFromPhotos() {
+    const select = bySelector('[data-fotos-atalho-atendimento]');
+    const previous = state.selectedAttendanceId;
+    if (select.value === previous) { updatePhotoShortcut(); return; }
+    if (attendanceDirty() && !window.confirm('Há alterações não salvas. Deseja descartá-las e trocar de atendimento?')) {
+      select.value = previous; updatePhotoShortcut(); return;
+    }
+    const row = state.data.atendimentos.find(function (item) { return item.id === select.value; });
+    if (row && !row.archived_at) { editAttendance(row.id, true); return; }
+    const selectedId = select.value;
+    resetAttendanceEditor();
+    const editor = bySelector('[data-atendimento-editor]');
+    if (editor) editor.open = false;
+    select.value = selectedId;
+    state.selectedAttendanceId = selectedId;
+    updatePhotoShortcut();
+  }
+
+  function filterAttendances() {
+    const search = bySelector('[data-operacao-busca]');
+    const query = String(search && search.value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+    all('[data-atendimento-card]').forEach(function (card) {
+      const row = state.data.atendimentos.find(function (item) { return item.id === card.dataset.atendimentoCard; });
+      const text = row ? selectedPatientName(row.patient_id) + ' ' + row.procedure_kind + ' ' + dateTime(row.attended_at) : '';
+      card.hidden = !text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().includes(query);
+    });
+    all('.operacao-paciente').forEach(function (group) {
+      group.hidden = !Array.from(group.querySelectorAll('[data-atendimento-card]')).some(function (card) { return !card.hidden; });
+    });
   }
 
   function resetProcedureEditor(form) {
@@ -924,6 +1068,12 @@
   }
 
   function renderAttendanceGallery(visit, items, visitArchived) {
+    const archivedProtocol = protocolForVisit(visit);
+    if (archivedProtocol && archivedProtocol.archived_at) {
+      return '<section class="operacao-fotos-consulta" data-fotos-consulta="' + escapeHtml(visit.id) + '"><h5>Prontuário arquivado — consulta disponível</h5>' +
+        '<p class="operacao-nota">Os dados e fotos permanecem no histórico. Abra o prontuário para consultar. Restauração é uma ação separada, sem alterar automaticamente este atendimento.</p>' +
+        '<button type="button" class="operacao-botao secundario" data-prontuario-abrir="' + escapeHtml(visit.protocol_id) + '">Abrir prontuário arquivado</button></section>';
+    }
     const protocol = protocolForVisit(visit);
     const galleryReadOnly = visitArchived || Boolean(protocol && protocol.archived_at);
     const photos = state.data.fotos_atendimento.filter(function (photo) {
@@ -1025,6 +1175,7 @@
       node.innerHTML = '<p class="operacao-vazio">Nenhum atendimento cadastrado.</p>';
       return;
     }
+    const openIds = new Set(all('[data-atendimento-card][open]').map(function (card) { return card.dataset.atendimentoCard; }));
     const patients = state.data.clientes.slice().sort(function (a, b) {
       return String(a.full_name || '').localeCompare(String(b.full_name || ''), 'pt-BR');
     });
@@ -1130,8 +1281,10 @@
             '<input name="motivo_repeticao_distinta" maxlength="500" placeholder="Motivo da repetição distinta, quando aplicável">' +
             '<button class="operacao-botao pequeno" type="submit" data-procedimento-submit>Adicionar</button>' +
             '<button class="operacao-botao pequeno secundario" type="button" data-procedimento-cancelar hidden>Cancelar edição</button></form>';
-          return '<article class="operacao-visita' + (archived ? ' arquivado' : '') +
-            '" data-atendimento-card="' + escapeHtml(visit.id) + '">' +
+          return '<details class="operacao-visita' + (archived ? ' arquivado' : '') +
+            '" data-atendimento-card="' + escapeHtml(visit.id) + '"' + (openIds.has(visit.id) ? ' open' : '') + '><summary><strong>' +
+            escapeHtml(visit.procedure_kind) + '</strong> · ' + escapeHtml(dateTime(visit.attended_at)) +
+            (archived ? ' · Arquivado' : '') + ' — Ver atendimento</summary>' +
             '<header><div><strong>' + escapeHtml(dateTime(visit.attended_at)) + '</strong><span>' +
               escapeHtml(visit.status) + ' · ID ' + escapeHtml(visit.id) + '</span></div>' +
               '<div class="operacao-acoes"><button type="button" class="operacao-botao pequeno secundario" data-resumo-procedimento="' +
@@ -1153,9 +1306,10 @@
                   ' foto(s) clínica(s) · ' + escapeHtml(photoOverview.products) + ' de produtos</span>') +
               '</div>' + (protocol && protocol.status === 'draft' && !protocol.archived_at
                 ? '<p class="operacao-nota operacao-nota-documental">A finalização documental exige revisão do registro e ao menos uma foto clínica ativa em Antes, Durante ou Depois. Fotos de produtos não contam. O arquivo permanece privado; publicação exige autorização específica.</p>'
-                : '') + renderAttendanceGallery(visit, items, archived) + '</article>';
+                : '') + renderAttendanceGallery(visit, items, archived) + '</details>';
         }).join('') + '</section>';
     }).join('');
+    filterAttendances();
   }
 
   function openAdministrativeSummary(attendanceId) {
@@ -1476,7 +1630,6 @@
     return true;
   }
   async function loadAfterMutation() {
-    resetAttendanceEditor();
     state.loading = false;
     await load();
   }
@@ -1729,6 +1882,8 @@
 
   function bind() {
     bySelector('[data-operacao-recarregar]').addEventListener('click', load);
+    bySelector('[data-atendimento-novo]').addEventListener('click', startAttendance);
+    bySelector('[data-operacao-busca]').addEventListener('input', filterAttendances);
     state.root.addEventListener('toggle', function (event) {
       const gallery = event.target.closest && event.target.closest('[data-galeria-atendimento]');
       if (!gallery || gallery !== event.target || !gallery.open) return;
@@ -1738,6 +1893,11 @@
       if (visit && visit.protocol_id) loadAttendancePhotos(visit.id);
     }, true);
     const attendance = bySelector('[data-form-atendimento]');
+    attendance.elements.cliente_id.addEventListener('change', function () {
+      ['agendamento_id','protocolo_id','lancamento_financeiro_id'].forEach(function (name) { attendance.elements[name].value = ''; });
+      hydrateAttendanceLinks();
+    });
+    attendance.addEventListener('input', attendanceContext);
     attendance.addEventListener('submit', function (event) {
       event.preventDefault(); submit(attendance, async function () {
         const attendanceId = formValue(attendance, 'atendimento_id');
@@ -1750,21 +1910,61 @@
           responsavel_id: formValue(attendance, 'responsavel_id'), agendamento_id: optional(formValue(attendance, 'agendamento_id')),
           protocolo_id: optional(formValue(attendance, 'protocolo_id')),
           lancamento_financeiro_id: optional(formValue(attendance, 'lancamento_financeiro_id')),
-          status: formValue(attendance, 'status'), idempotency_key: uuid()
+          status: formValue(attendance, 'status')
         };
+        const revision = state.attendanceRevision;
+        const existing = attendanceId && state.data.atendimentos.find(function (row) { return row.id === attendanceId; });
+        const removalFields = existing ? [
+          ['agendamento_id', 'appointment_id', 'agendamento'],
+          ['protocolo_id', 'protocol_id', 'prontuário'],
+          ['lancamento_financeiro_id', 'financial_entry_id', 'cobrança']
+        ].filter(function (pair) { return existing[pair[1]] && !payload[pair[0]]; }) : [];
+        if (removalFields.length) {
+          if (!window.confirm('Você retirou o vínculo de ' + removalFields.map(function (pair) { return pair[2]; }).join(', ') +
+            '. Confirma desvincular esses registros do atendimento? Os registros originais não serão apagados.')) {
+            throw new Error('Desvinculação cancelada. Confira os campos antes de salvar.');
+          }
+          payload.confirmar_remocao_vinculos = removalFields.map(function (pair) { return pair[0]; });
+        }
+        // A refreshed list may already reflect an unacknowledged unlink. The
+        // confirmation still travels to the endpoint, but is not RPC data and
+        // must not change the retry ID for the same fields and expected version.
+        const intentPayload = Object.assign({}, payload);
+        delete intentPayload.confirmar_remocao_vinculos;
+        const intentKey = intentKeyForForm(attendance, intentPayload);
+        payload.idempotency_key = intentKey;
+        attendanceStatus('Salvando atendimento…');
         try {
+          let result;
           if (attendanceId) {
-            await protectedRequest('salvar_atendimento', payload, 'Edição auditada do atendimento');
+            result = await protectedRequest('salvar_atendimento', payload, 'Edição auditada do atendimento');
           } else {
-            await jsonRequest('salvar_atendimento', payload);
+            result = await jsonRequest('salvar_atendimento', payload);
+          }
+          confirmFormIntent(attendance, intentKey);
+          if (revision === state.attendanceRevision) {
+            const saved = result && (result.resultado || result);
+            if (saved && saved.id) attendance.elements.atendimento_id.value = saved.id;
+            if (saved && saved.version) attendance.elements.versao.value = saved.version;
+            state.selectedAttendanceId = formValue(attendance, 'atendimento_id');
+            state.attendanceBaseline = attendanceFingerprint();
+            attendanceStatus('Atendimento salvo. Continue neste registro ou abra suas fotos e prontuário.');
+            if (bySelector('[data-atendimento-salvar]')) bySelector('[data-atendimento-salvar]').textContent = 'Salvar alterações';
+            if (bySelector('[data-atendimento-cancelar-edicao]')) bySelector('[data-atendimento-cancelar-edicao]').hidden = false;
           }
         } catch (error) {
+          if (revision === state.attendanceRevision) attendanceStatus((error.message || 'Não foi possível salvar.') + ' O preenchimento foi preservado.' + (error.code ? ' Código: ' + error.code + '.' : ''), true);
           showDuplicate(attendance, bySelector('[data-atendimento-salvar]'), 'atendimento', error);
           throw error;
         }
       });
     });
-    bySelector('[data-atendimento-cancelar-edicao]').addEventListener('click', resetAttendanceEditor);
+    bySelector('[data-atendimento-cancelar-edicao]').addEventListener('click', function () {
+      if (attendanceDirty() && !window.confirm('Deseja fechar e descartar as alterações não salvas deste atendimento?')) return;
+      resetAttendanceEditor();
+      const editor = bySelector('[data-atendimento-editor]');
+      if (editor) editor.open = false;
+    });
     const returnForm = bySelector('[data-form-retorno]');
     returnForm.addEventListener('submit', function (event) {
       event.preventDefault(); submit(returnForm, async function () {
@@ -1883,7 +2083,7 @@
       });
     });
     state.root.addEventListener('change', function (event) {
-      if (event.target.matches('[data-fotos-atalho-atendimento]')) updatePhotoShortcut();
+      if (event.target.matches('[data-fotos-atalho-atendimento]')) selectAttendanceFromPhotos();
       const uploadForm = event.target.closest('[data-form-foto-upload]');
       if (uploadForm && (event.target.matches('[name="categoria"]') || event.target.matches('[name="produto_id"]'))) {
         if (event.target.matches('[name="produto_id"]')) {
@@ -1989,6 +2189,24 @@
       }
     });
     state.root.addEventListener('click', async function (event) {
+      const linked = event.target.closest('[data-vinculo-abrir]');
+      if (linked) {
+        try {
+          const form = bySelector('[data-form-atendimento]');
+          if (linked.dataset.vinculoAbrir === 'prontuario') {
+            const protocolId = formValue(form, 'protocolo_id');
+            if (!protocolId) { attendanceStatus('Ainda não há prontuário selecionado. Salve o atendimento e use Preparar prontuário e fotos na consulta.'); return; }
+            if (!window.AMJProntuario || typeof window.AMJProntuario.abrirProtocolo !== 'function') throw new Error('A tela de prontuários não está disponível neste momento. Seu formulário foi preservado.');
+            await window.AMJProntuario.abrirProtocolo(protocolId);
+          } else if (linked.dataset.vinculoAbrir === 'cobranca') {
+            const entryId = formValue(form, 'lancamento_financeiro_id');
+            if (!entryId) { attendanceStatus('Selecione uma cobrança existente da paciente. Se ainda não existe, cadastre no Financeiro e depois vincule, sem repetir a mesma venda.'); return; }
+            if (!window.AMJFinanceiro || typeof window.AMJFinanceiro.abrirLancamento !== 'function') throw new Error('Não foi possível abrir a cobrança. O atendimento não foi alterado.');
+            if (!await window.AMJFinanceiro.abrirLancamento(entryId)) attendanceStatus('Não foi possível abrir a cobrança agora. O atendimento foi preservado; confira a mensagem na área financeira.', true);
+          } else if (window.AMJShell) await window.AMJShell.navigate('agenda', {source:'vinculo-atendimento'});
+        } catch (error) { attendanceStatus(error.message, true); status(error.message, true); }
+        return;
+      }
       const photoShortcut = event.target.closest('[data-fotos-atalho-abrir]');
       if (photoShortcut) {
         const visit = selectedPhotoShortcutVisit();
@@ -2293,6 +2511,9 @@
       photoIndex ? photoIndex.attendance_id : requestedId;
     const card = bySelector('[data-atendimento-card="' + CSS.escape(attendanceId) + '"]');
     if (!card) return false;
+    card.hidden = false;
+    if (card.closest('.operacao-paciente')) card.closest('.operacao-paciente').hidden = false;
+    card.open = true;
     all('[data-atendimento-card]').forEach(function (item) { item.classList.remove('em-destaque'); });
     card.classList.add('em-destaque');
     card.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -2324,9 +2545,15 @@
     if (!attendanceId) return false;
     if (!state.loaded && ownerAccess()) await load();
     let visit = state.data.atendimentos.find(function (item) { return item.id === attendanceId; });
-    if (!visit || visit.archived_at) {
+    if (!visit) throw new Error('Atendimento não encontrado. O preenchimento atual foi preservado.');
+    if (visit.archived_at) {
+      if (visit.protocol_id && window.AMJProntuario && typeof window.AMJProntuario.abrirProtocolo === 'function') {
+        await window.AMJProntuario.abrirProtocolo(visit.protocol_id);
+        return true;
+      }
       await openAttendance(attendanceId);
-      throw new Error('Este atendimento está arquivado. Restaure-o antes de adicionar fotos.');
+      status('Atendimento arquivado aberto para consulta. Restaurar é uma ação separada.');
+      return true;
     }
     if (!visit.protocol_id) {
       setBusy(true);
@@ -2344,8 +2571,9 @@
     const protocol = protocolForVisit(visit);
     if (!protocol) throw new Error('Não foi possível conferir este prontuário. Atualize a tela antes de adicionar fotos.');
     if (protocol && protocol.archived_at) {
-      await openAttendancePhotos(attendanceId);
-      throw new Error('O prontuário desta consulta está arquivado. Restaure-o antes de adicionar fotos.');
+      if (!window.AMJProntuario || typeof window.AMJProntuario.abrirProtocolo !== 'function') throw new Error('A tela de prontuários não está disponível neste momento.');
+      await window.AMJProntuario.abrirProtocolo(protocol.id);
+      return true;
     }
     if (!await openAttendancePhotos(attendanceId)) return false;
     const upload = bySelector('[data-form-foto-upload][data-atendimento-id="' + CSS.escape(attendanceId) + '"]');
@@ -2364,6 +2592,17 @@
     if (!state.loaded && ownerAccess()) await load();
     const visit = state.data.atendimentos.find(function (item) { return item.id === attendanceId; });
     if (!visit) return false;
+    const protocol = protocolForVisit(visit);
+    if (protocol && protocol.archived_at) {
+      if (!window.AMJProntuario || typeof window.AMJProntuario.abrirProtocolo !== 'function') throw new Error('A tela de prontuários não está disponível neste momento.');
+      await window.AMJProntuario.abrirProtocolo(protocol.id);
+      return true;
+    }
+    const parentCard = bySelector('[data-atendimento-card="' + CSS.escape(attendanceId) + '"]');
+    if (parentCard) {
+      parentCard.open = true; parentCard.hidden = false;
+      if (parentCard.closest('.operacao-paciente')) parentCard.closest('.operacao-paciente').hidden = false;
+    }
     let section = bySelector('[data-fotos-consulta="' + CSS.escape(attendanceId) + '"]');
     if (!section) return false;
     let gallery = section.querySelector('[data-galeria-atendimento]');
@@ -2439,10 +2678,12 @@
     loadedPhotoAttendances.clear(); loadingPhotoAttendances.clear(); protocolPrepareKeys.clear();
     protocolProductsById.clear(); loadingProtocolProducts.clear();
     state.listLimit = 1000; state.pagination = null; state.data = emptyData();
+    state.attendanceBaseline = ''; state.selectedAttendanceId = ''; state.attendanceRevision += 1;
   }
 
   window.AMJOperacaoClinica = {
     montar: mount,
+    novoAtendimento: startAttendance,
     ativar: load,
     abrirAtendimento: openAttendance,
     abrirAtalhoFotos: focusPhotoShortcut,

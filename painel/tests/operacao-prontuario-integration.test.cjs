@@ -30,7 +30,7 @@ assert.match(ui, /data-fotos-atalho[^>]*aria-labelledby="operacao-fotos-atalho-t
   'atalho direto deve ficar no topo de Procedimentos e possuir nome acessível');
 assert.match(ui, /data-fotos-atalho-atendimento[^>]*aria-label="Paciente e atendimento para adicionar fotos"/,
   'atalho deve exigir a consulta exata antes de abrir a galeria');
-assert.match(ui, /function updatePhotoShortcut\(\)[\s\S]*?if \(!visit\.protocol_id \|\| !protocol\)/,
+assert.match(ui, /function updatePhotoShortcut\(\)[\s\S]*?if \(\(!visit\.protocol_id \|\| !protocol\) && !visit\.archived_at\)/,
   'atalho deve exigir o protocolo confirmado antes de abrir o arquivo privado');
 assert.match(ui, /function openPhotoShortcutFlow\(id\)[\s\S]*?prepareAttendanceProtocol\(visit\.id, visit\.version\)/,
   'preparo iniciado pelo atalho deve usar a versão e proteção canônicas');
@@ -207,9 +207,9 @@ const finalizeArchivedCheck = finalizeMigration.indexOf('if v_protocol.archived_
 const finalizeSignedCheck = finalizeMigration.indexOf("if v_protocol.status = 'signed' then");
 assert(finalizeArchivedCheck >= 0 && finalizeArchivedCheck < finalizeSignedCheck,
   'protocolo arquivado deve ser rejeitado antes do retorno signed idempotente');
-assert.match(shell, /operacao\.js\?v=20260906-5/,
+assert.match(shell, /operacao\.js\?v=20260906-7/,
   'cache-bust deve entregar o JavaScript atualizado da Operação');
-assert.match(html, /operacao\.css\?v=20260905-1/,
+assert.match(html, /operacao\.css\?v=20260906-7/,
   'cache-bust deve entregar o CSS atualizado da Operação');
 assert.match(html, /app-shell\.js\?v=[^"']+/,
   'cache-bust do shell deve entregar a referência atualizada da Operação');
