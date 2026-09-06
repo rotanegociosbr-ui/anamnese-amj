@@ -12,7 +12,7 @@ function harness(){
  function node(id){if(!nodes.has(id))nodes.set(id,{value:'',checked:false,dataset:{},textContent:'',options:[],classList:{toggle(){},add(){},remove(){}},attributes:{},querySelectorAll:()=>[],setAttribute(k,v){this.attributes[k]=String(v);},getAttribute(k){return this.attributes[k];}});return nodes.get(id);}
  const sandbox={window:{crypto,AMJProtecao:{solicitarSenhaRecente:async()=>{throw Error('No critical prompt expected');},solicitarEdicaoRotineira:async()=>({operation_id:crypto.randomUUID()})}},document:{readyState:'loading',addEventListener(){},getElementById:node,querySelectorAll:()=>[]},modoAcesso:'auth',identidadeBackend:{role:'owner'},cabecalhosAcesso:async()=>({}),Intl,Date,URL,console,
   fetch:async(url,options)=>{const body=JSON.parse(options.body);calls.push(body);return body.acao==='criar_atualizar'?response({protocolo_id:ids.protocol,versao:8}):response({erro:'Leitura sintética indisponível'},false);}};
- vm.runInNewContext(source.replace('  window.AMJProntuario = {','  window.recovery={state,submitProtocol,load,beginEdit,protocolNeedsRefresh};\n  window.AMJProntuario = {'),sandbox);
+ vm.runInNewContext(source.replace('  window.AMJProntuario = {','  window.recovery={state,submitProtocol,load,beginEdit,protocolNeedsRefresh,openPatientHistory};\n  window.AMJProntuario = {'),sandbox);
  const api=sandbox.window.recovery;api.state.protocols=[JSON.parse(JSON.stringify(old))];api.state.loaded=true;
  node('prontuario-id').value=ids.protocol;node('prontuario-versao').value='7';node('prontuario-paciente').value=ids.patient;node('prontuario-notas').value='Complemento sintético digitado';
  const values={select:ids.product,lote:'LOTE DIGITADO',validade:'2028-01-31',quantidade:'1',unidade:'un'};
@@ -62,4 +62,16 @@ test('acknowledged save A invalidates only A after switching the editor to B',{t
 test('even a successful read cannot unlock an acknowledged version if the result is still older',{timeout:2000},async()=>{
  const h=harness();await h.save();h.serveCanonical([old]);assert.equal(await h.api.load(),false);assert.equal(h.api.protocolNeedsRefresh(ids.protocol),true);assert.equal(h.api.beginEdit(ids.protocol),false);
  h.serveCanonical();assert.equal(await h.api.load(),true);assert.equal(h.api.protocolNeedsRefresh(ids.protocol),false);
+});
+
+test('history shortcut queued during loading keeps the latest exact patient filter without resetting an open editor',{timeout:2000},async()=>{
+ const h=harness();h.api.state.loaded=false;h.api.state.loading=true;h.api.state.pendingPatientId='older-new-draft';h.api.state.pendingProtocolId='older-editor-target';
+ await h.api.openPatientHistory(ids.patient);await h.api.openPatientHistory(ids.other);
+ assert.equal(h.api.state.filterPatientId,ids.other);assert.equal(h.api.state.pendingHistoryPatientId,ids.other);
+ assert.equal(h.api.state.pendingPatientId,null);assert.equal(h.api.state.pendingProtocolId,null);
+ assert.equal(h.node('prontuario-id').value,ids.protocol);assert.equal(h.node('prontuario-notas').value,'Complemento sintético digitado');assert.equal(h.calls.length,0);
+ h.api.state.loading=false;h.serveCanonical();assert.equal(await h.api.load(),true);
+ assert.equal(h.api.state.pendingHistoryPatientId,null);assert.equal(h.api.state.filterPatientId,ids.other);
+ assert.equal(h.node('prontuario-id').value,ids.protocol);assert.equal(h.node('prontuario-notas').value,'Complemento sintético digitado');
+ assert(h.calls.every(c=>c.acao!=='criar_atualizar'));
 });

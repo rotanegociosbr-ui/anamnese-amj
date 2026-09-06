@@ -147,13 +147,15 @@ assert.match(source, /const groups = groupProtocols\(rows\)/);
 assert.match(source, /prontuario-paciente-grupo/);
 assert.match(source, /abrirProtocolo: openProtocol, editar: openProtocol/);
 assert.match(source, /option\.dataset\.protocolGenerated = 'true'/);
-assert.match(source, /setProtocolReadOnly\(completed\)/);
+assert.match(source, /setProtocolReadOnly\(completed \|\| archived\)/);
+assert.match(source, /Abrir registro arquivado/);
+assert.match(source, /setPhotoArchiveReadOnly\(archived\)/);
 assert.match(source, /prontuario-somente-leitura/);
-assert.match(html, /<h2>Pacientes e consultas<\/h2>/);
+assert.match(html, /<h2>Prontuários e fotos<\/h2>/);
 assert.match(html, /<option value="during">Durante<\/option>/);
 assert.match(html, /Limite de 25 MB/);
-assert.match(html, /prontuario\.js\?v=20260906-5/);
-assert.match(html, /prontuario\.css\?v=20260906-4/);
+assert.match(html, /prontuario\.js\?v=20260906-6/);
+assert.match(html, /prontuario\.css\?v=20260906-6/);
 assert.match(css, /\.prontuario-paciente-grupo/);
 assert.match(css, /\.prontuario-galerias/);
 assert.match(css, /scroll-margin-top:88px/,
@@ -162,7 +164,7 @@ assert.match(source, /prontuario-editor'\)\.querySelector\('summary'\)[\s\S]*?fo
   'navegação externa deve mover o foco para o editor aberto');
 const openProtocolBody = source.slice(
   source.indexOf('function openProtocol(protocolId)'),
-  source.indexOf('\n  function reset()', source.indexOf('function openProtocol(protocolId)'))
+  source.indexOf('\n  function focusHistory()', source.indexOf('function openProtocol(protocolId)'))
 );
 assert.match(openProtocolBody, /load\(\{ silent: true \}\)/,
   'abertura vinda da Operação deve atualizar o protocolo autoritativo');

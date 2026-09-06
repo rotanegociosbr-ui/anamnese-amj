@@ -642,7 +642,7 @@
         escapeHtml(item.nome) + (archived ? ' · Arquivado' : '') + '</strong><small>' +
         escapeHtml(details || 'Sem contato informado') + '</small></div><div class="financeiro-cadastro-acoes">' +
         (archived ? '' : '<button type="button" data-financeiro-atender="' + escapeHtml(item.id) + '">Atendimento</button>') +
-        (archived ? '' : '<button type="button" data-financeiro-prontuario="' + escapeHtml(item.id) + '">Prontuário</button>') +
+        '<button type="button" data-financeiro-prontuario="' + escapeHtml(item.id) + '">Ver prontuários</button>' +
         '<button type="button" data-financeiro-editar="cliente" data-financeiro-id="' + escapeHtml(item.id) + '">Editar</button>' +
         '<button class="' + (archived ? '' : 'perigo') + '" type="button" data-financeiro-registro-acao="' +
         (archived ? 'restaurar' : 'arquivar') + '" data-financeiro-entidade="cliente" data-financeiro-id="' +
@@ -2562,7 +2562,7 @@
       const button = event.target.closest('[data-financeiro-registro-acao]');
       if (button) changeRegistryState('produto', button.dataset.financeiroId, 'arquivar');
     });
-    byId('financeiro-cadastros-titulo').closest('.financeiro-cadastros-card').addEventListener('click', function (event) {
+    byId('financeiro-cadastros-titulo').closest('.financeiro-cadastros-card').addEventListener('click', async function (event) {
       const edit = event.target.closest('[data-financeiro-editar]');
       const stateButton = event.target.closest('[data-financeiro-registro-acao]');
       const cost = event.target.closest('[data-financeiro-custo]');
@@ -2578,8 +2578,15 @@
         byId('financeiro-custo-produto').value = productId;
         byId('financeiro-form-custo-produto').scrollIntoView({ behavior: 'smooth', block: 'start' });
         loadCosts(productId);
-      } else if (protocol && window.AMJProntuario && typeof window.AMJProntuario.novoParaPaciente === 'function') {
-        window.AMJProntuario.novoParaPaciente(protocol.dataset.financeiroProntuario);
+      } else if (protocol) {
+        try {
+          if (!window.AMJProntuario || typeof window.AMJProntuario.abrirHistoricoPaciente !== 'function') {
+            throw new Error('O histórico clínico ainda não está disponível. Atualize a página e tente novamente.');
+          }
+          await window.AMJProntuario.abrirHistoricoPaciente(protocol.dataset.financeiroProntuario);
+        } catch (error) {
+          status('financeiro-status', error.message || 'Não foi possível abrir os prontuários desta paciente.', true);
+        }
       }
     });
     byId('financeiro-clientes-lista').addEventListener('click', function (event) {

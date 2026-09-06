@@ -16,16 +16,16 @@
     despesas: Object.freeze({ title: 'Despesas', legacy: 'financeiro', owner: true, financeView: 'despesas', entryView: 'despesas', group: 'principal' }),
     estoque: Object.freeze({ title: 'Estoque', legacy: 'financeiro', owner: true, financeView: 'estoque', group: 'principal' }),
     cotacoes: Object.freeze({ title: 'Cotações e preços', legacy: 'cotacoes', owner: true, group: 'principal' }),
-    fichas: Object.freeze({ title: 'Fichas', legacy: 'fichas', group: 'principal' }),
+    fichas: Object.freeze({ title: 'Fichas e termos', legacy: 'fichas', group: 'principal' }),
     gestao: Object.freeze({ title: 'Gestão', legacy: 'gestao', owner: true, group: 'principal' }),
     integracoes: Object.freeze({ title: 'Integrações', legacy: 'integracoes', owner: true, group: 'principal' }),
-    prontuarios: Object.freeze({ title: 'Fotos e prontuários', legacy: 'prontuarios', owner: true, group: 'secondary' }),
+    prontuarios: Object.freeze({ title: 'Prontuários e fotos', legacy: 'prontuarios', owner: true, group: 'principal' }),
     rosto3d: Object.freeze({ title: 'Rosto 3D', legacy: 'rosto3d', owner: true, group: 'secondary' })
   });
 
-  const PRIMARY_ORDER = ['inicio', 'crm', 'marketing', 'procedimentos', 'acompanhamentos', 'clientes', 'agenda', 'receitas', 'despesas', 'produtos', 'marcas',
+  const PRIMARY_ORDER = ['inicio', 'crm', 'marketing', 'procedimentos', 'acompanhamentos', 'clientes', 'prontuarios', 'agenda', 'receitas', 'despesas', 'produtos', 'marcas',
     'fornecedores', 'estoque', 'cotacoes', 'fichas', 'gestao', 'integracoes'];
-  const SECONDARY_ORDER = ['prontuarios', 'rosto3d'];
+  const SECONDARY_ORDER = ['rosto3d'];
   const STORAGE_ROUTE = 'amj_shell_route';
   const MODULES = Object.freeze({
     rosto3d: Object.freeze({
@@ -615,7 +615,7 @@
       '<p>Registre a visita, os itens realizados, produtos, fotos antes/depois, cobrança e retorno no mesmo histórico.</p></div>' +
       '<div class="app-context-actions"><button type="button" class="app-procedure-photo-shortcut" data-app-action="fotos-atendimento">Adicionar ou tirar fotos</button>' +
       '<button type="button" class="secundario" data-app-action="refresh-procedures">Atualizar</button>' +
-      '<button type="button" class="secundario" data-shell-route="prontuarios">Fotos e prontuários</button>' +
+      '<button type="button" class="secundario" data-shell-route="prontuarios">Prontuários e fotos</button>' +
       '<button type="button" data-app-action="new-procedure">Novo procedimento</button></div>';
     root.insertBefore(context, root.firstChild);
   }

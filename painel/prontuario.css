@@ -2,6 +2,13 @@
 .prontuario-cabecalho{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px}
 .prontuario-cabecalho h2{margin:0;font-family:'Cormorant Garamond',Georgia,serif;font-size:30px;color:var(--dourado);line-height:1.05}
 .prontuario-cabecalho p{margin:4px 0 0;color:var(--cinza);font-size:12px}
+.prontuario-topo-acoes{display:flex;gap:8px;flex-wrap:wrap;flex-shrink:0}
+.prontuario-historico-ajuda{margin:0;padding:0 16px 12px;color:var(--cinza);font-size:11px;line-height:1.6}
+.prontuario-contexto-paciente{margin:0 16px 12px;padding:10px 12px;display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid var(--linha);border-radius:9px;background:var(--fundo,#FFFDF9);color:var(--tinta);font-size:12px}
+.prontuario-contexto-paciente[hidden]{display:none}
+.prontuario-contexto-paciente span{overflow-wrap:anywhere}
+.prontuario-contexto-paciente button{flex-shrink:0}
+.prontuario-consulta-ver{display:inline-flex;align-items:center;min-height:36px;padding:7px 12px;border:1px solid var(--dourado);border-radius:8px;color:var(--dourado);background:#fff;font-size:11px;font-weight:600;white-space:nowrap}
 .prontuario-sobretitulo{margin:0 0 3px!important;color:var(--dourado)!important;font-size:9.5px!important;font-weight:600;letter-spacing:.12em;text-transform:uppercase}
 .prontuario-botao{min-height:42px;padding:9px 13px;border:1px solid var(--dourado);border-radius:9px;background:var(--dourado);color:#fff;font-family:inherit;font-size:12px;font-weight:500;cursor:pointer}
 .prontuario-botao.secundario{background:#fff;color:var(--dourado)}
@@ -162,6 +169,8 @@
   .prontuario-produto-linha button{grid-column:1/-1;width:100%}
 }
 @media(max-width:640px){
+  .prontuario-topo-acoes{display:grid;grid-template-columns:1fr 1fr;width:100%}
+  .prontuario-contexto-paciente{align-items:stretch;flex-direction:column}
   .prontuario-cabecalho,.prontuario-lista-topo{flex-direction:column;align-items:stretch}
   .prontuario-cabecalho .prontuario-botao{width:100%}
   .prontuario-grid,.prontuario-fotos-editor form{grid-template-columns:1fr}
@@ -195,4 +204,5 @@
   .prontuario-fotos-grade{grid-template-columns:1fr}
 }
 .prontuario-rascunho-nota{padding:12px;border-left:3px solid #a47b30;background:#fff8e9;color:#594523;line-height:1.6}
+#prontuario-somente-leitura:not(.oculto)+.prontuario-rascunho-nota{display:none}
 .prontuario-badge.rascunho{background:#fff5df;color:#654600;border:1px solid #d6bd85}

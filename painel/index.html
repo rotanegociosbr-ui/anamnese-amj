@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
 <link href="./financeiro.css?v=20260906-4" rel="stylesheet">
-<link href="./prontuario.css?v=20260906-4" rel="stylesheet">
+<link href="./prontuario.css?v=20260906-6" rel="stylesheet">
 <link href="./operacao.css?v=20260905-1" rel="stylesheet">
 <link href="./gestao.css?v=20260824-2" rel="stylesheet">
 <link href="./cotacoes.css?v=20260824-2" rel="stylesheet">
@@ -375,7 +375,7 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
       <button class="aba" id="aba-bt-inicio" type="button" role="tab" aria-selected="true" aria-controls="aba-inicio" tabindex="0">Início</button>
       <button class="aba" id="aba-bt-crm" type="button" role="tab" aria-selected="false" aria-controls="aba-crm" tabindex="-1" hidden>CRM Leads</button>
       <button class="aba" id="aba-bt-marketing" type="button" role="tab" aria-selected="false" aria-controls="aba-marketing" tabindex="-1" hidden>Marketing</button>
-      <button class="aba" id="aba-bt-fichas" type="button" role="tab" aria-selected="false" aria-controls="aba-fichas" tabindex="-1">Fichas</button>
+      <button class="aba" id="aba-bt-fichas" type="button" role="tab" aria-selected="false" aria-controls="aba-fichas" tabindex="-1">Fichas e termos</button>
       <button class="aba" id="aba-bt-agenda" type="button" role="tab" aria-selected="false" aria-controls="aba-agenda" tabindex="-1">Agenda e retornos</button>
       <button class="aba" id="aba-bt-prontuarios" type="button" role="tab" aria-selected="false" aria-controls="aba-prontuarios" tabindex="-1" hidden>Prontuários</button>
       <button class="aba" id="aba-bt-financeiro" type="button" role="tab" aria-selected="false" aria-controls="aba-financeiro" tabindex="-1" hidden>Financeiro</button>
@@ -397,6 +397,11 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
       <section id="ai-home-root" class="copiloto-home" aria-label="Resumo gerencial do Copiloto" hidden></section>
 
       <div class="app-prioridades" aria-label="Atalhos das atividades de hoje">
+        <button class="app-prioridade" type="button" data-shell-route="prontuarios">
+          <span class="app-prioridade-icone" aria-hidden="true">P</span>
+          <span><strong>Prontuários e fotos</strong><small>Buscar paciente e abrir consultas já registradas, inclusive arquivadas</small></span>
+          <span class="app-prioridade-seta" aria-hidden="true">→</span>
+        </button>
         <button class="app-prioridade" type="button" data-shell-route="crm" data-shell-action="leads-abertos">
           <span class="app-prioridade-icone" aria-hidden="true">CRM</span>
           <span><strong>Leads em andamento</strong><small data-shell-metric="crm-abertos">Carrega ao abrir CRM Leads</small></span>
@@ -429,7 +434,7 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
         </button>
         <button class="app-prioridade" type="button" data-shell-route="fichas">
           <span class="app-prioridade-icone" aria-hidden="true">05</span>
-          <span><strong>Fichas da clínica</strong><small data-shell-metric="fichas">Atualizando documentos…</small></span>
+          <span><strong>Fichas e termos</strong><small data-shell-metric="fichas">Anamneses e termos preenchidos pelas pacientes</small></span>
           <span class="app-prioridade-seta" aria-hidden="true">→</span>
         </button>
       </div>
@@ -483,6 +488,7 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
     </section>
 
     <section class="painel-aba oculto" id="aba-fichas" role="tabpanel" aria-labelledby="aba-bt-fichas" hidden>
+    <header class="prontuario-cabecalho"><div><p class="prontuario-sobretitulo">Documentos das pacientes</p><h2>Fichas e termos</h2><p>Consulte anamneses e termos preenchidos. As anotações, produtos e fotos de cada consulta ficam em Prontuários e fotos.</p></div><button class="prontuario-botao secundario" type="button" data-shell-route="prontuarios">Ver prontuários e fotos</button></header>
     <div class="convite">
       <p class="rot">Enviar um documento para a paciente</p>
       <div class="linha-envio">
@@ -605,17 +611,27 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
       <div class="prontuario-cabecalho">
         <div>
           <p class="prontuario-sobretitulo">Registro clínico privado</p>
-          <h2>Pacientes e consultas</h2>
-          <p>Cada paciente reúne suas consultas, produtos, lotes, quantidades e galerias clínicas privadas.</p>
+          <h2>Prontuários e fotos</h2>
+          <p>Encontre a paciente e abra uma consulta já registrada para ver anotações, produtos, lotes e fotos.</p>
         </div>
-        <button class="prontuario-botao secundario" id="prontuario-atualizar" type="button">Atualizar</button>
+        <div class="prontuario-topo-acoes"><button class="prontuario-botao secundario" id="prontuario-atualizar" type="button">Atualizar lista</button><button class="prontuario-botao" id="prontuario-novo" type="button">Novo registro</button></div>
       </div>
       <div class="prontuario-bloqueio oculto" id="prontuario-bloqueio" role="alert">
         <strong>Acesso clínico protegido</strong>
         <p>Entre com uma conta proprietária individual e confirme o MFA.</p>
       </div>
       <div id="prontuario-conteudo">
-        <details class="prontuario-editor" id="prontuario-editor" open>
+        <section class="prontuario-lista-card" id="prontuario-lista-card" aria-labelledby="prontuario-lista-titulo">
+          <div class="prontuario-lista-topo">
+            <div><h3 id="prontuario-lista-titulo">Consultas registradas</h3><p id="prontuario-contagem"></p></div>
+            <div class="prontuario-filtros"><input id="prontuario-busca" type="search" maxlength="80" aria-label="Buscar paciente, consulta, produto ou lote" placeholder="Buscar paciente, consulta, produto ou lote"><label><input id="prontuario-mostrar-arquivados" type="checkbox" checked><span>Incluir consultas arquivadas</span></label></div>
+          </div>
+          <p class="prontuario-historico-ajuda">Registros arquivados continuam disponíveis para leitura. Você não precisa restaurá-los para consultar o histórico.</p>
+          <div class="prontuario-contexto-paciente" id="prontuario-contexto-paciente" hidden><span id="prontuario-contexto-nome"></span><button class="prontuario-botao secundario" id="prontuario-limpar-paciente" type="button">Ver todos os pacientes</button></div>
+          <div id="prontuario-lista" aria-live="polite" aria-busy="false"></div>
+          <p class="prontuario-status" id="prontuario-status" role="status" aria-live="polite"></p>
+        </section>
+        <details class="prontuario-editor" id="prontuario-editor">
           <summary id="prontuario-form-titulo">Novo registro de procedimento</summary>
           <form class="prontuario-form" id="prontuario-form" novalidate>
             <input id="prontuario-id" type="hidden">
@@ -664,14 +680,6 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
           <p class="prontuario-status" id="prontuario-foto-status" role="status" aria-live="polite"></p>
         </section>
 
-        <section class="prontuario-lista-card" aria-labelledby="prontuario-lista-titulo">
-          <div class="prontuario-lista-topo">
-            <div><h3 id="prontuario-lista-titulo">Pacientes e consultas</h3><p id="prontuario-contagem"></p></div>
-            <div class="prontuario-filtros"><input id="prontuario-busca" type="search" maxlength="80" aria-label="Buscar paciente, consulta, produto ou lote" placeholder="Buscar paciente, consulta, produto ou lote"><label><input id="prontuario-mostrar-arquivados" type="checkbox"><span>Mostrar arquivados</span></label></div>
-          </div>
-          <div id="prontuario-lista" aria-live="polite" aria-busy="false"></div>
-          <p class="prontuario-status" id="prontuario-status" role="status" aria-live="polite"></p>
-        </section>
       </div>
     </section>
 
@@ -1040,7 +1048,7 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
     <p class="reauth-status" id="fichas-exclusao-status" role="alert" aria-live="assertive"></p>
     <div class="reauth-acoes">
       <button id="fichas-exclusao-cancelar" type="button">Cancelar</button>
-      <button class="confirmar" id="fichas-exclusao-continuar" type="submit">Continuar para a senha</button>
+      <button class="confirmar" id="fichas-exclusao-continuar" type="submit">Continuar para confirmação</button>
     </div>
   </form>
 </dialog>
@@ -1049,9 +1057,9 @@ footer{text-align:center;font-size:11px;color:var(--cinza);padding:26px 0;
 
 <script src="./vendor/supabase-js-2.112.3.min.js"></script>
 <script src="./auth-mfa.js?v=20260906-5"></script>
-<script src="./financeiro.js?v=20260906-5"></script>
-<script src="./prontuario.js?v=20260906-5"></script>
-<script src="./app-shell.js?v=20260906-5"></script>
+<script src="./financeiro.js?v=20260906-6"></script>
+<script src="./prontuario.js?v=20260906-6"></script>
+<script src="./app-shell.js?v=20260906-6"></script>
 <script>
 const SUPABASE_URL = 'https://rjxtxoqprnumouqakxbc.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_Ip14p4tUfYFjwUYaWinMlw_Gf9v0YwT';
