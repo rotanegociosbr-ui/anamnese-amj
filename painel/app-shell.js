@@ -24,9 +24,13 @@
     rosto3d: Object.freeze({ title: 'Rosto 3D', legacy: 'rosto3d', owner: true, group: 'secondary' })
   });
 
-  const PRIMARY_ORDER = ['inicio', 'crm', 'marketing', 'procedimentos', 'acompanhamentos', 'clientes', 'prontuarios', 'agenda', 'receitas', 'despesas', 'produtos', 'marcas',
-    'fornecedores', 'estoque', 'cotacoes', 'fichas', 'gestao', 'integracoes'];
-  const SECONDARY_ORDER = ['rosto3d'];
+  const NAV_GROUPS = Object.freeze([
+    { title: 'Pacientes e atendimento', routes: ['inicio', 'clientes', 'prontuarios', 'agenda', 'procedimentos', 'fichas', 'acompanhamentos'] },
+    { title: 'Financeiro', routes: ['cobrancas', 'receitas', 'despesas'] },
+    { title: 'Produtos e compras', routes: ['produtos', 'estoque', 'fornecedores', 'marcas', 'cotacoes'] },
+    { title: 'Relacionamento', routes: ['crm', 'marketing'] },
+    { title: 'Ferramentas e gestão', routes: ['gestao', 'integracoes', 'rosto3d'] }
+  ]);
   const STORAGE_ROUTE = 'amj_shell_route';
   const MODULES = Object.freeze({
     rosto3d: Object.freeze({
@@ -37,7 +41,7 @@
     }),
     crm: Object.freeze({
       global: 'AMJCRMLeads',
-      src: './crm.js?v=20260906-4',
+      src: './crm.js?v=20260907-2',
       css: './crm.css?v=20260901-1',
       root: 'crm-root'
     }),
@@ -49,7 +53,7 @@
     }),
     operacao: Object.freeze({
       global: 'AMJOperacaoClinica',
-      src: './operacao.js?v=20260906-7',
+      src: './operacao.js?v=20260907-2',
       root: 'operacao-clinica-root'
     }),
     acompanhamentos: Object.freeze({
@@ -193,13 +197,11 @@
       '<aside class="app-shell-sidebar" id="app-shell-sidebar" aria-label="Menu principal">' +
         '<div class="app-shell-brand"><img src="../assets/identidade-visual-transparente-v1.png" alt=""><div>' +
           '<strong>Ana Maria Jacob</strong><span>Gestão da clínica</span></div></div>' +
-        '<div class="app-shell-nav-scroll"><p class="app-shell-nav-label">Trabalho</p>' +
-          '<nav class="app-shell-nav" aria-label="Áreas principais">' + PRIMARY_ORDER.map(function (route) {
-            return navButton(route, false);
-          }).join('') + '</nav><p class="app-shell-nav-label">Registro clínico</p>' +
-          '<nav class="app-shell-nav" aria-label="Área clínica protegida">' + SECONDARY_ORDER.map(function (route) {
-            return navButton(route, false);
-          }).join('') + '</nav></div>' +
+        '<div class="app-shell-nav-scroll">' + NAV_GROUPS.map(function (group) {
+          return '<p class="app-shell-nav-label">' + escapeHtml(group.title) + '</p>' +
+            '<nav class="app-shell-nav" aria-label="' + escapeHtml(group.title) + '">' +
+            group.routes.map(function (route) { return navButton(route, false); }).join('') + '</nav>';
+        }).join('') + '</div>' +
         '<div class="app-shell-privacy"><strong>Dados privados</strong>Pacientes, fotos, fichas e finanças permanecem nas áreas protegidas da clínica.</div>' +
       '</aside>' +
       '<div class="app-shell-workspace"><header class="app-shell-topbar">' +
@@ -212,7 +214,7 @@
         '<div class="app-shell-content" id="app-shell-content"></div></div>' +
       '<div id="copiloto-root"></div>' +
       '<nav class="app-shell-mobile-bar" aria-label="Atalhos no celular">' +
-        navButton('inicio', true) + navButton('crm', true) + navButton('procedimentos', true) + navButton('agenda', true) +
+        navButton('inicio', true) + navButton('clientes', true) + navButton('prontuarios', true) + navButton('agenda', true) +
         '<button class="app-mobile-action" type="button" data-shell-open-menu aria-expanded="false" aria-controls="app-shell-sidebar">' + icon('mais') + '<span>Mais</span></button>' +
       '</nav><p class="app-shell-route-status" role="status" aria-live="polite"></p>';
 
@@ -702,19 +704,8 @@
       if (window.AMJCopiloto && typeof window.AMJCopiloto.atualizarContexto === 'function') {
         window.AMJCopiloto.atualizarContexto(routeName);
       }
-      if (routeName === 'inicio' && isOwner()) {
-        void ensureModule('copiloto').then(function (api) {
-          if (isCurrent() && api && typeof api.ativar === 'function') api.ativar({ foco: routeName });
-        }).catch(function () {
-          if (!isCurrent()) return;
-          const home = byId('ai-home-root');
-          if (home) {
-            home.hidden = false;
-            home.innerHTML = '<section class="copiloto-home-card copiloto-state-error" role="alert"><strong>Copiloto indisponível.</strong>' +
-              '<span>As demais tarefas continuam funcionando normalmente.</span></section>';
-          }
-        });
-      }
+      // Optional analysis loads only when the user opens Copiloto. The home
+      // screen must not depend on that service to show patients and tasks.
       return true;
     } catch (error) {
       if (isCurrent()) setRouteStatus(error && error.message ? error.message : 'Não foi possível abrir esta área agora.');

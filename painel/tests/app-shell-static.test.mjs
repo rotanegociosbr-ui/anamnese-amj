@@ -61,14 +61,16 @@ assert.match(js, /AMJFinanceiro\.abrirCadastro\(type, id\)/,
   'cadastros existentes devem abrir pela fonte financeira canônica');
 assert.match(js, /AMJOperacaoClinica\.abrirAtendimento\(id\)/,
   'atendimentos existentes devem abrir pela fonte operacional canônica');
-assert.match(js, /src: '\.\/crm\.js\?v=20260906-4'[\s\S]*?css: '\.\/crm\.css\?v=20260901-1'/,
+assert.match(js, /src: '\.\/crm\.js\?v=20260907-2'[\s\S]*?css: '\.\/crm\.css\?v=20260901-1'/,
   'CRM deve entregar o JS atualizado e manter a versão independente do CSS não alterado');
 assert.match(js, /copiloto: Object\.freeze\(\{[\s\S]*?global: 'AMJCopiloto'[\s\S]*?src: '\.\/copiloto\.js\?v=[^']+'[\s\S]*?css: '\.\/copiloto\.css\?v=[^']+'[\s\S]*?root: 'copiloto-root'/,
   'shell deve registrar o Copiloto como módulo lazy');
 assert.match(js, /data-copiloto-open[\s\S]*?aria-controls="copiloto-drawer"/,
   'topbar deve oferecer acesso global e acessível ao Copiloto');
-assert.match(js, /routeName === 'inicio'[\s\S]*?ensureModule\('copiloto'\)/,
-  'Início deve iniciar o briefing sem bloquear a navegação');
+assert.doesNotMatch(js, /routeName === 'inicio' && isOwner\(\)/,
+  'Início não deve depender de carregar análises opcionais');
+assert.match(js, /if \(copilotButton\)[\s\S]*?ensureModule\('copiloto'\)/,
+  'Copiloto continua acessível sob demanda');
 assert.match(js, /AMJCopiloto\.reset\(\)/,
   'logout deve limpar respostas e cancelar requisições do Copiloto');
 assert.doesNotMatch(js, /navButton\('copiloto', true\)/,
@@ -96,23 +98,21 @@ assert.match(html, /const abas = \['inicio', 'crm', 'marketing', 'fichas', 'agen
 assert.match(html, /id="aba-inicio"/, 'painel Início deve existir no HTML');
 assert.match(html, /id="ai-home-root"[^>]*hidden/,
   'Início deve reservar uma região progressiva para o briefing gerencial');
-assert.match(html, /Dados observados são exibidos como reais; previsões aparecem identificadas como estimativas\./,
-  'Início deve separar fatos observados de previsões');
+assert.match(html, /Encontre os cadastros já salvos/,
+  'Início deve orientar a abertura do que já existe');
 assert.match(html, /id="aba-crm"[\s\S]*?id="crm-root"/,
   'painel CRM deve fornecer somente a raiz do módulo lazy');
 assert.match(html, /id="aba-marketing"[\s\S]*?id="marketing-root"/,
   'painel Marketing deve fornecer somente a raiz do módulo lazy');
-assert.match(html, /data-shell-metric="crm-abertos"[\s\S]*?data-shell-metric="crm-vencidos"/,
-  'Início deve mostrar contadores reais do CRM após o módulo carregar');
-assert.match(html, /data-shell-route="crm" data-shell-action="novo-lead"/,
-  'Início deve oferecer cadastro rápido de lead');
+assert.match(js, /title: 'Relacionamento', routes: \['crm', 'marketing'\]/,
+  'CRM e marketing continuam acessíveis sem repetir cartões na Home');
 assert.match(html, /data-shell-route="estoque" data-shell-action="nova-compra"/,
   'atalho de compra/frete deve abrir Estoque');
 assert.match(html, /data-shell-route="procedimentos" data-shell-action="fotos-atendimento"[^>]*><strong>Adicionar ou tirar fotos<\/strong>/,
   'Início deve oferecer acesso direto às fotos do atendimento');
-assert.match(html, /app-fluxo-etapas[\s\S]*?Paciente[\s\S]*?Procedimento[\s\S]*?Fotos[\s\S]*?Cobrança[\s\S]*?Retorno/,
-  'Início deve conectar visualmente a jornada operacional completa');
-assert.doesNotMatch(html, /app-fluxo-etapas[\s\S]*?data-shell-route="receitas"[\s\S]*?Recebimento/,
-  'jornada da paciente não pode transformar pagamento de procedimento em receita avulsa');
+assert.doesNotMatch(html, /class="app-fluxo-etapas"/,
+  'Home não deve repetir pela terceira vez as mesmas ações');
+assert.match(html, /data-shell-route="cobrancas"[\s\S]*?Cobranças dos procedimentos/,
+  'atalho de pagamento do atendimento deve abrir suas cobranças, não receita avulsa');
 
 console.log('app-shell static: OK');

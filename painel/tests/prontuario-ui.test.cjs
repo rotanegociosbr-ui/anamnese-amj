@@ -154,8 +154,8 @@ assert.match(source, /prontuario-somente-leitura/);
 assert.match(html, /<h2>Prontuários e fotos<\/h2>/);
 assert.match(html, /<option value="during">Durante<\/option>/);
 assert.match(html, /Limite de 25 MB/);
-assert.match(html, /prontuario\.js\?v=20260906-6/);
-assert.match(html, /prontuario\.css\?v=20260906-6/);
+assert.match(html, /prontuario\.js\?v=20260907-2/);
+assert.match(html, /prontuario\.css\?v=20260907-2/);
 assert.match(css, /\.prontuario-paciente-grupo/);
 assert.match(css, /\.prontuario-galerias/);
 assert.match(css, /scroll-margin-top:88px/,

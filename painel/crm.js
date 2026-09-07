@@ -260,12 +260,14 @@
   }
 
   async function protectedRequest(action, payload, options) {
+    const generation = state.generation;
     if (!window.AMJProtecao || typeof window.AMJProtecao.solicitarSenhaRecente !== 'function') {
       throw new Error('A confirmação administrativa não está disponível. Atualize a página.');
     }
     let proof = null;
     try {
       proof = await window.AMJProtecao.solicitarSenhaRecente(options || {});
+      if (generation !== state.generation || !ownerAccess()) throw staleError();
       return await request(action, Object.assign({}, payload || {}, {
         operation_id: proof.operation_id,
         motivo: proof.motivo || 'Alteração comercial confirmada pela gestão'
@@ -588,12 +590,17 @@
   }
 
   async function load(force) {
+    if (!ownerAccess()) return false;
     if (state.loadPromise) return state.loadPromise;
-    if (state.loaded && !force) { render(); return; }
+    if (state.loaded && !force) { render(); return true; }
+    const generation = state.generation;
     state.loading = true;
     const content = byId('crm-content');
     const siteContent = byId('crm-site-content');
-    if (content) { content.setAttribute('aria-busy', 'true'); content.innerHTML = '<div class="crm-loading">Carregando leads…</div>'; }
+    if (content) {
+      content.setAttribute('aria-busy', 'true');
+      if (!state.loaded) content.innerHTML = '<div class="crm-loading">Carregando leads…</div>';
+    }
     if (siteContent) {
       siteContent.setAttribute('aria-busy', 'true');
       if (!state.loaded) siteContent.innerHTML = '<div class="crm-site-empty"><span>Carregando pedidos do site…</span></div>';
@@ -614,19 +621,26 @@
         fillCampaigns();
         render();
         setStatus('CRM atualizado.', false);
+        return true;
       } catch (error) {
-        if (error.code !== 'stale_session' && content) {
-          content.innerHTML = '<div class="crm-error"><strong>Não foi possível carregar os leads.</strong><span>' + escapeHtml(error.message) +
-            '</span><button type="button" class="crm-secondary" data-crm-action="retry">Tentar novamente</button></div>';
-          if (siteContent) siteContent.innerHTML = '<div class="crm-site-empty"><strong>Pedidos indisponíveis</strong>' +
-            '<span>Use “Tentar novamente” para atualizar a caixa de entrada.</span></div>';
-          setStatus(error.message, true);
+        if (generation === state.generation && error.code !== 'stale_session') {
+          if (!state.loaded) {
+            if (content) content.innerHTML = '<div class="crm-error"><strong>Não foi possível carregar os leads.</strong><span>' + escapeHtml(error.message) +
+              '</span><button type="button" class="crm-secondary" data-crm-action="retry">Tentar novamente</button></div>';
+            if (siteContent) siteContent.innerHTML = '<div class="crm-site-empty"><strong>Pedidos indisponíveis</strong>' +
+              '<span>Use “Tentar novamente” para atualizar a caixa de entrada.</span></div>';
+          }
+          setStatus((error.message || 'Não foi possível atualizar o CRM.') + (state.loaded
+            ? ' Exibindo os dados da última atualização. Use Atualizar para tentar novamente.' : ''), true);
         }
+        return false;
       } finally {
-        state.loading = false;
-        if (state.loadPromise === promise) state.loadPromise = null;
-        if (content) content.setAttribute('aria-busy', 'false');
-        if (siteContent) siteContent.setAttribute('aria-busy', 'false');
+        if (state.loadPromise === promise) {
+          state.loading = false;
+          state.loadPromise = null;
+          if (content) content.setAttribute('aria-busy', 'false');
+          if (siteContent) siteContent.setAttribute('aria-busy', 'false');
+        }
       }
     }());
     state.loadPromise = promise;
@@ -635,6 +649,7 @@
 
   async function loadMore() {
     if (state.loadingMore || state.pagination.has_more !== true) return;
+    const generation = state.generation;
     state.loadingMore = true; render(); setStatus('Carregando mais leads…', false);
     try {
       const currentOffset = Number(state.pagination.offset) || 0;
@@ -657,7 +672,7 @@
     } catch (error) {
       if (error.code !== 'stale_session') setStatus(error.message || 'Não foi possível carregar mais leads.', true);
     } finally {
-      state.loadingMore = false; render();
+      if (generation === state.generation) { state.loadingMore = false; render(); }
     }
   }
 
@@ -762,7 +777,7 @@
     try {
       await request('salvar_lead', payload, { idempotencyKey: intentKey('save'), expectedVersion: expected || null });
       clearIntent('save'); resetForm(); byId('crm-editor').open = false;
-      await load(true); setStatus('Lead salvo com sucesso.', false);
+      if (await load(true)) setStatus('Lead salvo com sucesso.', false);
     } catch (error) { if (error.code !== 'stale_session') setStatus(error.message, true); }
     finally { setBusy(form, false); }
   }
@@ -788,8 +803,7 @@
         }));
       }
       clearIntent(intent);
-      await load(true);
-      setStatus(accepting ? 'Pedido aceito e vinculado ao CRM.' : 'Pedido do site arquivado.', false);
+      if (await load(true)) setStatus(accepting ? 'Pedido aceito e vinculado ao CRM.' : 'Pedido do site arquivado.', false);
     } catch (error) {
       if (error.code !== 'stale_session') setStatus(error.message, true);
     } finally {
@@ -804,7 +818,7 @@
         titulo: 'Arquivar lead', motivo: 'Registrar o motivo do arquivamento comercial', motivoObrigatorio: true,
         idempotencyKey: intentKey('archive:' + id), expectedVersion: leadVersion(lead)
       });
-      clearIntent('archive:' + id); await load(true); setStatus('Lead arquivado.', false);
+      clearIntent('archive:' + id); if (await load(true)) setStatus('Lead arquivado.', false);
     } catch (error) { if (error.code !== 'stale_session') setStatus(error.message, true); }
   }
 
@@ -866,7 +880,7 @@
       });
       clearIntent('conversion-review:' + id);
       if (data.convertido === true || data.converted === true) {
-        state.conversionReturnFocus = null; await load(true); setStatus('Conversão concluída pela API.', false); return;
+        state.conversionReturnFocus = null; if (await load(true)) setStatus('Conversão concluída pela API.', false); return;
       }
       renderConversion(data, lead); setStatus('Confira os candidatos antes de continuar.', false);
     } catch (error) { if (error.code !== 'stale_session') setStatus(error.message, true); }
@@ -921,8 +935,8 @@
         idempotencyKey: intentKey(conversionIntentName(mode, patientId)),
         expectedVersion: conversion.version
       });
-      closeConversion(false); await load(true);
-      setStatus('Lead convertido com segurança.', false);
+      closeConversion(false);
+      if (await load(true)) setStatus('Lead convertido com segurança.', false);
       const title = byId('crm-workspace-title'); if (title) title.focus({ preventScroll: true });
     } catch (error) {
       if (error.code === 'candidate_fingerprint_required' || error.code === 'candidate_set_changed' ||
@@ -1010,7 +1024,13 @@
     state.root.innerHTML = shellHtml(); bind(); updateConditionalFields(); renderSiteInbox();
   }
   function ativar() { mount(); if (ownerAccess()) void load(false); }
-  async function abrirLead(id) { ativar(); await load(false); editLead(id); }
+  async function abrirLead(id) {
+    mount();
+    const generation = state.generation;
+    if (!await load(false) || generation !== state.generation || !ownerAccess() || !findLead(id)) return false;
+    editLead(id);
+    return true;
+  }
   function reset() {
     state.generation += 1; state.controllers.forEach(function (controller) { controller.abort(); }); state.controllers.clear();
     state.loaded = false; state.loading = false; state.leads = []; state.owners = []; state.campaigns = []; state.summary = {};

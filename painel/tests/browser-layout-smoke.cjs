@@ -13,7 +13,7 @@ const root = fs.realpathSync(path.resolve(__dirname, '..', '..'));
 const origin = 'https://127.0.0.1:8765';
 const output = fs.mkdtempSync(path.join(os.tmpdir(), 'amj-layout-smoke-'));
 const widths = [360, 390, 430, 1366];
-const routes = ['cotacoes', 'prontuarios', 'procedimentos', 'clientes', 'receitas', 'despesas', 'estoque'];
+const routes = ['inicio', 'cotacoes', 'prontuarios', 'procedimentos', 'clientes', 'receitas', 'despesas', 'estoque'];
 const patient = { id: 'synthetic-client', nome: 'Cliente Sintética de Verificação de Layout',
   full_name: 'Cliente Sintética de Verificação de Layout', version: 1, ativo: true };
 const product = { id: 'synthetic-product', nome: 'Produto Sintético de Apresentação Longa 10 mL',
@@ -50,11 +50,12 @@ function fixture(endpoint, action) {
   }
   if (endpoint === 'financeiro-fichas') {
     const responses = {
-      resumo: { resumo: { receita_recebida: 600, contas_receber: 1200, contas_pagar: 330 }, fluxo_mensal: [] },
+      resumo: { resumo: { receita_recebida: 600, despesa_paga: 0, fluxo_liquido: 600,
+        contas_receber: 1200, contas_pagar: 330, receita_faturada: 1800, despesa_incorrida: 330 }, fluxo_mensal: [] },
       listar_catalogos: { formas_pagamento: [{ codigo: 'pix', nome: 'Pix' }, { codigo: 'boleto', nome: 'Boleto' }],
         fornecedores: [{ id: 'synthetic-supplier', nome: 'Fornecedor Sintético de Teste', ativo: true }],
         marcas: [{ id: 'synthetic-brand', nome: 'Marca Sintética', ativo: true }], produtos: [product] },
-      listar_clientes: { clientes: [patient], paginacao: { tem_mais: false } },
+      listar_clientes: { clientes: [patient], paginacao: { pagina: 1, por_pagina: 100, tem_mais: false } },
       listar_lancamentos: { lancamentos: [revenue, expense] }, listar_auditoria: { auditoria: [] },
       listar_estoque: { estoque: [{ id: 'synthetic-lot', produto_id: product.id, lote: 'LOTE-TESTE',
         saldo: 3, unidade: 'mL', validade: '2027-09-05' }] },
@@ -242,7 +243,7 @@ async function trial(page, selector, label) {
         try {
           console.log(width + ': route ' + route);
           await page.evaluate(async target => { await window.AMJShell.navigate(target, { focus: false }); }, route);
-          const rootSelector = route === 'cotacoes' ? '#cotacoes-root' : route === 'prontuarios' ? '#aba-prontuarios' :
+          const rootSelector = route === 'inicio' ? '#aba-inicio' : route === 'cotacoes' ? '#cotacoes-root' : route === 'prontuarios' ? '#aba-prontuarios' :
             route === 'procedimentos' ? '#operacao-clinica-root' : '#aba-financeiro';
           await page.locator(rootSelector).waitFor({ state: 'visible', timeout: 8000 });
           await page.waitForFunction(selector => !Array.from(document.querySelectorAll(selector + ' [aria-busy="true"], ' + selector + '[aria-busy="true"]')).length, rootSelector);
@@ -252,6 +253,7 @@ async function trial(page, selector, label) {
             await page.locator('.prontuario-foto-card img').first().waitFor({ state: 'visible' });
           }
           if (route === 'procedimentos') {
+            await page.locator('[data-atendimento-card] > summary').first().click();
             await page.locator('[data-fotos-abrir]').first().click();
             await page.locator('input[name="camera"]').first().waitFor({ state: 'visible' });
           }
@@ -265,7 +267,7 @@ async function trial(page, selector, label) {
           ] : route === 'procedimentos' ? [
             ['input[name="camera"]', 'Tirar foto'],
             ['input[name="arquivos"]', 'Adicionar fotos']
-          ] : [['#app-finance-context button', 'Ação financeira contextual']];
+          ] : route === 'inicio' ? [['#aba-inicio [data-shell-route="clientes"]', 'Ver cadastros'], ['#aba-inicio [data-shell-route="prontuarios"]', 'Abrir prontuários e fotos']] : [['#app-finance-context button', 'Ação financeira contextual']];
           const actions = [];
           for (const [selector, label] of checks) actions.push(await trial(page, selector, label));
           report.observations[report.observations.length - 1].actions = actions;

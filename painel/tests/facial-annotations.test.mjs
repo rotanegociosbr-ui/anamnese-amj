@@ -89,11 +89,13 @@ test('a stale list reveal cannot apply after a newer selection or consultation r
 });
 
 // Exercise the actual preview callbacks without WebGL or loading a patient's data.
-const previewSource=readFileSync(new URL('../rosto3d/v2/preview.js',import.meta.url),'utf8');
+const previewSource=readFileSync(new URL('../rosto3d/v2/preview.js',import.meta.url),'utf8').replace(/\r\n?/g,'\n');
 test('preview reveal opens a hidden atlas tissue, restores skin, and preserves current mode when possible',async()=>{
  const state={mode:'appearance',surface:true,opacity:1,muscles:false,arteries:false,nerves:false,bones:true,atlasEyes:true,atlasHair:true,selected:'other',isolated:true},models=[{name:'muscle',userData:{mode:'anatomy',layer:'muscles'}},{name:'surface',userData:{mode:'anatomy',layer:'surface'}},{name:'face',userData:{mode:'appearance',layer:'skin'}}],switched=[],focused=[];
  const context={state,models,tissueLayers:new Set(['muscles','arteries','nerves']),gesture:{clear(){}},stopFocus(){},disposed:false,lost:false,async setMode(mode,options){switched.push([mode,options.reframe]);state.mode=mode;},sync(){},focusPoint(point,mesh,baseChanged){focused.push([point.meshId,mesh.name,baseChanged]);}};
- vm.runInNewContext(previewSource.slice(previewSource.indexOf('async function revealPoint('),previewSource.indexOf('\ntry{\n scene=')),context);
+ const revealStart=previewSource.indexOf('async function revealPoint('),revealEnd=previewSource.indexOf('\ntry{\n scene=',revealStart);
+ assert(revealStart>=0&&revealEnd>revealStart,'Extract only revealPoint, never the module initialization with top-level await');
+ vm.runInNewContext(previewSource.slice(revealStart,revealEnd),context);
  const muscle={mode:'anatomy',meshId:'muscle'};await context.revealPoint(muscle,()=>true);assert.equal(state.mode,'anatomy');assert.equal(state.muscles,true);assert.equal(state.opacity,.23);assert.equal(state.isolated,true);assert.equal(state.selected,'muscle');assert.equal(state.bones,false);assert.deepEqual(switched,[['anatomy',false]]);
  await context.revealPoint(muscle,()=>true);assert.equal(switched.length,1);assert.equal(focused.at(-1)[2],false);
  state.surface=false;await context.revealPoint({mode:'anatomy',meshId:'surface'},()=>true);assert.equal(state.surface,true);assert.equal(state.opacity,1);assert.equal(state.isolated,false);

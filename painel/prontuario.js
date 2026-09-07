@@ -3,7 +3,7 @@
 
   const API = 'https://rjxtxoqprnumouqakxbc.supabase.co/functions/v1/prontuario-fichas';
   const FINANCE_API = 'https://rjxtxoqprnumouqakxbc.supabase.co/functions/v1/financeiro-fichas';
-  const state = { loaded: false, loading: false, patients: [], brands: [], products: [], inventory: [], protocols: [], generation: 0,
+  const state = { loaded: false, loading: false, patients: [], brands: [], products: [], inventory: [], inventoryAvailable: false, protocols: [], generation: 0,
     pendingPatientId: null, pendingProtocolId: null, pendingHistoryPatientId: null, filterPatientId: null, originalProductsSignature: null, editorGeneration: 0,
     photosByProtocol: new Map(), openProtocolIds: new Set(), protocolRevision: 0, pendingProtocolVersions: new Map() };
   const DATE = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeZone: 'America/Sao_Paulo' });
@@ -175,6 +175,14 @@
     return data;
   }
 
+  function accessFailure(error) {
+    return Boolean(error && ([401, 403].includes(Number(error.status)) || [
+      'authorization_required', 'invalid_token', 'session_revoked', 'mfa_required',
+      'membership_required', 'membership_inactive', 'ambiguous_membership', 'role_forbidden',
+      'auth_unavailable', 'session_validation_unavailable', 'membership_unavailable'
+    ].includes(error.code)));
+  }
+
   async function protectedRequest(action, payload, options) {
     if (!window.AMJProtecao || typeof window.AMJProtecao.solicitarSenhaRecente !== 'function') {
       throw new Error('A confirmação administrativa não está disponível. Atualize a página.');
@@ -221,10 +229,12 @@
     const brand = state.brands.find(function (row) { return row.id === item.marca_id; });
     const lots = inventoryForProduct(item.id);
     const balance = lots.reduce(function (sum, lot) { return sum + Number(lot.saldo || 0); }, 0);
-    const stock = item.controla_estoque ? 'estoque ' + balance + ' ' + (item.unidade || '') : '';
+    const stock = item.controla_estoque ? (state.inventoryAvailable
+      ? 'estoque ' + balance + ' ' + (item.unidade || '') : 'estoque não atualizado') : '';
     return [item.nome, brand && brand.nome, stock].filter(Boolean).join(' · ') + (isArchived(item) ? ' · arquivado' : '');
   }
   function inventoryForProduct(productId) {
+    if (!state.inventoryAvailable) return [];
     return state.inventory.filter(function (item) {
       return String(item.produto_id) === String(productId) && Number(item.saldo || 0) > 0;
     });
@@ -456,7 +466,7 @@
       if (lots.length === 1) { lotInput.value = lots[0].lote;expiryInput.value = lots[0].validade || ''; }
     }
     const savedIndex = lots.findIndex(function (lot) { return String(lot.lote) === lotInput.value && String(lot.validade || '') === expiryInput.value; });
-    lotSelect.innerHTML = '<option value="">' + (lots.length ? 'Escolha um lote cadastrado' : 'Nenhum lote disponível') + '</option>' + lots.map(function (lot, index) {
+    lotSelect.innerHTML = '<option value="">' + (!state.inventoryAvailable ? 'Estoque não atualizado' : lots.length ? 'Escolha um lote cadastrado' : 'Nenhum lote disponível') + '</option>' + lots.map(function (lot, index) {
       return '<option value="' + index + '">' + escapeHtml(lot.lote + ' · validade ' + safeDate(lot.validade) + ' · saldo ' + lot.saldo + ' ' + (lot.unidade || '')) + '</option>';
     }).join('') + '<option value="manual">Informar outro lote / completar depois</option>';
     lotSelect.value = savedIndex >= 0 ? String(savedIndex) : lotInput.value || !lots.length ? 'manual' : '';
@@ -464,6 +474,10 @@
     expiryInput.readOnly = savedIndex >= 0 && Boolean(lots[savedIndex].validade);
     if (!product) { hint.textContent = 'Você pode guardar o lote no rascunho e selecionar o produto depois.'; return; }
     if (changedProduct) row.querySelector('.prontuario-produto-unidade').value = displayUnit(product.unidade);
+    if (!state.inventoryAvailable) {
+      hint.textContent = 'O estoque não foi atualizado. O lote e a validade informados foram preservados; você pode continuar o rascunho.';
+      return;
+    }
     const balance = lots.reduce(function (sum, lot) { return sum + Number(lot.saldo || 0); }, 0);
     hint.textContent = lots.length === 1
       ? 'Um lote disponível no cadastro. Ao escolher o produto, lote e validade são preenchidos com os dados já registrados.'
@@ -818,9 +832,12 @@
   async function loadPhotos(protocolId, append) {
     const key = String(protocolId || '');
     if (!key || !ownerAccess()) return;
+    const generation = state.generation;
     const current = photoPage(key);
     if (current && current.loading) return;
     const showArchived = byId('prontuario-mostrar-arquivados').checked;
+    const retained = current && current.includeArchived === showArchived ? current : null;
+    append = Boolean(append && retained);
     const activeElement = document.activeElement;
     const focusedConsultation = activeElement && activeElement.closest
       ? activeElement.closest('[data-prontuario-consulta]')
@@ -833,11 +850,11 @@
       if (restoreSummaryFocus) focusConsultationSummary(key);
     }
     const requestToken = uuid();
-    const pageNumber = append && current ? Number(current.page || 0) + 1 : 1;
+    const pageNumber = append ? Number(retained.page || 0) + 1 : 1;
     const loadingPage = {
-      items: append && current ? current.items.slice() : [],
-      page: append && current ? current.page : 0,
-      hasMore: append && current ? current.hasMore : false,
+      items: retained ? retained.items.slice() : [],
+      page: retained ? retained.page : 0,
+      hasMore: retained ? retained.hasMore : false,
       includeArchived: showArchived,
       requestToken: requestToken,
       loading: true,
@@ -845,7 +862,7 @@
     };
     function requestIsCurrent() {
       const latest = photoPage(key);
-      return Boolean(latest && latest.requestToken === requestToken &&
+      return Boolean(generation === state.generation && latest && latest.requestToken === requestToken &&
         byId('prontuario-mostrar-arquivados').checked === showArchived);
     }
     state.photosByProtocol.set(key, loadingPage);
@@ -858,7 +875,8 @@
         incluir_arquivadas: showArchived
       });
       if (!requestIsCurrent()) return;
-      const incoming = Array.isArray(result.fotos) ? result.fotos : [];
+      if (!Array.isArray(result.fotos)) throw new Error('A galeria não pôde ser atualizada. Tente novamente.');
+      const incoming = result.fotos;
       const combined = append ? loadingPage.items.concat(incoming) : incoming;
       const seen = new Set();
       const items = combined.filter(function (photo) {
@@ -878,7 +896,10 @@
       });
     } catch (error) {
       if (!requestIsCurrent()) return;
+      const keepPrevious = !accessFailure(error) && (!error.status || error.status === 408 || error.status === 429 || error.status >= 500);
       state.photosByProtocol.set(key, Object.assign({}, loadingPage, {
+        items: keepPrevious ? loadingPage.items : [],
+        hasMore: keepPrevious && loadingPage.hasMore,
         loading: false,
         error: error.code === 'clinical_photography_consent_required'
           ? 'Galeria privada indisponível nesta versão do servidor. Atualize a página e tente novamente. O rascunho pode ser salvo sem fotos.'
@@ -927,6 +948,32 @@
     }, MAX_PROTOCOL_PAGES);
   }
 
+  async function collectPatientPages() {
+    const generation = state.generation;
+    const patients = [];
+    const seen = new Set();
+    for (let page = 1; page <= 1000; page += 1) {
+      if (generation !== state.generation || !ownerAccess()) throw new Error('Sessão do prontuário encerrada.');
+      const result = await jsonRequest(FINANCE_API, 'listar_clientes', { pagina: page, por_pagina: 100, incluir_arquivados: true });
+      if (generation !== state.generation || !ownerAccess()) throw new Error('Sessão do prontuário encerrada.');
+      const pagination = result.paginacao;
+      if (!Array.isArray(result.clientes) || pagination &&
+          (Number(pagination.pagina) !== page || typeof pagination.tem_mais !== 'boolean')) {
+        throw new Error('A lista de clientes veio incompleta. Use Atualizar para tentar novamente.');
+      }
+      let added = 0;
+      result.clientes.forEach(function (patient) {
+        if (!patient || !patient.id) throw new Error('Não foi possível conferir a lista de clientes. Use Atualizar.');
+        const id = String(patient.id);
+        if (!seen.has(id)) { seen.add(id); patients.push(patient); added += 1; }
+      });
+      if (result.clientes.length && !added) throw new Error('A paginação de clientes não avançou. Use Atualizar para tentar novamente.');
+      if (pagination ? !pagination.tem_mais : result.clientes.length < 100) return patients;
+      if (!pagination || !added) throw new Error('A paginação de clientes não avançou. Use Atualizar para tentar novamente.');
+    }
+    throw new Error('Não foi possível carregar todos os clientes. A lista anterior foi preservada; tente Atualizar.');
+  }
+
   async function load(options) {
     if (state.loading || !ownerAccess()) return;
     const generation = state.generation;
@@ -936,34 +983,49 @@
     byId('prontuario-lista').setAttribute('aria-busy', 'true');
     if (!silent) status('prontuario-status', 'Atualizando prontuários…', false);
     try {
-      const result = await Promise.all([
-        jsonRequest(FINANCE_API, 'listar_clientes', { por_pagina: 100, incluir_arquivados: true }),
+      const result = await Promise.allSettled([
+        collectPatientPages(),
         jsonRequest(FINANCE_API, 'listar_catalogos', { incluir_arquivados: true }),
         jsonRequest(FINANCE_API, 'listar_estoque', { limite: 500 }),
         loadAllProtocols()
       ]);
-      if (generation !== state.generation) return false;
+      if (generation !== state.generation || !ownerAccess()) return false;
       if (protocolRevision !== state.protocolRevision) {
         status('prontuario-status', refreshRequiredMessage(), false);
         return false;
       }
-      state.patients = Array.isArray(result[0].clientes) ? result[0].clientes : [];
-      state.brands = Array.isArray(result[1].marcas) ? result[1].marcas : [];
-      state.products = Array.isArray(result[1].produtos) ? result[1].produtos : [];
-      state.inventory = Array.isArray(result[2].estoque) ? result[2].estoque : [];
-      state.protocols = Array.isArray(result[3]) ? result[3] : [];
+      const denied = result.find(function (item) { return item.status === 'rejected' && accessFailure(item.reason); });
+      if (denied) throw denied.reason;
+      // Only a fully paginated clinical read can replace the historical snapshot.
+      if (result[3].status !== 'fulfilled') throw result[3].reason;
+      const patients = result[0].status === 'fulfilled' ? result[0].value : {};
+      const catalogs = result[1].status === 'fulfilled' ? result[1].value : {};
+      const inventory = result[2].status === 'fulfilled' ? result[2].value : {};
+      const unavailable = [];
+      if (Array.isArray(patients)) state.patients = patients;
+      else unavailable.push('clientes');
+      if (Array.isArray(catalogs.marcas) && Array.isArray(catalogs.produtos)) {
+        state.brands = catalogs.marcas;
+        state.products = catalogs.produtos;
+      } else unavailable.push('produtos');
+      state.inventoryAvailable = Array.isArray(inventory.estoque);
+      if (state.inventoryAvailable) state.inventory = inventory.estoque;
+      else unavailable.push('estoque');
+      state.protocols = result[3].value;
       state.pendingProtocolVersions.forEach(function (version, id) {
         if (state.protocols.some(function (item) { return String(item.id) === id && expectedVersion(item) >= version; })) {
           state.pendingProtocolVersions.delete(id);
         }
       });
       populateOptions();
+      document.querySelectorAll('.prontuario-produto-linha').forEach(function (row) { syncProductStock(row, false); });
       render();
       state.loaded = true;
       if (!protocolNeedsRefresh(byId('prontuario-id').value) && byId('prontuario-form-status').textContent === refreshRequiredMessage()) {
         status('prontuario-form-status', 'Lista atualizada. Os campos do formulário foram preservados; você pode continuar esta consulta.', false);
       }
-      if (!silent) status('prontuario-status', 'Prontuários atualizados com dados privados do servidor.', false);
+      if (unavailable.length) status('prontuario-status', 'Histórico carregado. Não foi possível atualizar: ' + unavailable.join(', ') + '. Você pode consultar os registros e as fotos; use Atualizar para tentar novamente.', false);
+      else if (!silent) status('prontuario-status', 'Prontuários atualizados com dados privados do servidor.', false);
       if (state.pendingHistoryPatientId) {
         state.pendingHistoryPatientId = null;
         focusHistory();
@@ -988,7 +1050,12 @@
       }
       return true;
     } catch (error) {
-      if (generation === state.generation) status('prontuario-status', error.message, true);
+      if (generation !== state.generation) return false;
+      if ([401, 403].includes(Number(error.status)) && typeof acessoNegado === 'function') {
+        await acessoNegado();
+        return false;
+      }
+      status('prontuario-status', error.message, true);
       return false;
     } finally {
       if (generation === state.generation) {
@@ -1532,6 +1599,7 @@
     state.brands = [];
     state.products = [];
     state.inventory = [];
+    state.inventoryAvailable = false;
     state.protocols = [];
     state.pendingProtocolVersions.clear();
     state.protocolRevision += 1;

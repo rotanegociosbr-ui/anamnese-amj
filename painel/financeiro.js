@@ -15,6 +15,8 @@
     openingEntry: null,
     catalogs: { formas_pagamento: [], fornecedores: [], marcas: [], produtos: [] },
     catalogRevision: 0,
+    clientRevision: 0,
+    unavailableSources: {},
     registryEditorRevisions: { cliente: 0, produto: 0, marca: 0, fornecedor: 0 },
     costs: [],
     inventory: [],
@@ -451,6 +453,31 @@
     renderRegistries();
   }
 
+  function rememberSavedRegistration(type, item) {
+    if (!item || !item.id) return;
+    if (type === 'produto') { rememberSavedProduct(item); return; }
+    const key = type === 'fornecedor' ? 'fornecedores' : 'marcas';
+    const rows = type === 'cliente' ? state.clients : state.catalogs[key];
+    const previous = rows.find(function (row) { return String(row.id) === String(item.id); });
+    if (previous && versionOf(previous) > versionOf(item)) return;
+    // Keep only the acknowledged server version, with the same document
+    // masking used by list endpoints. Editor-only documents stay out of lists.
+    const saved = Object.assign({}, item);
+    if (type === 'cliente') {
+      saved.cpf_mascarado = saved.cpf_mascarado || maskedDocument(saved.cpf);
+      delete saved.cpf;
+    } else if (type === 'fornecedor') {
+      saved.documento_mascarado = saved.documento_mascarado || maskedDocument(saved.documento);
+      delete saved.documento;
+    }
+    const updated = rows.filter(function (row) { return String(row.id) !== String(saved.id); }).concat(saved);
+    updated.sort(function (a, b) { return String(a.nome || '').localeCompare(String(b.nome || ''), LOCALE); });
+    if (type === 'cliente') { state.clients = updated; state.clientRevision += 1; }
+    else { state.catalogs[key] = updated; state.catalogRevision += 1; }
+    populateCatalogs();
+    renderRegistries();
+  }
+
   function populateCatalogs() {
     const catalog = state.catalogs;
     const activeClients = activeRows(state.clients);
@@ -504,7 +531,8 @@
         (brandRow && (brandRow.nome || brandRow.name)) || '';
       const lots = inventoryForProduct(item.id);
       const balance = lots.reduce(function (sum, lot) { return sum + num(lot.saldo); }, 0);
-      const stock = item.controla_estoque ? 'Estoque ' + balance + ' ' + (item.unidade || '') : '';
+      const stock = item.controla_estoque ? (state.unavailableSources.inventory || state.unavailableSources.catalogs
+        ? 'Estoque não atualizado' : 'Estoque ' + balance + ' ' + (item.unidade || '')) : '';
       return [item.nome || item.name, brand, stock].filter(Boolean).join(' · ');
     });
   }
@@ -693,6 +721,7 @@
       '<p class="financeiro-vazio">Nenhum produto encontrado.</p>';
     byId('financeiro-marcas-lista').innerHTML = brandHtml ||
       '<p class="financeiro-vazio">Nenhuma marca encontrada.</p>';
+    renderUnavailableSources();
   }
 
   function showClientsRegistry(query, message) {
@@ -728,7 +757,6 @@
   function renderSummary(data) {
     state.summary = data.resumo || {};
     state.flow = Array.isArray(data.fluxo_mensal) ? data.fluxo_mensal : [];
-    if (Array.isArray(data.ultimos_lancamentos)) state.entries = data.ultimos_lancamentos;
     const summary = state.summary;
     byId('financeiro-kpi-recebido').textContent = money(summary.receita_recebida);
     byId('financeiro-kpi-pago').textContent = money(summary.despesa_paga);
@@ -1278,19 +1306,82 @@
     }
   }
 
+  async function collectClientPages() {
+    const generation = state.generation;
+    const clients = [];
+    const seen = new Set();
+    for (let page = 1; page <= 1000; page += 1) {
+      if (generation !== state.generation || !ownerAccess()) throw staleSessionError();
+      const result = await call('listar_clientes', { pagina: page, por_pagina: 100, incluir_arquivados: true });
+      const pagination = result.paginacao;
+      if (!Array.isArray(result.clientes) || pagination &&
+          (pagination.pagina !== page || typeof pagination.tem_mais !== 'boolean')) {
+        throw new Error('A lista de clientes veio incompleta. Use Atualizar para tentar novamente.');
+      }
+      let added = 0;
+      result.clientes.forEach(function (item) {
+        if (!item || !item.id) throw new Error('Não foi possível conferir a lista de clientes. Use Atualizar.');
+        if (!seen.has(String(item.id))) { seen.add(String(item.id)); clients.push(item); added += 1; }
+      });
+      if (pagination ? !pagination.tem_mais : result.clientes.length < 100) return clients;
+      if (!pagination || !added) throw new Error('A paginação de clientes não avançou. Use Atualizar para tentar novamente.');
+    }
+    throw new Error('Não foi possível carregar todos os clientes. A lista anterior foi preservada; tente Atualizar.');
+  }
+
+  function recordArray(value) {
+    return Array.isArray(value) && value.every(function (item) {
+      return item && typeof item === 'object' && !Array.isArray(item);
+    });
+  }
+
+  function olderRegistryRows(incoming, previous) {
+    const versions = new Map(previous.map(function (item) { return [String(item.id), versionOf(item)]; }));
+    return incoming.some(function (item) { return (versions.get(String(item.id)) || 0) > versionOf(item); });
+  }
+
+  function renderUnavailableSources() {
+    const failed = state.unavailableSources;
+    const emptySource = function (source, rows, elementId, label, countId) {
+      if (!failed[source] || rows.length) return;
+      const element = byId(elementId);
+      if (element) element.innerHTML = '<p class="financeiro-vazio">' + label +
+        ' indisponível no momento. Use Atualizar para tentar novamente.</p>';
+      if (countId && byId(countId)) byId(countId).textContent = '—';
+    };
+    emptySource('clients', state.clients, 'financeiro-clientes-lista', 'Lista de clientes', 'financeiro-clientes-contagem');
+    emptySource('catalogs', state.catalogs.fornecedores, 'financeiro-fornecedores-lista', 'Lista de fornecedores', 'financeiro-fornecedores-contagem');
+    emptySource('catalogs', state.catalogs.marcas, 'financeiro-marcas-lista', 'Lista de marcas', 'financeiro-marcas-contagem');
+    emptySource('catalogs', productRegistry(), 'financeiro-produtos-lista', 'Lista de produtos', 'financeiro-produtos-contagem');
+    emptySource('entries', state.entries, 'financeiro-lista', 'Lista de lançamentos', 'financeiro-contagem');
+    emptySource('audit', state.audit, 'financeiro-auditoria', 'Auditoria');
+    emptySource('inventory', state.inventory, 'financeiro-estoque-resumo', 'Estoque');
+    emptySource('pendingStock', state.pendingStock, 'financeiro-pendencias-estoque', 'Lista de pendências de estoque', 'financeiro-pendencias-contagem');
+    emptySource('duplicateReviews', state.duplicateReviews, 'financeiro-duplicidades-lista', 'Lista de duplicidades');
+    if (failed.summary && !Object.keys(state.summary).length) {
+      ['recebido', 'pago', 'fluxo', 'receber', 'pagar', 'competencia'].forEach(function (key) {
+        const node = byId('financeiro-kpi-' + key);
+        if (node) node.textContent = '—';
+      });
+      const chart = byId('financeiro-grafico');
+      if (chart) { chart.innerHTML = '<p class="financeiro-vazio">Resumo indisponível.</p>'; chart.setAttribute('aria-label', 'Resumo indisponível'); }
+    }
+  }
+
   async function load(options) {
     if (state.loading || !ownerAccess()) return false;
     const generation = state.generation;
     const catalogRevision = state.catalogRevision;
+    const clientRevision = state.clientRevision;
     state.loading = true;
     let completeLoad;
     state.loadCompletion = new Promise(function (resolve) { completeLoad = resolve; });
     status('financeiro-status', options && options.silent ? '' : 'Atualizando dados financeiros…', false);
     byId('financeiro-lista').setAttribute('aria-busy', 'true');
     try {
-      const results = await Promise.all([
+      const settled = await Promise.allSettled([
         call('resumo'), call('listar_catalogos', { incluir_arquivados: true }),
-        call('listar_clientes', { por_pagina: 100, incluir_arquivados: true }),
+        collectClientPages(),
         call('listar_lancamentos', { por_pagina: 100 }), call('listar_auditoria', { limite: 50 }),
         call('listar_estoque', { limite: 500 }),
         call('listar_pendencias_estoque', { limite: 200 }),
@@ -1300,28 +1391,68 @@
         })
       ]);
       if (generation !== state.generation || !ownerAccess()) throw staleSessionError();
-      renderSummary(results[0]);
-      // A refresh begun before a successful product save must not restore its
-      // old version or remove the newly acknowledged draft from the registry.
-      const catalogCurrent = catalogRevision === state.catalogRevision;
-      if (catalogCurrent) state.catalogs = Object.assign(state.catalogs, results[1] || {});
-      state.clients = Array.isArray(results[2].clientes) ? results[2].clientes : [];
-      state.entries = Array.isArray(results[3].lancamentos) ? results[3].lancamentos : state.entries;
-      state.audit = Array.isArray(results[4].auditoria) ? results[4].auditoria : [];
-      state.inventory = Array.isArray(results[5].estoque) ? results[5].estoque : [];
-      state.pendingStock = Array.isArray(results[6].pendencias) ? results[6].pendencias : [];
-      state.duplicateReviews = Array.isArray(results[7].revisoes) ? results[7].revisoes : [];
-      populateCatalogs();
-      renderRegistries();
-      renderInventory();
-      renderPendingStock();
-      renderEntries();
-      renderAudit();
-      renderDuplicateReviews();
-      state.loaded = true;
-      status('financeiro-status', catalogCurrent ? 'Financeiro atualizado com dados do servidor.' :
-        'Produto salvo. A atualização geral começou antes da alteração; use Atualizar para conferir os demais dados.', false);
-      return catalogCurrent;
+      const rejected = settled.filter(function (result) { return result.status === 'rejected'; });
+      const denied = rejected.find(function (result) {
+        const error = result.reason;
+        return error && (error.status === 401 || error.status === 403 || error.code === '401' || error.code === '403');
+      });
+      if (denied) {
+        reset();
+        if (typeof acessoNegado === 'function') await acessoNegado();
+        return false;
+      }
+      if (rejected.some(function (result) { return isStaleSession(result.reason); })) throw staleSessionError();
+      const results = settled.map(function (result) { return result.status === 'fulfilled' ? result.value : null; });
+      const summary = results[0] && results[0].resumo;
+      const numeric = function (value) {
+        return (typeof value === 'number' || typeof value === 'string' && value.trim() !== '') && Number.isFinite(Number(value));
+      };
+      const validSummary = summary && ['receita_recebida', 'despesa_paga', 'fluxo_liquido', 'contas_receber',
+        'contas_pagar', 'receita_faturada', 'despesa_incorrida'].every(function (key) { return numeric(summary[key]); }) &&
+        recordArray(results[0].fluxo_mensal);
+      const catalogKeys = ['formas_pagamento', 'fornecedores', 'marcas', 'produtos'];
+      const validCatalogs = results[1] && catalogKeys.every(function (key) { return recordArray(results[1][key]); }) &&
+        (results[1].produtos_rascunho === undefined || recordArray(results[1].produtos_rascunho));
+      // Preserve acknowledged writes against both in-flight old refreshes and
+      // a replica response carrying an older server version of the same row.
+      const catalogCurrent = validCatalogs && catalogRevision === state.catalogRevision &&
+        ['fornecedores', 'marcas', 'produtos', 'produtos_rascunho'].every(function (key) {
+          return !olderRegistryRows(results[1][key] || [], state.catalogs[key] || []);
+        });
+      const clientsCurrent = recordArray(results[2]) && clientRevision === state.clientRevision &&
+        !olderRegistryRows(results[2], state.clients);
+      const current = [Boolean(validSummary), Boolean(catalogCurrent), Boolean(clientsCurrent)].concat(
+        ['lancamentos', 'auditoria', 'estoque', 'pendencias', 'revisoes'].map(function (key, index) {
+          return Boolean(results[index + 3] && recordArray(results[index + 3][key]));
+        })
+      );
+      const sources = ['summary', 'catalogs', 'clients', 'entries', 'audit', 'inventory', 'pendingStock', 'duplicateReviews'];
+      const labels = ['resumo', 'catálogos', 'clientes', 'lançamentos', 'auditoria', 'estoque', 'pendências de estoque', 'duplicidades'];
+      sources.forEach(function (key, index) { state.unavailableSources[key] = !current[index]; });
+      if (current[0]) renderSummary(results[0]);
+      if (current[1]) state.catalogs = Object.assign(state.catalogs, results[1]);
+      if (current[2]) state.clients = results[2];
+      if (current[3]) state.entries = results[3].lancamentos;
+      if (current[4]) state.audit = results[4].auditoria;
+      if (current[5]) state.inventory = results[5].estoque;
+      if (current[6]) state.pendingStock = results[6].pendencias;
+      if (current[7]) state.duplicateReviews = results[7].revisoes;
+      if (current[1] || current[2] || current[3] || current[5]) populateCatalogs();
+      if (current[1] || current[2]) renderRegistries();
+      // Stock totals depend on both sources; do not present mixed snapshots as new.
+      if (current[1] && current[5]) renderInventory();
+      if (current[6]) renderPendingStock();
+      if (current[3]) renderEntries();
+      if (current[4]) renderAudit();
+      if (current[7]) renderDuplicateReviews();
+      renderUnavailableSources();
+      state.loaded = state.loaded || current.some(Boolean);
+      const failedLabels = labels.filter(function (_, index) { return !current[index]; });
+      status('financeiro-status', failedLabels.length
+        ? 'Atualização parcial. Fontes indisponíveis ou não atualizadas: ' + failedLabels.join(', ') +
+          '. Dados anteriores dessas fontes foram preservados e podem estar desatualizados. Use Atualizar para conferir.'
+        : 'Financeiro atualizado com dados do servidor.', Boolean(failedLabels.length));
+      return !failedLabels.length;
     } catch (error) {
       if (isStaleSession(error)) return false;
       if (error.status === 401 || error.status === 403) {
@@ -1329,8 +1460,10 @@
         if (typeof acessoNegado === 'function') await acessoNegado();
         return false;
       }
-      status('financeiro-status', error.message, true);
-      byId('financeiro-lista').innerHTML = '<p class="financeiro-vazio">Não foi possível carregar o Financeiro.</p>';
+      status('financeiro-status', 'Não foi possível atualizar. Os dados já carregados foram preservados. ' + error.message, true);
+      if (!state.loaded && !state.entries.length) {
+        byId('financeiro-lista').innerHTML = '<p class="financeiro-vazio">Não foi possível carregar o Financeiro. Use Atualizar para tentar novamente.</p>';
+      }
       return false;
     } finally {
       if (generation === state.generation) {
@@ -1358,6 +1491,8 @@
     state.openingEntry = null;
     state.catalogs = { formas_pagamento: [], fornecedores: [], marcas: [], produtos: [] };
     state.catalogRevision += 1;
+    state.clientRevision += 1;
+    state.unavailableSources = {};
     state.costs = [];
     state.inventory = [];
     state.pendingStock = [];
@@ -1858,7 +1993,12 @@
 
   async function openExistingRegistration(type, id) {
     if (!['cliente', 'fornecedor', 'marca', 'produto'].includes(type) || !id) return;
-    if (!recordByType(type, id)) await load({ silent: true });
+    const generation = state.generation;
+    if (!recordByType(type, id)) {
+      if (state.loading && state.loadCompletion) await state.loadCompletion;
+      else await load({ silent: true });
+    }
+    if (generation !== state.generation || !ownerAccess()) return;
     await beginRegistryEdit(type, id);
   }
 
@@ -1980,10 +2120,11 @@
   async function changeRegistryState(type, id, action) {
     const item = recordByType(type, id);
     if (!item) return;
+    const generation = state.generation;
     const restoring = action === 'restaurar';
     const label = item.nome || 'cadastro';
     try {
-      await protectedCall(action + '_' + type, {
+      const result = await protectedCall(action + '_' + type, {
         id: item.id,
         version: versionOf(item)
       }, {
@@ -1993,6 +2134,8 @@
           ' Cadastro: ' + label + '.',
         motivo: (restoring ? 'Restauração' : 'Arquivamento') + ' solicitado pela gestão'
       });
+      if (generation !== state.generation || !ownerAccess()) throw staleSessionError();
+      rememberSavedRegistration(type, result && result[type]);
       status('financeiro-status', label + (restoring ? ' foi restaurado.' : ' foi arquivado com auditoria.'), false);
       if (type === 'cliente' && byId('financeiro-cliente-id').value === String(id)) resetClientEdit();
       if (type !== 'cliente' && byId('financeiro-' + type + '-id').value === String(id)) resetCatalogEdit(type);
@@ -2032,13 +2175,14 @@
         origem_id: candidate ? (candidate.origem_id || candidate.source_id) : null,
         match_method: candidate ? (candidate.match_method || 'manual') : null
       };
+      let result;
       if (clientId) {
         payload.id = clientId;
         payload.version = Number(byId('financeiro-cliente-versao').value);
         delete payload.origem;
         delete payload.origem_id;
         delete payload.match_method;
-        await protectedCall('editar_cliente', payload, {
+        result = await protectedCall('editar_cliente', payload, {
           rotina: true,
           titulo: 'Editar cliente',
           explicacao: 'Confirme a alteração dos dados de ' + payload.nome + '.',
@@ -2046,8 +2190,10 @@
         });
       } else {
         payload.idempotency_key = intentKey('cliente');
-        await call('criar_cliente', payload);
+        result = await call('criar_cliente', payload);
       }
+      if (generation !== state.generation || !ownerAccess()) throw staleSessionError();
+      rememberSavedRegistration('cliente', result && result.cliente);
       if (!sameEditor()) return;
       clearIntent('cliente');
       resetClientEdit();
@@ -2055,9 +2201,11 @@
       const successMessage = clientId ? 'Dados do cliente atualizados.' :
         'Cliente salvo e exibido em Clientes cadastrados.';
       status('financeiro-cliente-status', successMessage, false);
-      await load({ silent: true });
+      const refreshed = await load({ silent: true });
       if (!sameEditor()) return;
-      showClientsRegistry(payload.nome, successMessage);
+      const message = successMessage + (refreshed ? '' : ' Atualização da lista pendente. Use Atualizar para conferir.');
+      status('financeiro-cliente-status', message, false);
+      showClientsRegistry(payload.nome, message);
     } catch (error) {
       if (sameEditor() && !isStaleSession(error)) {
         status('financeiro-cliente-status', error.message, true);
@@ -2070,7 +2218,7 @@
   async function saveRegistry(form, type, payload, statusId, success) {
     if (!requireValid(form)) return;
     const generation = state.generation;
-    const editorRevision = state.registryEditorRevisions[type];
+    let editorRevision = state.registryEditorRevisions[type];
     const sameEditor = function () {
       return generation === state.generation &&
         editorRevision === state.registryEditorRevisions[type];
@@ -2095,6 +2243,7 @@
       if (generation !== state.generation || !ownerAccess()) throw staleSessionError();
       if (sameEditor()) clearIntent('criar_' + type);
       const saved = result && result[type];
+      if (type !== 'produto') rememberSavedRegistration(type, saved);
       if (type !== 'produto' && !sameEditor()) return;
       if (type === 'produto' && saved && saved.id) {
         if (sameEditor()) {
@@ -2106,14 +2255,17 @@
         byId('financeiro-produto-titulo').textContent = 'Editar produto';
         byId('financeiro-produto-salvar').textContent = isProductDraft(saved) ? 'Salvar e continuar depois' : 'Salvar alterações';
         byId('financeiro-produto-cancelar-edicao').classList.remove('oculto');
-      } else resetCatalogEdit(type);
+      } else {
+        resetCatalogEdit(type);
+        editorRevision = state.registryEditorRevisions[type];
+      }
       const savedMessage = isProductDraft(saved) ? 'Rascunho salvo. Use Continuar cadastro para completar os dados, sem criar outro produto.' : id ? 'Cadastro atualizado.' : success;
       status(statusId, savedMessage, false);
       const refreshed = await load({ silent: true });
       if (generation !== state.generation || !ownerAccess()) throw staleSessionError();
       if (!sameEditor()) return;
-      if (type === 'produto' && saved && saved.id && !refreshed) {
-        status(statusId, savedMessage + ' Atualização da lista pendente; o produto e seu preenchimento foram preservados. Use Atualizar para conferir.', false);
+      if (saved && saved.id && !refreshed) {
+        status(statusId, savedMessage + ' Atualização da lista pendente; o cadastro confirmado foi preservado. Use Atualizar para conferir.', false);
       }
     } catch (error) {
       if (!isStaleSession(error) && sameEditor()) {

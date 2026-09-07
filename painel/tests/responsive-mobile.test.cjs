@@ -84,8 +84,8 @@ assert.match(operationCss,
   /@media \(max-width: 900px\)[\s\S]*?\.operacao-fotos-atalho-controles \{ align-items: stretch; grid-template-columns: 1fr; \}/,
   'atalho de fotos deve empilhar seletor e ação em telas estreitas');
 assert.match(shellCss,
-  /@media \(max-width: 840px\)[\s\S]*?\.app-fluxo-etapas \{ grid-template-columns: 1fr; \}/,
-  'jornada interativa do início deve empilhar no celular');
+  /@media \(max-width: 840px\)[\s\S]*?\.app-prioridades \{ grid-template-columns: 1fr; \}/,
+  'os acessos essenciais do início devem empilhar no celular');
 assert.match(shellCss,
   /@media \(max-width: 840px\)[\s\S]*?#aba-financeiro\[data-app-finance-view="produtos"\] \.financeiro-subformularios \{[\s\S]*?grid-template-columns: minmax\(0, 1fr\)/,
   'cadastro e custo de produtos não podem permanecer em duas colunas no celular');

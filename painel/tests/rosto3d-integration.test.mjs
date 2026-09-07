@@ -80,8 +80,8 @@ test('app routing, lazy load, reset and no privileged key added',()=>{
  const html=read(path.join(panel,'index.html')),shell=read(path.join(panel,'app-shell.js'));
  assert.match(html,/id="aba-bt-rosto3d"/);assert.match(html,/id="aba-rosto3d"/);assert.match(html,/AMJRosto3D\.reset\(\)/);
  assert.match(shell,/rosto3d: Object.freeze\(\{ title: 'Rosto 3D'.*owner: true/);
- assert.match(shell,/SECONDARY_ORDER = \['rosto3d'\]/);
- assert.match(shell,/PRIMARY_ORDER = \[[^;]*'clientes', 'prontuarios'/);
+ assert.match(shell,/title: 'Ferramentas e gestão', routes: \['gestao', 'integracoes', 'rosto3d'\]/);
+ assert.match(shell,/title: 'Pacientes e atendimento', routes: \['inicio', 'clientes', 'prontuarios'/);
  assert.doesNotMatch(html,/<iframe/);assert.doesNotMatch(hostSource,/localStorage|sessionStorage|postMessage|service_role/);
  assert.match(hostSource,/functions\/v1\/rosto3d-fichas/);
  assert.match(read(path.join(base,'entry.js')),/app\.frameAllowed\(window\)/);

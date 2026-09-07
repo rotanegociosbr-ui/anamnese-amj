@@ -159,7 +159,7 @@
   function optional(value) { return value === '' ? null : value; }
   function selectedPatientName(id) {
     const row = state.data.clientes.find(function (item) { return item.id === id; });
-    return row ? row.full_name : 'Cliente';
+    return row ? row.full_name : 'Paciente não carregada nesta listagem';
   }
 
   function assertSessionContext(generation) {
@@ -564,6 +564,21 @@
     }
     node.value = current || '';
   }
+  function selectHistoricalValue(node, value, label) {
+    if (value && !Array.from(node.options).some(function (option) { return option.value === value; })) {
+      node.insertAdjacentHTML('beforeend', '<option value="' + escapeHtml(value) + '">' +
+        escapeHtml(label) + ' · vínculo atual preservado</option>');
+    }
+    node.value = value || '';
+  }
+  function resetAttendanceIdentityOptions(form) {
+    form.elements.cliente_id.innerHTML = options(state.data.clientes.filter(function (row) {
+      return !row.archived_at;
+    }), 'id', function (row) { return row.full_name; });
+    form.elements.responsavel_id.innerHTML = options(state.data.responsaveis, 'user_id', function (row) {
+      return row.display_name;
+    });
+  }
   function attendanceFingerprint() {
     const form = bySelector('[data-form-atendimento]');
     if (!form) return '';
@@ -667,6 +682,7 @@
     const form = bySelector('[data-form-atendimento]');
     if (!form) return;
     form.reset();
+    resetAttendanceIdentityOptions(form);
     form.elements.atendimento_id.value = '';
     form.elements.versao.value = '';
     form.elements.realizado_em.value = localNow();
@@ -693,15 +709,18 @@
     const form = bySelector('[data-form-atendimento]');
     if (!row || !form || row.archived_at) return false;
     if (!skipConfirmation && attendanceDirty() && !window.confirm('Há alterações não salvas. Deseja descartá-las e abrir este atendimento?')) return false;
+    resetAttendanceIdentityOptions(form);
     state.attendanceRevision += 1;
     form.elements.atendimento_id.value = row.id;
     form.elements.versao.value = row.version;
-    form.elements.cliente_id.value = row.patient_id;
+    // A saved attendance can outlive an active-patient/member option or lie outside
+    // the independently paginated catalogs. Keep its original IDs, never a default.
+    selectHistoricalValue(form.elements.cliente_id, row.patient_id, selectedPatientName(row.patient_id));
     form.elements.procedimento.value = row.procedure_kind || '';
     form.elements.procedimento.disabled = true;
     form.elements.realizado_em.value = timestampToLocalInput(row.attended_at);
     form.elements.duracao_minutos.value = row.duration_minutes || '';
-    form.elements.responsavel_id.value = row.responsible_user_id || '';
+    selectHistoricalValue(form.elements.responsavel_id, row.responsible_user_id, 'Responsável do atendimento');
     form.elements.status.value = row.status || 'realizado';
     [['agendamento_id',row.appointment_id],['protocolo_id',row.protocol_id],['lancamento_financeiro_id',row.financial_entry_id]].forEach(function (pair) {
       const select = form.elements[pair[0]];
@@ -1176,7 +1195,15 @@
       return;
     }
     const openIds = new Set(all('[data-atendimento-card][open]').map(function (card) { return card.dataset.atendimentoCard; }));
-    const patients = state.data.clientes.slice().sort(function (a, b) {
+    const patients = state.data.clientes.slice();
+    const patientIds = new Set(patients.map(function (patient) { return patient.id; }));
+    state.data.atendimentos.forEach(function (visit) {
+      if (!patientIds.has(visit.patient_id)) {
+        patientIds.add(visit.patient_id);
+        patients.push({ id: visit.patient_id, full_name: selectedPatientName(visit.patient_id) });
+      }
+    });
+    patients.sort(function (a, b) {
       return String(a.full_name || '').localeCompare(String(b.full_name || ''), 'pt-BR');
     });
     node.innerHTML = patients.map(function (patient) {
@@ -2496,8 +2523,11 @@
 
   async function openAttendance(id) {
     const requestedId = String(id || '');
-    if (!requestedId) return false;
-    if (!state.loaded && ownerAccess()) await load();
+    if (!requestedId || !ownerAccess()) return false;
+    const generation = state.generation;
+    if (state.loadPromise) await state.loadPromise;
+    else if (!state.loaded) await load();
+    if (generation !== state.generation || !ownerAccess()) return false;
     const procedure = state.data.procedimentos_atendimento.find(function (item) {
       return item.id === requestedId;
     });

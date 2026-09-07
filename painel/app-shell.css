@@ -117,7 +117,7 @@ body.app-shell-authenticated #tela-lista {
 .app-shell-nav-label {
   margin: 0 9px 8px;
   color: #a89c91;
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 600;
   letter-spacing: .16em;
   text-transform: uppercase;
@@ -146,7 +146,7 @@ body.app-shell-authenticated #tela-lista {
   background: transparent;
   color: #ddd5cc;
   font-family: inherit;
-  font-size: 12.5px;
+  font-size: 14px;
   font-weight: 400;
   text-align: left;
   cursor: pointer;
@@ -396,13 +396,14 @@ body.app-shell-authenticated #tela-lista {
   max-width: 680px;
   margin: 10px 0 0;
   color: var(--app-muted);
-  font-size: 12.5px;
+  font-size: 15px;
+  line-height: 1.55;
 }
 
 .app-prioridades {
   display: grid;
-  grid-template-columns: repeat(5, minmax(170px, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
 }
 
 .app-prioridade {
@@ -440,7 +441,7 @@ body.app-shell-authenticated #tela-lista {
 }
 
 .app-prioridade strong {
-  font-size: 12px;
+  font-size: 16px;
   font-weight: 600;
   line-height: 1.3;
 }
@@ -448,8 +449,8 @@ body.app-shell-authenticated #tela-lista {
 .app-prioridade small {
   margin-top: 5px;
   color: var(--app-muted);
-  font-size: 9.5px;
-  line-height: 1.35;
+  font-size: 13px;
+  line-height: 1.5;
 }
 
 .app-prioridade-icone {
@@ -509,7 +510,7 @@ body.app-shell-authenticated #tela-lista {
 
 .app-secao-titulo > span {
   color: var(--app-muted);
-  font-size: 10.5px;
+  font-size: 13px;
 }
 
 .app-atalhos-grid {
@@ -541,86 +542,17 @@ body.app-shell-authenticated #tela-lista {
 }
 
 .app-atalhos-grid strong {
-  font-size: 12.5px;
+  font-size: 16px;
   font-weight: 600;
 }
 
 .app-atalhos-grid span {
   margin-top: 5px;
   color: var(--app-muted);
-  font-size: 10px;
+  font-size: 13px;
+  line-height: 1.5;
 }
 
-.app-fluxo-conectado {
-  padding: clamp(18px, 2.5vw, 28px);
-  border: 1px solid var(--app-line);
-  border-radius: 18px;
-  background: #fff;
-  box-shadow: var(--app-shadow);
-}
-
-.app-fluxo-etapas {
-  display: grid;
-  align-items: center;
-  grid-template-columns: repeat(4, minmax(0, 1fr) auto) minmax(0, 1fr);
-  gap: 8px;
-}
-
-.app-fluxo-etapas button {
-  display: grid;
-  gap: 3px;
-  min-height: 94px;
-  padding: 13px;
-  border: 1px solid var(--app-line);
-  border-radius: 13px;
-  background: var(--app-surface-soft);
-  color: var(--app-ink);
-  font-family: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.app-fluxo-etapas button:hover,
-.app-fluxo-etapas button:focus-visible {
-  border-color: #c8ad72;
-  background: #fffaf1;
-  transform: translateY(-1px);
-}
-
-.app-fluxo-etapas button > span {
-  color: var(--app-gold);
-  font-size: 10px;
-  font-weight: 700;
-}
-
-.app-fluxo-etapas button > strong { font-size: 12.5px; }
-.app-fluxo-etapas button > small { color: var(--app-muted); font-size: 9.5px; }
-.app-fluxo-etapas > i { color: var(--app-gold); font-size: 18px; font-style: normal; text-align: center; }
-
-.app-fluxo-seguro {
-  margin: 16px 0 0;
-  padding: 17px 18px;
-  border: 1px solid #d7c398;
-  border-left: 4px solid var(--app-gold);
-  border-radius: 5px 14px 14px 5px;
-  background: #fffaf0;
-  color: var(--app-ink);
-  font-size: 10.5px;
-}
-
-.app-fluxo-seguro strong {
-  display: block;
-  margin-bottom: 3px;
-  font-size: 12px;
-}
-
-.app-fluxo-seguro p {
-  margin: 0;
-  color: var(--app-muted);
-  font-size: 10.5px;
-}
-
-/* Cabeçalho contextual usado pelas subdivisões do Financeiro e Procedimentos. */
 .app-route-context,
 .app-procedure-context {
   display: flex;
@@ -958,9 +890,6 @@ body.app-shell-authenticated #tela-lista {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .app-fluxo-etapas { grid-template-columns: 1fr; }
-  .app-fluxo-etapas > i { transform: rotate(90deg); }
-  .app-fluxo-etapas button { min-height: 76px; }
 
   .app-shell-sidebar {
     position: fixed;
@@ -1077,7 +1006,9 @@ body.app-shell-authenticated #tela-lista {
     background: transparent;
     color: var(--app-muted);
     font-family: inherit;
-    font-size: 9px;
+    font-size: 11px;
+    line-height: 1.2;
+    overflow-wrap: anywhere;
     cursor: pointer;
   }
 

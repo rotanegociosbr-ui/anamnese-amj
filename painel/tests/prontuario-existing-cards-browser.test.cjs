@@ -32,7 +32,7 @@ for(const mobile of [false,true])test('existing SQL-shaped draft and signed cons
   if(url.hostname==='rjxtxoqprnumouqakxbc.supabase.co'&&url.pathname.startsWith('/functions/v1/')){
    const body=route.request().postDataJSON()||{};calls.push({...body,endpoint:url.pathname});let result={};
    if(body.acao==='listar_clientes')result={clientes:[patientId,otherPatientId].map(id=>({id,nome:'Paciente fixture existente',ativo:id===patientId,status:id===patientId?'active':'archived',archived_at:id===patientId?null:'2026-09-02T13:00:00+00:00'}))};
-   else if(body.acao==='listar_catalogos')result={produtos:[{id:productId,nome:'Produto fixture',tipo:'toxina',unidade:'U',apresentacao:'Frasco',ativo:true}],produtos_rascunho:[],marcas:[],fornecedores:[]};
+   else if(body.acao==='listar_catalogos')result={produtos:[{id:productId,nome:'Produto fixture',tipo:'toxina',unidade:'U',apresentacao:'Frasco',ativo:true}],produtos_rascunho:[],marcas:[],fornecedores:[],formas_pagamento:[]};
    else if(body.acao==='listar_estoque')result={estoque:[{produto_id:productId,lote:'LOTE EXISTENTE',validade:'2027-01-31',saldo:20,unidade:'U'}]};
    else if(body.acao==='listar'&&url.pathname.endsWith('/prontuario-fichas'))result={ok:true,protocolos:onlyArchived?archivedOnly:protocols,paginacao:{pagina:1,por_pagina:100,tem_mais:false}};
    else if(body.acao==='listar_fotos')result={ok:true,fotos:[],paginacao:{pagina:1,tem_mais:false}};
