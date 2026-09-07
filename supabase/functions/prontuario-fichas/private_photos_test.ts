@@ -19,7 +19,7 @@ const moduleSource=[
  between("function safeText(","function encodePath("),
  between("function tenant(","async function serviceFetch("),
  between("async function assertPhotoUploadPreflight(","async function assertPhotoProductContextPreflight("),
- "export {tenant,assertPhotoUploadPreflight,setup,paths};",
+ "export {tenant,assertPhotoUploadPreflight,assertPhotoReadPreflight,setup,paths};",
 ].join("\n");
 const api=await import("data:application/typescript,"+encodeURIComponent(moduleSource));
 const C="22222222-2222-4222-8222-222222222222",U="11111111-1111-4111-8111-111111111111",P="33333333-3333-4333-8333-333333333333";
@@ -47,8 +47,21 @@ Deno.test("non-owner retains previous consent gate; owner scope comes from authe
  api.setup([[{id:P,status:"draft",archived_at:null}],[]]);
  await assert.rejects(api.assertPhotoUploadPreflight(C,P,null,null,false));
  assert.match(api.paths[1],/protocol_consent_current/);
- assert.match(source,/assertPhotoUploadPreflight\(clinicId, protocolId, null, null, context.role === "owner"\)/);
+ assert.match(source,/assertPhotoReadPreflight\(context, protocolId\)/);
  assert.match(source,/lotSnapshot,\s*context.role === "owner",/);
+});
+Deno.test("read-only archived consultation access is limited to owner AAL2; other roles retain archive and consent gates",async()=>{
+ const owner={authMethod:"supabase_auth",aal:"aal2",role:"owner",clinicId:C,userId:U};
+ api.setup([[{id:P,status:"draft",archived_at:"2026-09-06"}]]);
+ await api.assertPhotoReadPreflight(owner,P);assert.equal(api.paths.length,1);
+ for(const override of [{aal:"aal1"},{authMethod:"legacy"},{clinicId:"invalid"}]){
+  api.setup([]);await assert.rejects(api.assertPhotoReadPreflight({...owner,...override},P));assert.equal(api.paths.length,0);
+ }
+ api.setup([[{id:P,status:"draft",archived_at:"2026-09-06"}]]);
+ await assert.rejects(api.assertPhotoReadPreflight({...owner,role:"professional"},P));
+ api.setup([[{id:P,status:"draft",archived_at:null}],[]]);
+ await assert.rejects(api.assertPhotoReadPreflight({...owner,role:"professional"},P));
+ assert.match(api.paths[1],/protocol_consent_current/);
 });
 Deno.test("private migration neither creates consent nor opens browser RPC access",()=>{
  assert.doesNotMatch(migration,/(insert\s+into|update)\s+public\.protocol_consents/i);

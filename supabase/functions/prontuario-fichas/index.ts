@@ -241,7 +241,7 @@ const DATABASE_ERROR_MESSAGES: Record<string, string> = {
   photo_procedure_item_context_invalid: "A foto não pertence a este item de procedimento.",
   photo_operation_link_invalid: "Revise o vínculo da foto com o atendimento.",
   photo_exact_duplicate:
-    "Este mesmo arquivo já está neste prontuário. Abra a foto existente ou confirme, com senha e motivo, que este registro é distinto.",
+    "Este mesmo arquivo já está neste prontuário. Abra a foto existente ou confirme o motivo para manter este registro como distinto.",
   photo_duplicate_confirmation_stale:
     "A foto existente mudou. Atualize as fotos e tente novamente.",
   photo_not_found: "Foto não encontrada.",
@@ -367,6 +367,33 @@ async function assertPhotoUploadPreflight(
       DATABASE_ERROR_MESSAGES.clinical_photography_consent_required,
     );
   }
+}
+
+async function assertPhotoReadPreflight(
+  context: DualAuthContext,
+  protocolId: string,
+): Promise<void> {
+  const { clinicId } = tenant(context);
+  if (context.role !== "owner") {
+    // Preserve the existing consent and archive restrictions for other roles.
+    await assertPhotoUploadPreflight(clinicId, protocolId, null, null, false);
+    return;
+  }
+  const protocols = await serviceJson(
+    "/rest/v1/protocols?select=id,status,archived_at" +
+      "&clinic_id=eq." + encodeURIComponent(clinicId) +
+      "&id=eq." + encodeURIComponent(protocolId) + "&limit=1",
+  );
+  const protocol = protocols[0];
+  if (!protocol) {
+    throw new ApiError(404, "protocol_not_found_or_locked", DATABASE_ERROR_MESSAGES.protocol_not_found_or_locked);
+  }
+  if (!["draft", "signed"].includes(safeText(protocol.status, 20))) {
+    throw new ApiError(403, "protocol_locked", DATABASE_ERROR_MESSAGES.protocol_locked);
+  }
+  // tenant() requires individual AAL2 authentication. An owner may view the
+  // preserved record of an archived consultation; this neither restores it nor
+  // permits uploads/mutations. Individually archived photos remain unsigned.
 }
 
 async function assertPhotoProductContextPreflight(
@@ -627,7 +654,7 @@ async function handleListPhotos(
   if (!validUuid(protocolId)) {
     throw new ApiError(422, "invalid_protocol", "Prontuário inválido.");
   }
-  await assertPhotoUploadPreflight(clinicId, protocolId, null, null, context.role === "owner");
+  await assertPhotoReadPreflight(context, protocolId);
   const page = positiveInteger(payload.pagina, 1, 100_000);
   const pageSize = positiveInteger(payload.por_pagina, 12, 24);
   const includeArchived = payload.incluir_arquivadas === true;
@@ -1503,7 +1530,7 @@ async function handleAddPhoto(
       throw new ApiError(
         422,
         "duplicate_confirmation_required",
-        "Informe o motivo e confirme sua senha para registrar a foto como distinta.",
+        "Informe e confirme o motivo para registrar a foto como distinta.",
       );
     }
     await requireProtectedOperation(
